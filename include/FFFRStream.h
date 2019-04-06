@@ -169,6 +169,13 @@ public:
      */
     [[nodiscard]] bool seek(int64_t timeStamp) noexcept;
 
+    /**
+     * Seeks the stream to the given frame number.
+     * @param frame The zero-indexed frame number to seek to.
+     * @returns True if it succeeds, false if it fails.
+     */
+    [[nodiscard]] bool seekFrame(int64_t frame) noexcept;
+
 private:
     std::recursive_mutex m_mutex;
 
@@ -182,9 +189,9 @@ private:
     int32_t m_index = -1; /**< Zero-based index of the video stream  */
     CodecContextPtr m_codecContext;
 
-    int64_t m_startTimeStamp = 0; // PTS of the first frame in the stream
+    int64_t m_startTimeStamp = 0; // PTS of the first frame in the stream time base
     int64_t m_totalFrames = 0;    // video duration in frames
-    int64_t m_totalDuration = 0;  // video duration in frames
+    int64_t m_totalDuration = 0;  // video duration in microseconds (AV_TIME_BASE)
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to the stream timebase.
@@ -209,6 +216,14 @@ private:
      * @return The converted time stamp.
      */
     [[nodiscard]] int64_t frameToTimeStamp(int64_t frame) const noexcept;
+
+    /**
+     * Convert a zero-based frame number to time value represented in microseconds (AV_TIME_BASE).
+     * @note This will not be fully accurate when dealing with VFR video streams
+     * @param frame The zero-based frame number
+     * @return The converted time stamp.
+     */
+    [[nodiscard]] int64_t frameToTime(int64_t frame) const noexcept;
 
     /**
      * Convert stream based time stamp to an equivalent zero-based frame number.
@@ -238,7 +253,7 @@ private:
     //[[nodiscard]] int getCodecDelay() const noexcept;
 
     /**
-     * Gets stream start time.
+     * Gets stream start time in the stream timebase.
      * @returns The stream start time.
      */
     [[nodiscard]] int64_t getStreamStartTime() noexcept;

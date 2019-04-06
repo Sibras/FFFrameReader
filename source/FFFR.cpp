@@ -217,6 +217,24 @@ variant<bool, vector<FrameInterface>> StreamInterface::getNextFrameSequence(cons
     return false;
 }
 
+bool StreamInterface::seek(const int64_t timeStamp) const noexcept
+{
+    // Check if initialised to a valid stream
+    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+
+    // Call the member function
+    return m_stream->seek(timeStamp);
+}
+
+bool StreamInterface::seekFrame(const int64_t frame) const noexcept
+{
+    // Check if initialised to a valid stream
+    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+
+    // Call the member function
+    return m_stream->seekFrame(frame);
+}
+
 StreamInterface::StreamInterface(shared_ptr<Stream> stream) noexcept
     : m_stream(move(stream))
 {}

@@ -158,6 +158,20 @@ public:
     [[nodiscard]] std::variant<bool, std::vector<FrameInterface>> getNextFrameSequence(
         const std::vector<uint64_t>& frameSequence) const noexcept;
 
+    /**
+     * Seeks the stream to the given time stamp.
+     * @param timeStamp The time stamp to seek to (in micro-seconds).
+     * @returns True if it succeeds, false if it fails.
+     */
+    [[nodiscard]] bool seek(int64_t timeStamp) const noexcept;
+
+    /**
+     * Seeks the stream to the given frame number.
+     * @param frame The zero-indexed frame number to seek to.
+     * @returns True if it succeeds, false if it fails.
+     */
+    [[nodiscard]] bool seekFrame(int64_t frame) const noexcept;
+
 protected:
     explicit StreamInterface(std::shared_ptr<Stream> stream) noexcept;
 

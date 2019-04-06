@@ -162,6 +162,81 @@ TEST_F(StreamTest1, getFrameNumberLoop)
     }
 }
 
-// TODO: seek test
+TEST_F(StreamTest1, seek)
+{
+    ASSERT_TRUE(m_stream.seek(40000 * 80));
+    const auto ret1 = m_stream.getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    const auto frame1 = std::get<1>(ret1);
+    ASSERT_EQ(frame1.getTimeStamp(), 40000 * 80);
+}
+
+TEST_F(StreamTest1, seekSmall)
+{
+    // First fill the buffer
+    ASSERT_NE(m_stream.getNextFrame().index(), 0);
+    // Seek forward 2 frames only. This should just increment the existing buffer
+    ASSERT_TRUE(m_stream.seek(40000 * 2));
+    const auto ret1 = m_stream.getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    const auto frame1 = std::get<1>(ret1);
+    ASSERT_EQ(frame1.getTimeStamp(), 40000 * 2);
+}
+
+TEST_F(StreamTest1, seekMedium)
+{
+    // First fill the buffer
+    ASSERT_NE(m_stream.getNextFrame().index(), 0);
+    // Seek forward 1.5 * bufferSize frame
+    ASSERT_TRUE(m_stream.seek(40000 * 15));
+    const auto ret1 = m_stream.getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    const auto frame1 = std::get<1>(ret1);
+    ASSERT_EQ(frame1.getTimeStamp(), 40000 * 15);
+}
+
+TEST_F(StreamTest1, seekLoop)
+{
+    int64_t timeStamp = 0;
+    // Perform multiple forward seeks
+    for (uint32_t i = 0; i < 5; i++) {
+        ASSERT_TRUE(m_stream.seek(timeStamp));
+        // Check that multiple sequential frames can be read
+        int64_t timeStamp2 = timeStamp;
+        for (uint32_t j = 0; j < 25; j++) {
+            const auto ret1 = m_stream.getNextFrame();
+            ASSERT_NE(ret1.index(), 0);
+            const auto frame1 = std::get<1>(ret1);
+            ASSERT_EQ(frame1.getTimeStamp(), timeStamp2);
+            timeStamp2 += 40000;
+        }
+        timeStamp += 40000 * 40;
+    }
+}
+
+TEST_F(StreamTest1, seekBack)
+{
+    // Seek forward
+    ASSERT_TRUE(m_stream.seek(40000 * 80));
+    auto ret1 = m_stream.getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    auto frame1 = std::get<1>(ret1);
+    ASSERT_EQ(frame1.getTimeStamp(), 40000 * 80);
+    // Seek back
+    ASSERT_TRUE(m_stream.seek(0));
+    ret1 = m_stream.getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    frame1 = std::get<1>(ret1);
+    ASSERT_EQ(frame1.getTimeStamp(), 0);
+}
+
+TEST_F(StreamTest1, seekFrame)
+{
+    ASSERT_TRUE(m_stream.seekFrame(80));
+    const auto ret1 = m_stream.getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    const auto frame1 = std::get<1>(ret1);
+    ASSERT_EQ(frame1.getFrameNumber(), 80);
+}
 
 // TODO: do all the same tests for each of the input data files
