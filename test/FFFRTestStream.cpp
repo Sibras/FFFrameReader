@@ -27,54 +27,55 @@ protected:
 
     void SetUp() override
     {
-        const auto ret = Interface::getStream(g_test1File);
+        auto ret = m_manager.getStream(g_test1File);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
     }
 
     ~StreamTest1() override
     {
-        Interface::releaseStream(g_test1File);
+        m_manager.releaseStream(g_test1File);
     }
 
-    StreamInterface m_stream;
+    Manager m_manager;
+    std::shared_ptr<Stream> m_stream;
 };
 
 TEST_F(StreamTest1, getWidth)
 {
-    ASSERT_EQ(m_stream.getWidth(), 3840);
+    ASSERT_EQ(m_stream->getWidth(), 3840);
 }
 
 TEST_F(StreamTest1, getHeight)
 {
-    ASSERT_EQ(m_stream.getHeight(), 2160);
+    ASSERT_EQ(m_stream->getHeight(), 2160);
 }
 
 TEST_F(StreamTest1, getAspectRatio)
 {
-    ASSERT_DOUBLE_EQ(m_stream.getAspectRatio(), 16.0 / 9.0);
+    ASSERT_DOUBLE_EQ(m_stream->getAspectRatio(), 16.0 / 9.0);
 }
 
 TEST_F(StreamTest1, getTotalFrames)
 {
-    ASSERT_EQ(m_stream.getTotalFrames(), 1296);
+    ASSERT_EQ(m_stream->getTotalFrames(), 1296);
 }
 
 TEST_F(StreamTest1, getDuration)
 {
-    ASSERT_EQ(m_stream.getDuration(), 2073600000);
+    ASSERT_EQ(m_stream->getDuration(), 2073600000);
 }
 
 TEST_F(StreamTest1, getNextFrame)
 {
-    ASSERT_NE(m_stream.getNextFrame().index(), 0);
+    ASSERT_NE(m_stream->getNextFrame().index(), 0);
 }
 
 TEST_F(StreamTest1, getNextFrame2)
 {
-    const auto ret1 = m_stream.getNextFrame();
+    const auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
-    const auto ret2 = m_stream.getNextFrame();
+    const auto ret2 = m_stream->getNextFrame();
     ASSERT_NE(ret2.index(), 0);
     // TODO: Check that the frames are in fact different
 }
@@ -83,7 +84,7 @@ TEST_F(StreamTest1, getNextFrameLoop)
 {
     // Ensure that multiple frames can be read
     for (uint32_t i = 0; i < 25; i++) {
-        const auto ret1 = m_stream.getNextFrame();
+        const auto ret1 = m_stream->getNextFrame();
         ASSERT_NE(ret1.index(), 0);
     }
 }
@@ -95,45 +96,46 @@ protected:
 
     void SetUp() override
     {
-        const auto ret = Interface::getStream(g_test1File);
+        const auto ret = m_manager.getStream(g_test1File);
         ASSERT_NE(ret.index(), 0);
         const auto stream = std::get<1>(ret);
-        const auto ret1 = stream.getNextFrame();
+        const auto ret1 = stream->getNextFrame();
         ASSERT_NE(ret1.index(), 0);
         m_frame = std::get<1>(ret1);
     }
 
     ~FrameTest1() override
     {
-        Interface::releaseStream(g_test1File);
+        m_manager.releaseStream(g_test1File);
     }
 
-    FrameInterface m_frame;
+    Manager m_manager;
+    std::shared_ptr<Frame> m_frame;
 };
 
 TEST_F(FrameTest1, getTimeStamp)
 {
-    ASSERT_EQ(m_frame.getTimeStamp(), 0);
+    ASSERT_EQ(m_frame->getTimeStamp(), 0);
 }
 
 TEST_F(FrameTest1, getFrameNumber)
 {
-    ASSERT_EQ(m_frame.getFrameNumber(), 0);
+    ASSERT_EQ(m_frame->getFrameNumber(), 0);
 }
 
 TEST_F(FrameTest1, getWidth)
 {
-    ASSERT_EQ(m_frame.getWidth(), 3840);
+    ASSERT_EQ(m_frame->getWidth(), 3840);
 }
 
 TEST_F(FrameTest1, getHeight)
 {
-    ASSERT_EQ(m_frame.getHeight(), 2160);
+    ASSERT_EQ(m_frame->getHeight(), 2160);
 }
 
 TEST_F(FrameTest1, getAspectRatio)
 {
-    ASSERT_DOUBLE_EQ(m_frame.getAspectRatio(), 16.0 / 9.0);
+    ASSERT_DOUBLE_EQ(m_frame->getAspectRatio(), 16.0 / 9.0);
 }
 
 TEST_F(StreamTest1, getTimeStampLoop)
@@ -141,10 +143,10 @@ TEST_F(StreamTest1, getTimeStampLoop)
     // Ensure that multiple frames can be read
     int64_t timeStamp = 0;
     for (uint32_t i = 0; i < 25; i++) {
-        const auto ret1 = m_stream.getNextFrame();
+        const auto ret1 = m_stream->getNextFrame();
         ASSERT_NE(ret1.index(), 0);
         const auto frame1 = std::get<1>(ret1);
-        ASSERT_EQ(frame1.getTimeStamp(), timeStamp);
+        ASSERT_EQ(frame1->getTimeStamp(), timeStamp);
         timeStamp += 40000;
     }
 }
@@ -154,45 +156,45 @@ TEST_F(StreamTest1, getFrameNumberLoop)
     // Ensure that multiple frames can be read
     int64_t frameNum = 0;
     for (uint32_t i = 0; i < 25; i++) {
-        const auto ret1 = m_stream.getNextFrame();
+        const auto ret1 = m_stream->getNextFrame();
         ASSERT_NE(ret1.index(), 0);
         const auto frame1 = std::get<1>(ret1);
-        ASSERT_EQ(frame1.getFrameNumber(), frameNum);
+        ASSERT_EQ(frame1->getFrameNumber(), frameNum);
         ++frameNum;
     }
 }
 
 TEST_F(StreamTest1, seek)
 {
-    ASSERT_TRUE(m_stream.seek(40000 * 80));
-    const auto ret1 = m_stream.getNextFrame();
+    ASSERT_TRUE(m_stream->seek(40000 * 80));
+    const auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
     const auto frame1 = std::get<1>(ret1);
-    ASSERT_EQ(frame1.getTimeStamp(), 40000 * 80);
+    ASSERT_EQ(frame1->getTimeStamp(), 40000 * 80);
 }
 
 TEST_F(StreamTest1, seekSmall)
 {
     // First fill the buffer
-    ASSERT_NE(m_stream.getNextFrame().index(), 0);
+    ASSERT_NE(m_stream->getNextFrame().index(), 0);
     // Seek forward 2 frames only. This should just increment the existing buffer
-    ASSERT_TRUE(m_stream.seek(40000 * 2));
-    const auto ret1 = m_stream.getNextFrame();
+    ASSERT_TRUE(m_stream->seek(40000 * 2));
+    const auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
     const auto frame1 = std::get<1>(ret1);
-    ASSERT_EQ(frame1.getTimeStamp(), 40000 * 2);
+    ASSERT_EQ(frame1->getTimeStamp(), 40000 * 2);
 }
 
 TEST_F(StreamTest1, seekMedium)
 {
     // First fill the buffer
-    ASSERT_NE(m_stream.getNextFrame().index(), 0);
+    ASSERT_NE(m_stream->getNextFrame().index(), 0);
     // Seek forward 1.5 * bufferSize frame
-    ASSERT_TRUE(m_stream.seek(40000 * 15));
-    const auto ret1 = m_stream.getNextFrame();
+    ASSERT_TRUE(m_stream->seek(40000 * 15));
+    const auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
     const auto frame1 = std::get<1>(ret1);
-    ASSERT_EQ(frame1.getTimeStamp(), 40000 * 15);
+    ASSERT_EQ(frame1->getTimeStamp(), 40000 * 15);
 }
 
 TEST_F(StreamTest1, seekLoop)
@@ -200,14 +202,14 @@ TEST_F(StreamTest1, seekLoop)
     int64_t timeStamp = 0;
     // Perform multiple forward seeks
     for (uint32_t i = 0; i < 5; i++) {
-        ASSERT_TRUE(m_stream.seek(timeStamp));
+        ASSERT_TRUE(m_stream->seek(timeStamp));
         // Check that multiple sequential frames can be read
         int64_t timeStamp2 = timeStamp;
         for (uint32_t j = 0; j < 25; j++) {
-            const auto ret1 = m_stream.getNextFrame();
+            const auto ret1 = m_stream->getNextFrame();
             ASSERT_NE(ret1.index(), 0);
             const auto frame1 = std::get<1>(ret1);
-            ASSERT_EQ(frame1.getTimeStamp(), timeStamp2);
+            ASSERT_EQ(frame1->getTimeStamp(), timeStamp2);
             timeStamp2 += 40000;
         }
         timeStamp += 40000 * 40;
@@ -217,26 +219,28 @@ TEST_F(StreamTest1, seekLoop)
 TEST_F(StreamTest1, seekBack)
 {
     // Seek forward
-    ASSERT_TRUE(m_stream.seek(40000 * 80));
-    auto ret1 = m_stream.getNextFrame();
+    ASSERT_TRUE(m_stream->seek(40000 * 80));
+    auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
     auto frame1 = std::get<1>(ret1);
-    ASSERT_EQ(frame1.getTimeStamp(), 40000 * 80);
+    ASSERT_EQ(frame1->getTimeStamp(), 40000 * 80);
     // Seek back
-    ASSERT_TRUE(m_stream.seek(0));
-    ret1 = m_stream.getNextFrame();
+    ASSERT_TRUE(m_stream->seek(0));
+    ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
     frame1 = std::get<1>(ret1);
-    ASSERT_EQ(frame1.getTimeStamp(), 0);
+    ASSERT_EQ(frame1->getTimeStamp(), 0);
 }
 
 TEST_F(StreamTest1, seekFrame)
 {
-    ASSERT_TRUE(m_stream.seekFrame(80));
-    const auto ret1 = m_stream.getNextFrame();
+    ASSERT_TRUE(m_stream->seekFrame(80));
+    const auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
     const auto frame1 = std::get<1>(ret1);
-    ASSERT_EQ(frame1.getFrameNumber(), 80);
+    ASSERT_EQ(frame1->getFrameNumber(), 80);
 }
+
+// TODO: Test getNextFrameSequence
 
 // TODO: do all the same tests for each of the input data files

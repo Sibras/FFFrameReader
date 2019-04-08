@@ -24,108 +24,6 @@ extern "C" {
 }
 
 namespace FfFrameReader {
-Stream::FormatContextPtr::FormatContextPtr(AVFormatContext* formatContext) noexcept
-    : m_formatContext(formatContext)
-{}
-
-Stream::FormatContextPtr::~FormatContextPtr() noexcept
-{
-    if (m_formatContext != nullptr) {
-        avformat_close_input(&m_formatContext);
-    }
-}
-
-Stream::FormatContextPtr::FormatContextPtr(FormatContextPtr&& other) noexcept
-    : m_formatContext(other.m_formatContext)
-{
-    other.m_formatContext = nullptr;
-}
-
-Stream::FormatContextPtr& Stream::FormatContextPtr::operator=(FormatContextPtr& other) noexcept
-{
-    m_formatContext = other.m_formatContext;
-    other.m_formatContext = nullptr;
-    return *this;
-}
-
-Stream::FormatContextPtr& Stream::FormatContextPtr::operator=(FormatContextPtr&& other) noexcept
-{
-    m_formatContext = other.m_formatContext;
-    other.m_formatContext = nullptr;
-    return *this;
-}
-
-AVFormatContext*& Stream::FormatContextPtr::operator*() noexcept
-{
-    return m_formatContext;
-}
-
-const AVFormatContext* Stream::FormatContextPtr::operator*() const noexcept
-{
-    return m_formatContext;
-}
-
-AVFormatContext*& Stream::FormatContextPtr::operator->() noexcept
-{
-    return m_formatContext;
-}
-
-const AVFormatContext* Stream::FormatContextPtr::operator->() const noexcept
-{
-    return m_formatContext;
-}
-
-Stream::CodecContextPtr::CodecContextPtr(AVCodecContext* codecContext) noexcept
-    : m_codecContext(codecContext)
-{}
-
-Stream::CodecContextPtr::~CodecContextPtr() noexcept
-{
-    if (m_codecContext != nullptr) {
-        avcodec_close(m_codecContext);
-    }
-}
-
-Stream::CodecContextPtr::CodecContextPtr(CodecContextPtr&& other) noexcept
-    : m_codecContext(other.m_codecContext)
-{
-    other.m_codecContext = nullptr;
-}
-
-Stream::CodecContextPtr& Stream::CodecContextPtr::operator=(CodecContextPtr& other) noexcept
-{
-    m_codecContext = other.m_codecContext;
-    other.m_codecContext = nullptr;
-    return *this;
-}
-
-Stream::CodecContextPtr& Stream::CodecContextPtr::operator=(CodecContextPtr&& other) noexcept
-{
-    m_codecContext = other.m_codecContext;
-    other.m_codecContext = nullptr;
-    return *this;
-}
-
-AVCodecContext*& Stream::CodecContextPtr::operator*() noexcept
-{
-    return m_codecContext;
-}
-
-const AVCodecContext* Stream::CodecContextPtr::operator*() const noexcept
-{
-    return m_codecContext;
-}
-
-AVCodecContext*& Stream::CodecContextPtr::operator->() noexcept
-{
-    return m_codecContext;
-}
-
-const AVCodecContext* Stream::CodecContextPtr::operator->() const noexcept
-{
-    return m_codecContext;
-}
-
 Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecContextPtr& codecContext,
     const uint32_t bufferLength) noexcept
     : m_bufferLength(bufferLength)
@@ -144,6 +42,34 @@ Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecCon
     }
     m_totalFrames = getStreamFrames();
     m_totalDuration = getStreamDuration();
+}
+
+Stream::FormatContextPtr::FormatContextPtr(AVFormatContext* formatContext) noexcept
+    : m_formatContext(formatContext, [](AVFormatContext* p) { avformat_close_input(&p); })
+{}
+
+AVFormatContext* Stream::FormatContextPtr::operator->() const noexcept
+{
+    return m_formatContext.get();
+}
+
+AVFormatContext* Stream::FormatContextPtr::get() const noexcept
+{
+    return m_formatContext.get();
+}
+
+Stream::CodecContextPtr::CodecContextPtr(AVCodecContext* codecContext) noexcept
+    : m_codecContext(codecContext, avcodec_close)
+{}
+
+AVCodecContext* Stream::CodecContextPtr::operator->() const noexcept
+{
+    return m_codecContext.get();
+}
+
+AVCodecContext* Stream::CodecContextPtr::get() const noexcept
+{
+    return m_codecContext.get();
 }
 
 uint32_t Stream::getWidth() const noexcept
@@ -289,9 +215,9 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     }
 
     // Seek to desired timestamp
-    avcodec_flush_buffers(*m_codecContext);
+    avcodec_flush_buffers(m_codecContext.get());
     const auto localTimeStamp = timeToTimeStamp(timeStamp);
-    const auto err = avformat_seek_file(*m_formatContext, m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
+    const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
         av_log(nullptr, AV_LOG_ERROR, "Failed to seek to specified time stamp %d: %s", timeStamp,
@@ -360,7 +286,7 @@ bool Stream::decodeNextBlock() noexcept
     av_init_packet(&packet);
     while (true) {
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
-        int32_t ret = av_read_frame(*m_formatContext, &packet);
+        int32_t ret = av_read_frame(m_formatContext.get(), &packet);
         if (ret < 0) {
             if (ret != AVERROR_EOF) {
                 char buffer[AV_ERROR_MAX_STRING_SIZE];
@@ -372,7 +298,7 @@ bool Stream::decodeNextBlock() noexcept
         }
 
         if (m_index == packet.stream_index) {
-            ret = avcodec_send_packet(*m_codecContext, &packet);
+            ret = avcodec_send_packet(m_codecContext.get(), &packet);
             av_packet_unref(&packet);
             if (ret < 0) {
                 char buffer[AV_ERROR_MAX_STRING_SIZE];
@@ -390,7 +316,7 @@ bool Stream::decodeNextBlock() noexcept
                     }
                 }
 
-                ret = avcodec_receive_frame(*m_codecContext, *frame);
+                ret = avcodec_receive_frame(m_codecContext.get(), *frame);
                 if (ret < 0) {
                     av_frame_unref(*frame);
                     if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF)) {
@@ -442,7 +368,7 @@ int Stream::getCodecDelay() const noexcept
         m_codecContext->has_b_frames;
 }*/
 
-int64_t Stream::getStreamStartTime() noexcept
+int64_t Stream::getStreamStartTime() const noexcept
 {
     // First check if the stream has a start timeStamp
     AVStream* stream = m_formatContext->streams[m_index];
@@ -450,14 +376,14 @@ int64_t Stream::getStreamStartTime() noexcept
         return stream->start_time;
     }
     // Seek to the first frame in the video to get information directly from it
-    avcodec_flush_buffers(*m_codecContext);
-    if (av_seek_frame(*m_formatContext, m_index, 0, 0) >= 0) {
+    avcodec_flush_buffers(m_codecContext.get());
+    if (av_seek_frame(m_formatContext.get(), m_index, 0, 0) >= 0) {
         AVPacket packet;
         av_init_packet(&packet);
         // Read frames until we get one for the video stream that contains a valid PTS or DTS.
         auto startTimeStamp = int64_t(AV_NOPTS_VALUE);
         do {
-            if (av_read_frame(*m_formatContext, &packet) < 0) {
+            if (av_read_frame(m_formatContext.get(), &packet) < 0) {
                 return 0;
             }
             if (packet.stream_index == m_index) {
@@ -476,7 +402,7 @@ int64_t Stream::getStreamStartTime() noexcept
     return 0;
 }
 
-int64_t Stream::getStreamFrames() noexcept
+int64_t Stream::getStreamFrames() const noexcept
 {
     // First try and get the format duration if specified. For some formats this durations can override the duration
     // specified within each stream which is why it should be checked first.
@@ -508,13 +434,13 @@ int64_t Stream::getStreamFrames() noexcept
     int64_t foundTimeStamp = m_startTimeStamp;
 
     // Seek last key-frame.
-    avcodec_flush_buffers(*m_codecContext);
-    av_seek_frame(*m_formatContext, m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD);
+    avcodec_flush_buffers(m_codecContext.get());
+    av_seek_frame(m_formatContext.get(), m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD);
 
     // Read up to last frame, extending max PTS for every valid PTS value found for the video stream.
     AVPacket packet;
     av_init_packet(&packet);
-    while (av_read_frame(*m_formatContext, &packet) >= 0) {
+    while (av_read_frame(m_formatContext.get(), &packet) >= 0) {
         if (packet.stream_index == m_index) {
             auto found = packet.dts;
             if (found != int64_t(AV_NOPTS_VALUE)) {
@@ -531,7 +457,7 @@ int64_t Stream::getStreamFrames() noexcept
     return 1 + timeStampToFrame(foundTimeStamp);
 }
 
-int64_t Stream::getStreamDuration() noexcept
+int64_t Stream::getStreamDuration() const noexcept
 {
     // First try and get the format duration if specified. For some formats this durations can override the duration
     // specified within each stream which is why it should be checked first.
@@ -549,13 +475,13 @@ int64_t Stream::getStreamDuration() noexcept
     int64_t foundTimeStamp = m_startTimeStamp;
 
     // Seek last key-frame.
-    avcodec_flush_buffers(*m_codecContext);
-    av_seek_frame(*m_formatContext, m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD);
+    avcodec_flush_buffers(m_codecContext.get());
+    av_seek_frame(m_formatContext.get(), m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD);
 
     // Read up to last frame, extending max PTS for every valid PTS value found for the video stream.
     AVPacket packet;
     av_init_packet(&packet);
-    while (av_read_frame(*m_formatContext, &packet) >= 0) {
+    while (av_read_frame(m_formatContext.get(), &packet) >= 0) {
         if (packet.stream_index == m_index) {
             auto found = packet.dts;
             if (found != int64_t(AV_NOPTS_VALUE)) {

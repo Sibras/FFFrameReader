@@ -21,6 +21,7 @@ extern "C" {
 #include <libavutil/hwcontext.h>
 #include <libavutil/log.h>
 }
+
 using namespace std;
 
 static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const enum AVPixelFormat* pixelFormats)
@@ -66,9 +67,9 @@ DecoderContext::DecoderContext(const DecodeType type, const uint32_t bufferLengt
         // TODO: Allow specifying the device to use
 
         // Create the hardware context for decoding
-        int err;
-        if ((err = av_hwdevice_ctx_create(
-                 &m_deviceContext, decodeTypeToFFmpeg(m_deviceType), device.c_str(), nullptr, 0)) < 0) {
+        const int err =
+            av_hwdevice_ctx_create(&m_deviceContext, decodeTypeToFFmpeg(m_deviceType), device.c_str(), nullptr, 0);
+        if (err < 0) {
             char buffer[AV_ERROR_MAX_STRING_SIZE];
             av_log(nullptr, AV_LOG_ERROR, "Failed to create specified hardware device: %s",
                 av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, err));
@@ -86,17 +87,18 @@ DecoderContext::~DecoderContext() noexcept
     }
 }
 
-variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filename) noexcept
+variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filename) const noexcept
 {
-    Stream::FormatContextPtr tempFormat;
-    auto ret = avformat_open_input(&*tempFormat, filename.c_str(), nullptr, nullptr);
+    AVFormatContext* formatPtr = nullptr;
+    auto ret = avformat_open_input(&formatPtr, filename.c_str(), nullptr, nullptr);
+    Stream::FormatContextPtr tempFormat(formatPtr);
     if (ret < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
         av_log(nullptr, AV_LOG_ERROR, "Failed to open input stream '%s': %s", filename.c_str(),
             av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
         return false;
     }
-    ret = avformat_find_stream_info(*tempFormat, nullptr);
+    ret = avformat_find_stream_info(tempFormat.get(), nullptr);
     if (ret < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
         av_log(nullptr, AV_LOG_ERROR, "Failed finding stream information '%s': %s", filename.c_str(),
@@ -106,7 +108,7 @@ variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filena
 
     // Get the primary video stream
     AVCodec* decoder = nullptr;
-    ret = av_find_best_stream(*tempFormat, AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
+    ret = av_find_best_stream(tempFormat.get(), AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
     if (ret < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
         av_log(nullptr, AV_LOG_ERROR, "Failed to find video stream in file '%s': %s", filename.c_str(),
@@ -134,12 +136,12 @@ variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filena
 
     // Create a decoder context
     Stream::CodecContextPtr tempCodec(avcodec_alloc_context3(decoder));
-    if (*tempCodec == nullptr) {
+    if (tempCodec.get() == nullptr) {
         av_log(nullptr, AV_LOG_ERROR, "Failed allocating decoder context %s", filename.c_str());
         return false;
     }
 
-    ret = avcodec_parameters_to_context(*tempCodec, stream->codecpar);
+    ret = avcodec_parameters_to_context(tempCodec.get(), stream->codecpar);
     if (ret < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
         av_log(nullptr, AV_LOG_ERROR, "Failed copying parameters to decoder context '%s': %s", filename.c_str(),
@@ -157,7 +159,7 @@ variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filena
         }
         tempCodec->hw_device_ctx = av_buffer_ref(m_deviceContext);
     }
-    ret = avcodec_open2(*tempCodec, decoder, nullptr);
+    ret = avcodec_open2(tempCodec.get(), decoder, nullptr);
     if (ret < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
         av_log(nullptr, AV_LOG_ERROR, "Failed opening decoder for %s: %s", filename.c_str(),

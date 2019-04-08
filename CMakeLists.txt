@@ -66,12 +66,9 @@ set(SOURCES
 
 set(HEADERS
     include/FfFrameReader.h
-)
-
-set(PRIVATE_HEADERS
-      include/FFFRStream.h
-      include/FFFRDecoderContext.h
-      include/FFFRFrame.h
+    include/FFFRStream.h
+    include/FFFRDecoderContext.h
+    include/FFFRFrame.h
 )
 
 # Add source to this project's executable.
@@ -89,10 +86,19 @@ else()
     )
 endif()
 
-set_target_properties(FfFrameReader PROPERTIES 
+set_target_properties(FfFrameReader PROPERTIES
+    FRAMEWORK ON
+    SOVERSION 0
     VERSION ${PROJECT_VERSION} 
-    PUBLIC_HEADER ${HEADERS}
+    PUBLIC_HEADER "${HEADERS}"
 )
+
+# Enable all compile warnings
+if(MSVC)
+  target_compile_options(FfFrameReader PRIVATE /W4 /WX /experimental:external /external:anglebrackets /external:W3)
+else()
+  target_compile_options(FfFrameReader PRIVATE -Wall -Wextra -pedantic -Werror)
+endif()
 
 # Find the required FFmpeg libraries
 find_path(AVCODEC_INCLUDE_DIR NAMES libavcodec/avcodec.h)

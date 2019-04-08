@@ -32,63 +32,37 @@ class Stream
 private:
     class FormatContextPtr
     {
-    public:
-        FormatContextPtr() noexcept = default;
-
-        explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
-
-        ~FormatContextPtr() noexcept;
-
-        FormatContextPtr(const FormatContextPtr& other) noexcept = delete;
-
-        FormatContextPtr(FormatContextPtr&& other) noexcept;
-
-        FormatContextPtr& operator=(FormatContextPtr& other) noexcept;
-
-        FormatContextPtr& operator=(FormatContextPtr&& other) noexcept;
-
-        AVFormatContext*& operator*() noexcept;
-
-        const AVFormatContext* operator*() const noexcept;
-
-        AVFormatContext*& operator->() noexcept;
-
-        const AVFormatContext* operator->() const noexcept;
+        friend class FfFrameReader::DecoderContext;
+        friend class FfFrameReader::Stream;
 
     private:
-        AVFormatContext* m_formatContext = nullptr;
+        explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
+
+        [[nodiscard]] AVFormatContext* get() const noexcept;
+
+        AVFormatContext* operator->() const noexcept;
+
+        std::shared_ptr<AVFormatContext> m_formatContext = nullptr;
     };
 
     class CodecContextPtr
     {
-    public:
-        CodecContextPtr() noexcept = default;
-
-        explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
-
-        ~CodecContextPtr() noexcept;
-
-        CodecContextPtr(const CodecContextPtr& other) noexcept = delete;
-
-        CodecContextPtr(CodecContextPtr&& other) noexcept;
-
-        CodecContextPtr& operator=(CodecContextPtr& other) noexcept;
-
-        CodecContextPtr& operator=(CodecContextPtr&& other) noexcept;
-
-        AVCodecContext*& operator*() noexcept;
-
-        const AVCodecContext* operator*() const noexcept;
-
-        AVCodecContext*& operator->() noexcept;
-
-        const AVCodecContext* operator->() const noexcept;
+        friend class FfFrameReader::DecoderContext;
+        friend class FfFrameReader::Stream;
 
     private:
-        AVCodecContext* m_codecContext = nullptr;
+        explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
+
+        [[nodiscard]] AVCodecContext* get() const noexcept;
+
+        AVCodecContext* operator->() const noexcept;
+
+        std::shared_ptr<AVCodecContext> m_codecContext = nullptr;
     };
 
 public:
+    Stream() = delete;
+
     /**
      * Constructor.
      * @param [in,out] formatContext Context for the format. This is reset to nullptr on function exit.
@@ -99,13 +73,13 @@ public:
     Stream(FormatContextPtr& formatContext, int32_t streamID, CodecContextPtr& codecContext,
         uint32_t bufferLength) noexcept;
 
-    ~Stream() noexcept = default;
+    ~Stream() = default;
 
-    Stream(const Stream& other) noexcept = delete;
+    Stream(const Stream& other) = delete;
 
     Stream(Stream&& other) noexcept = delete;
 
-    Stream& operator=(const Stream& other) noexcept = delete;
+    Stream& operator=(const Stream& other) = delete;
 
     Stream& operator=(Stream&& other) noexcept = delete;
 
@@ -256,18 +230,18 @@ private:
      * Gets stream start time in the stream timebase.
      * @returns The stream start time.
      */
-    [[nodiscard]] int64_t getStreamStartTime() noexcept;
+    [[nodiscard]] int64_t getStreamStartTime() const noexcept;
 
     /**
      * Gets total number of frames in a stream.
      * @returns The stream frames.
      */
-    [[nodiscard]] int64_t getStreamFrames() noexcept;
+    [[nodiscard]] int64_t getStreamFrames() const noexcept;
 
     /**
      * Gets the duration of a stream represented in microseconds (AV_TIME_BASE).
      * @returns The duration.
      */
-    [[nodiscard]] int64_t getStreamDuration() noexcept;
+    [[nodiscard]] int64_t getStreamDuration() const noexcept;
 };
 } // namespace FfFrameReader

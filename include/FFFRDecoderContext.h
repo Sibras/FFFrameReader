@@ -16,8 +16,6 @@
 #pragma once
 #include "FFFRStream.h"
 
-#include <map>
-
 struct AVBufferRef;
 
 namespace FfFrameReader {
@@ -61,11 +59,10 @@ public:
 
     /**
      * Gets a stream from a file.
-     * @note Once a stream has been finished with it should be released using releaseStream().
      * @param filename Filename of the file to open.
      * @returns The stream if succeeded, false otherwise.
      */
-    std::variant<bool, std::shared_ptr<Stream>> getStream(const std::string& filename) noexcept;
+    [[nodiscard]] std::variant<bool, std::shared_ptr<Stream>> getStream(const std::string& filename) const noexcept;
 
 private:
     DecodeType m_deviceType = DecodeType::Software;

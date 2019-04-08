@@ -13,298 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "FFFRDecoderContext.h"
 #include "FfFrameReader.h"
-
-#include <map>
-#include <mutex>
-
-extern "C" {
-#include <libavutil/log.h>
-}
 
 using namespace std;
 
 namespace FfFrameReader {
-class Module
-{
-    friend class Interface;
-
-public:
-    Module() noexcept {}
-
-    ~Module() noexcept = default;
-
-    Module(const Module& other) = delete;
-
-    Module(Module&& other) noexcept = delete;
-
-    Module& operator=(const Module& other) = delete;
-
-    Module& operator=(Module&& other) noexcept = delete;
-
-protected:
-    mutex m_mutex;
-    map<Interface::DecoderType, shared_ptr<DecoderContext>> m_managers;
-    map<string, shared_ptr<DecoderContext>> m_filenames;
-};
-
-Module g_module;
-
-FrameInterface::FrameInterface(shared_ptr<Frame> frame) noexcept
-    : m_frame(move(frame))
-{}
-
-int64_t FrameInterface::getTimeStamp() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_frame.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_frame->getTimeStamp();
-}
-
-int64_t FrameInterface::getFrameNumber() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_frame.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_frame->getFrameNumber();
-}
-
-uint8_t* FrameInterface::getFrameData() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_frame.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_frame->getFrameData();
-}
-
-uint32_t FrameInterface::getWidth() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_frame.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_frame->getWidth();
-}
-
-uint32_t FrameInterface::getHeight() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_frame.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_frame->getHeight();
-}
-
-double FrameInterface::getAspectRatio() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_frame.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0.0;
-    }
-
-    // Call the member function
-    return m_frame->getAspectRatio();
-}
-
-uint32_t StreamInterface::getWidth() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_stream.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_stream->getWidth();
-}
-
-uint32_t StreamInterface::getHeight() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_stream.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_stream->getHeight();
-}
-
-double StreamInterface::getAspectRatio() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_stream.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_stream->getAspectRatio();
-}
-
-int64_t StreamInterface::getTotalFrames() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_stream.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_stream->getTotalFrames();
-}
-
-int64_t StreamInterface::getDuration() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_stream.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_stream->getDuration();
-}
-
-variant<bool, FrameInterface> StreamInterface::getNextFrame() const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_stream.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    const auto frame = m_stream->getNextFrame();
-    try {
-        if (frame.index() != 0) {
-            return FrameInterface(get<1>(frame));
-        }
-    } catch (...) {
-    }
-    return false;
-}
-
-variant<bool, vector<FrameInterface>> StreamInterface::getNextFrameSequence(const vector<uint64_t>& frameSequence) const
-    noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_stream.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    const auto frames = m_stream->getNextFrameSequence(frameSequence);
-    try {
-        if (frames.index() != 0) {
-            vector<FrameInterface> newFrames;
-            for (const auto& i : get<1>(frames)) {
-                newFrames.emplace_back(i);
-            }
-            return newFrames;
-        }
-    } catch (...) {
-    }
-    return false;
-}
-
-bool StreamInterface::seek(const int64_t timeStamp) const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_stream.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_stream->seek(timeStamp);
-}
-
-bool StreamInterface::seekFrame(const int64_t frame) const noexcept
-{
-    // Check if initialised to a valid stream
-    if (m_stream.get() != nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
-        return 0;
-    }
-
-    // Call the member function
-    return m_stream->seekFrame(frame);
-}
-
-StreamInterface::StreamInterface(shared_ptr<Stream> stream) noexcept
-    : m_stream(move(stream))
-{}
-
-variant<bool, StreamInterface> Interface::getStream(const string& filename, const DecoderType type) noexcept
+variant<bool, shared_ptr<Stream>> Manager::getStream(
+    const string& filename, const DecoderContext::DecodeType type) noexcept
 {
     try {
-        lock_guard<mutex> lock(g_module.m_mutex);
+        lock_guard<mutex> lock(m_mutex);
         // Check if file already open
-        const auto foundFile = g_module.m_filenames.find(filename);
+        const auto foundFile = m_streams.find(filename);
         shared_ptr<DecoderContext> found;
-        if (foundFile == g_module.m_filenames.end()) {
+        if (foundFile == m_streams.end()) {
             // Check if a manager already registered for type
-            const auto foundManager = g_module.m_managers.find(type);
-            if (foundManager == g_module.m_managers.end()) {
-                DecoderContext::DecodeType decodeType = DecoderContext::DecodeType::Software;
-                if (type == DecoderType::Nvdec) {
-                    decodeType = DecoderContext::DecodeType::Nvdec;
-                } else if (type != DecoderType::Software) {
-                    av_log(nullptr, AV_LOG_ERROR, "Decoder type conversion not implemented");
-                    return false;
-                }
-                g_module.m_managers.emplace(type, make_shared<DecoderContext>(decodeType));
-                found = g_module.m_managers.find(type)->second;
+            const auto foundManager = m_decoders.find(type);
+            if (foundManager == m_decoders.end()) {
+                m_decoders.emplace(type, make_shared<DecoderContext>(type));
+                found = m_decoders.find(type)->second;
             } else {
                 found = foundManager->second;
             }
         } else {
-            found = foundFile->second;
+            return foundFile->second;
         }
 
         // Create a new stream using the requested manager
         const auto newStream = found->getStream(filename);
         if (newStream.index() != 0) {
-            if (foundFile == g_module.m_filenames.end()) {
-                g_module.m_filenames.emplace(filename, found);
+            if (foundFile == m_streams.end()) {
+                m_streams.emplace(filename, get<1>(newStream));
             }
-            return StreamInterface(get<1>(newStream));
+            return get<1>(newStream);
         }
     } catch (...) {
     }
     return false;
 }
 
-void Interface::releaseStream(const string& filename) noexcept
+void Manager::releaseStream(const string& filename) noexcept
 {
     try {
-        lock_guard<mutex> lock(g_module.m_mutex);
-        const auto found = g_module.m_filenames.find(filename);
-        if (found != g_module.m_filenames.end()) {
-            g_module.m_filenames.erase(found);
+        lock_guard<mutex> lock(m_mutex);
+        const auto found = m_streams.find(filename);
+        if (found != m_streams.end()) {
+            m_streams.erase(found);
         }
     } catch (...) {
     }
