@@ -163,9 +163,10 @@ private:
     int32_t m_index = -1; /**< Zero-based index of the video stream  */
     CodecContextPtr m_codecContext;
 
-    int64_t m_startTimeStamp = 0; // PTS of the first frame in the stream time base
-    int64_t m_totalFrames = 0;    // video duration in frames
-    int64_t m_totalDuration = 0;  // video duration in microseconds (AV_TIME_BASE)
+    int64_t m_startTimeStamp = 0;     /**< PTS of the first frame in the stream time base */
+    bool m_frameSeekSupported = true; /**< True if frame seek supported */
+    int64_t m_totalFrames = 0;        /**< Stream video duration in frames */
+    int64_t m_totalDuration = 0;      /**< Stream video duration in microseconds (AV_TIME_BASE) */
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to the stream timebase.

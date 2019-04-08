@@ -422,9 +422,12 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
     }
 
     // If we have recursed and still havnt found the frame then we never will
-    if (recursed) {
-        av_log(nullptr, AV_LOG_ERROR,
-            "Failed to seek to specified frame %" PRId64 " (retrying using timestamp based seek)", frame);
+    if (recursed || !m_frameSeekSupported) {
+        if (m_frameSeekSupported) {
+            m_frameSeekSupported = false;
+            av_log(nullptr, AV_LOG_ERROR,
+                "Failed to seek to specified frame %" PRId64 " (retrying using timestamp based seek)", frame);
+        }
 
         // Try and seek just using a timestamp
         return seek(frameToTime(frame));
@@ -434,6 +437,7 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
     avcodec_flush_buffers(m_codecContext.get());
     const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, frame, frame, AVSEEK_FLAG_FRAME);
     if (err < 0) {
+        m_frameSeekSupported = false;
         char buffer[AV_ERROR_MAX_STRING_SIZE];
         av_log(nullptr, AV_LOG_ERROR,
             "Failed to seek to specified frame %" PRId64 ": %s (retrying using timestamp based seek)", frame,

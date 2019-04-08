@@ -241,6 +241,25 @@ TEST_F(StreamTest1, seekFrame)
     ASSERT_EQ(frame1->getFrameNumber(), 80);
 }
 
+TEST_F(StreamTest1, seekFrameLoop)
+{
+    int64_t frame = 0;
+    // Perform multiple forward seeks
+    for (uint32_t i = 0; i < 5; i++) {
+        ASSERT_TRUE(m_stream->seekFrame(frame));
+        // Check that multiple sequential frames can be read
+        int64_t frame2 = frame;
+        for (uint32_t j = 0; j < 25; j++) {
+            const auto ret1 = m_stream->getNextFrame();
+            ASSERT_NE(ret1.index(), 0);
+            const auto frame1 = std::get<1>(ret1);
+            ASSERT_EQ(frame1->getFrameNumber(), frame2);
+            ++frame2;
+        }
+        frame += 80;
+    }
+}
+
 // TODO: Test getNextFrameSequence
 
 // TODO: do all the same tests for each of the input data files
