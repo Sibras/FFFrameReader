@@ -38,7 +38,7 @@ Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecCon
     // Set stream start time and numbers of frames
     m_startTimeStamp = getStreamStartTime();
     if (m_startTimeStamp != 0) {
-        av_log(nullptr, AV_LOG_WARNING, "Untested video with non zero-index start time");
+        av_log(nullptr, AV_LOG_WARNING, "Untested video with non zero-index start time\n");
     }
     m_totalFrames = getStreamFrames();
     m_totalDuration = getStreamDuration();
@@ -141,7 +141,7 @@ variant<bool, vector<shared_ptr<Frame>>> Stream::getNextFrameSequence(const vect
         if (i < start) {
             // Invalid sequence list
             av_log(nullptr, AV_LOG_ERROR,
-                "Invalid sequence list passed to getNextFrameSequence(). Sequences in the list must be in ascending order.");
+                "Invalid sequence list passed to getNextFrameSequence(). Sequences in the list must be in ascending order.\n");
             return false;
         }
         // Remove all frames until first in sequence
@@ -220,7 +220,7 @@ bool Stream::decodeNextBlock() noexcept
         if (ret < 0) {
             if (ret != AVERROR_EOF) {
                 char buffer[AV_ERROR_MAX_STRING_SIZE];
-                av_log(nullptr, AV_LOG_ERROR, "Failed to retrieve new frame: %s",
+                av_log(nullptr, AV_LOG_ERROR, "Failed to retrieve new frame: %s\n",
                     av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
                 return false;
             }
@@ -232,7 +232,7 @@ bool Stream::decodeNextBlock() noexcept
             av_packet_unref(&packet);
             if (ret < 0) {
                 char buffer[AV_ERROR_MAX_STRING_SIZE];
-                av_log(nullptr, AV_LOG_ERROR, "Failed to send packet to decoder: %s",
+                av_log(nullptr, AV_LOG_ERROR, "Failed to send packet to decoder: %s\n",
                     av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
                 return false;
             }
@@ -241,7 +241,7 @@ bool Stream::decodeNextBlock() noexcept
                 if (*frame == nullptr) {
                     *frame = av_frame_alloc();
                     if (*frame == nullptr) {
-                        av_log(nullptr, AV_LOG_ERROR, "Failed to allocate new frame");
+                        av_log(nullptr, AV_LOG_ERROR, "Failed to allocate new frame\n");
                         return false;
                     }
                 }
@@ -261,7 +261,7 @@ bool Stream::decodeNextBlock() noexcept
                         break;
                     }
                     char buffer[AV_ERROR_MAX_STRING_SIZE];
-                    av_log(nullptr, AV_LOG_ERROR, "Failed to receive decoded frame: %s",
+                    av_log(nullptr, AV_LOG_ERROR, "Failed to receive decoded frame: %s\n",
                         av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
                     return false;
                 }
@@ -285,7 +285,7 @@ bool Stream::decodeNextBlock() noexcept
 void Stream::popFrame() noexcept
 {
     if (m_bufferPingHead >= m_bufferPing.size()) {
-        av_log(nullptr, AV_LOG_ERROR, "No more frames to pop");
+        av_log(nullptr, AV_LOG_ERROR, "No more frames to pop\n");
         return;
     }
     // Release reference and pop frame
@@ -345,7 +345,7 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
 
     // If we have recursed and still havnt found the frame then we never will
     if (recursed) {
-        av_log(nullptr, AV_LOG_ERROR, "Failed to seek to specified time stamp %" PRId64 "", timeStamp);
+        av_log(nullptr, AV_LOG_ERROR, "Failed to seek to specified time stamp %" PRId64 "\n", timeStamp);
     }
 
     // Seek to desired timestamp
@@ -354,7 +354,7 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
     const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
-        av_log(nullptr, AV_LOG_ERROR, "Failed seeking to specified time stamp %" PRId64 ": %s", timeStamp,
+        av_log(nullptr, AV_LOG_ERROR, "Failed seeking to specified time stamp %" PRId64 ": %s\n", timeStamp,
             av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, err));
         return false;
     }
@@ -426,7 +426,7 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
         if (m_frameSeekSupported) {
             m_frameSeekSupported = false;
             av_log(nullptr, AV_LOG_ERROR,
-                "Failed to seek to specified frame %" PRId64 " (retrying using timestamp based seek)", frame);
+                "Failed to seek to specified frame %" PRId64 " (retrying using timestamp based seek)\n", frame);
         }
 
         // Try and seek just using a timestamp
@@ -440,7 +440,7 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
         m_frameSeekSupported = false;
         char buffer[AV_ERROR_MAX_STRING_SIZE];
         av_log(nullptr, AV_LOG_ERROR,
-            "Failed to seek to specified frame %" PRId64 ": %s (retrying using timestamp based seek)", frame,
+            "Failed to seek to specified frame %" PRId64 ": %s (retrying using timestamp based seek)\n", frame,
             av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, err));
 
         // Try and seek just using a timestamp
