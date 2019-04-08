@@ -27,7 +27,7 @@ struct AVCodecContext;
 namespace FfFrameReader {
 class Stream
 {
-    friend class Manager;
+    friend class DecoderContext;
 
 private:
     class FormatContextPtr

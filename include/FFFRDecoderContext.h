@@ -17,29 +17,28 @@
 #include "FFFRLog.h"
 #include "FFFRStream.h"
 
-extern "C" {
-#include <libavutil/hwcontext.h>
-}
 #include <map>
 
+struct AVBufferRef;
+
 namespace FfFrameReader {
-class Manager
+class DecoderContext
 {
 public:
     enum class DecodeType
     {
-        Nvdec = AV_HWDEVICE_TYPE_CUDA,
+        Software,
+        Nvdec,
 #if 0
 #    if defined(WIN32)
-        Dxva2 = AV_HWDEVICE_TYPE_DXVA2,
-        D3d11va = AV_HWDEVICE_TYPE_D3D11VA,
+        Dxva2,
+        D3d11va,
 #    else
-        Vaapi = AV_HWDEVICE_TYPE_VAAPI,
-        Vdpau = AV_HWDEVICE_TYPE_VDPAU,
+        Vaapi,
+        Vdpau,
 #    endif
-        Qsv = AV_HWDEVICE_TYPE_QSV,
+        Qsv,
 #endif
-        Software = AV_HWDEVICE_TYPE_NONE,
     };
 
     /**
@@ -49,17 +48,17 @@ public:
      * @param type         (Optional) The type of decoding to use.
      * @param bufferLength (Optional) Number of frames in the the decode buffer.
      */
-    explicit Manager(DecodeType type = DecodeType::Software, uint32_t bufferLength = 10) noexcept;
+    explicit DecoderContext(DecodeType type = DecodeType::Software, uint32_t bufferLength = 10) noexcept;
 
-    ~Manager() noexcept;
+    ~DecoderContext() noexcept;
 
-    Manager(const Manager& other) noexcept = default;
+    DecoderContext(const DecoderContext& other) noexcept = default;
 
-    Manager(Manager&& other) noexcept = default;
+    DecoderContext(DecoderContext&& other) noexcept = default;
 
-    Manager& operator=(const Manager& other) noexcept = default;
+    DecoderContext& operator=(const DecoderContext& other) noexcept = default;
 
-    Manager& operator=(Manager&& other) noexcept = default;
+    DecoderContext& operator=(DecoderContext&& other) noexcept = default;
 
     /**
      * Gets a stream from a file.
@@ -69,16 +68,9 @@ public:
      */
     std::variant<bool, std::shared_ptr<Stream>> getStream(const std::string& filename) noexcept;
 
-    /**
-     * Releases the stream described by filename
-     * @param filename Filename of the file.
-     */
-    void releaseStream(const std::string& filename) noexcept;
-
 private:
-    enum AVHWDeviceType m_deviceType = AV_HWDEVICE_TYPE_NONE;
+    DecodeType m_deviceType = DecodeType::Software;
     uint32_t m_bufferLength = 10;
     AVBufferRef* m_deviceContext = nullptr;
-    std::map<std::string, std::shared_ptr<Stream>> m_streams;
 };
 } // namespace FfFrameReader

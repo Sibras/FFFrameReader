@@ -60,7 +60,7 @@ endif()
 set(SOURCES
       source/FFFR.cpp
       source/FFFRStream.cpp
-      source/FFFRManager.cpp
+      source/FFFRDecoderContext.cpp
       source/FFFRLog.cpp
       source/FFFRFrame.cpp
 )
@@ -71,7 +71,7 @@ set(HEADERS
 
 set(PRIVATE_HEADERS
       include/FFFRStream.h
-      include/FFFRManager.h
+      include/FFFRDecoderContext.h
       include/FFFRLog.h
       include/FFFRFrame.h
 )

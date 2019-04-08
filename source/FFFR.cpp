@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "FFFRDecoderContext.h"
 #include "FFFRLog.h"
-#include "FFFRManager.h"
 #include "FfFrameReader.h"
 
 #include <cstdarg>
@@ -70,8 +70,8 @@ public:
 
 protected:
     mutex m_mutex;
-    map<Interface::DecoderType, shared_ptr<Manager>> m_managers;
-    map<string, shared_ptr<Manager>> m_filenames;
+    map<Interface::DecoderType, shared_ptr<DecoderContext>> m_managers;
+    map<string, shared_ptr<DecoderContext>> m_filenames;
     Log m_log;
 };
 
@@ -245,18 +245,18 @@ variant<bool, StreamInterface> Interface::getStream(const string& filename, cons
         lock_guard<mutex> lock(g_module.m_mutex);
         // Check if file already open
         const auto foundFile = g_module.m_filenames.find(filename);
-        shared_ptr<Manager> found;
+        shared_ptr<DecoderContext> found;
         if (foundFile == g_module.m_filenames.end()) {
             // Check if a manager already registered for type
             const auto foundManager = g_module.m_managers.find(type);
             if (foundManager == g_module.m_managers.end()) {
-                Manager::DecodeType decodeType = Manager::DecodeType::Software;
+                DecoderContext::DecodeType decodeType = DecoderContext::DecodeType::Software;
                 if (type == DecoderType::Nvdec) {
-                    decodeType = Manager::DecodeType::Nvdec;
+                    decodeType = DecoderContext::DecodeType::Nvdec;
                 } else if (type != DecoderType::Software) {
                     FFFRASSERT(false, "Decoder type conversion not implemeneted", false);
                 }
-                g_module.m_managers.emplace(type, make_shared<Manager>(decodeType));
+                g_module.m_managers.emplace(type, make_shared<DecoderContext>(decodeType));
                 found = g_module.m_managers.find(type)->second;
             } else {
                 found = foundManager->second;
@@ -284,7 +284,6 @@ void Interface::releaseStream(const string& filename) noexcept
         lock_guard<mutex> lock(g_module.m_mutex);
         const auto found = g_module.m_filenames.find(filename);
         if (found != g_module.m_filenames.end()) {
-            found->second->releaseStream(filename);
             g_module.m_filenames.erase(found);
         }
     } catch (...) {

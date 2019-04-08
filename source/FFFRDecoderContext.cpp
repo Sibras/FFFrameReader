@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "FFFRManager.h"
+#include "FFFRDecoderContext.h"
 
 #include "FfFrameReader.h"
 
@@ -49,18 +49,27 @@ static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const 
 }
 
 namespace FfFrameReader {
-Manager::Manager(const DecodeType type, const uint32_t bufferLength) noexcept
-    : m_deviceType(static_cast<AVHWDeviceType>(type))
+static enum AVHWDeviceType decodeTypeToFFmpeg(const DecoderContext::DecodeType type)
+{
+    if (type == DecoderContext::DecodeType::Nvdec) {
+        return AV_HWDEVICE_TYPE_CUDA;
+    }
+    return AV_HWDEVICE_TYPE_NONE;
+}
+
+DecoderContext::DecoderContext(const DecodeType type, const uint32_t bufferLength) noexcept
+    : m_deviceType(type)
     , m_bufferLength(bufferLength)
 {
-    if (m_deviceType != AV_HWDEVICE_TYPE_NONE) {
+    if (m_deviceType != DecodeType::Software) {
         // Create device specific options
         const string device = "0";
         // TODO: Allow specifying the device to use
 
         // Create the hardware context for decoding
         int err;
-        if ((err = av_hwdevice_ctx_create(&m_deviceContext, m_deviceType, device.c_str(), nullptr, 0)) < 0) {
+        if ((err = av_hwdevice_ctx_create(
+                 &m_deviceContext, decodeTypeToFFmpeg(m_deviceType), device.c_str(), nullptr, 0)) < 0) {
             Interface::logError("Failed to create specified hardware device: " + Log::getFfmpegErrorString(err));
             return;
             // TODO: need is Valid
@@ -68,7 +77,7 @@ Manager::Manager(const DecodeType type, const uint32_t bufferLength) noexcept
     }
 }
 
-Manager::~Manager() noexcept
+DecoderContext::~DecoderContext() noexcept
 {
     // Release the contexts
     if (m_deviceContext != nullptr) {
@@ -76,14 +85,8 @@ Manager::~Manager() noexcept
     }
 }
 
-variant<bool, shared_ptr<Stream>> Manager::getStream(const string& filename) noexcept
+variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filename) noexcept
 {
-    // Check if the stream already exists
-    const auto found = m_streams.find(filename);
-    if (found != m_streams.end()) {
-        return found->second;
-    }
-
     Stream::FormatContextPtr tempFormat;
     auto ret = avformat_open_input(&*tempFormat, filename.c_str(), nullptr, nullptr);
     if (ret < 0) {
@@ -106,6 +109,22 @@ variant<bool, shared_ptr<Stream>> Manager::getStream(const string& filename) noe
     AVStream* stream = tempFormat->streams[ret];
     int32_t index = ret;
 
+    if (m_deviceType != DecodeType::Software) {
+        // Check if required codec is supported
+        for (int i = 0;; i++) {
+            const AVCodecHWConfig* config = avcodec_get_hw_config(decoder, i);
+            if (config == nullptr) {
+                FfFrameReader::Interface::logError("Decoder does not support device type: "s + decoder->name + ", "s +
+                    av_hwdevice_get_type_name(decodeTypeToFFmpeg(m_deviceType)));
+                return false;
+            }
+            if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+                config->device_type == AV_HWDEVICE_TYPE_CUDA) {
+                break;
+            }
+        }
+    }
+
     // Create a decoder context
     Stream::CodecContextPtr tempCodec(avcodec_alloc_context3(decoder));
     if (*tempCodec == nullptr) {
@@ -121,8 +140,12 @@ variant<bool, shared_ptr<Stream>> Manager::getStream(const string& filename) noe
     }
 
     // Setup any required hardware decoding parameters
-    if (m_deviceType != AV_HWDEVICE_TYPE_NONE) {
-        tempCodec->get_format = getHardwareFormatNvdec;
+    if (m_deviceType != DecodeType::Software) {
+        if (m_deviceType == DecodeType::Nvdec) {
+            tempCodec->get_format = getHardwareFormatNvdec;
+        } else {
+            FFFRASSERT(false, "HWDEVICE not properly implemented", false);
+        }
         tempCodec->hw_device_ctx = av_buffer_ref(m_deviceContext);
     }
     ret = avcodec_open2(*tempCodec, decoder, nullptr);
@@ -132,15 +155,6 @@ variant<bool, shared_ptr<Stream>> Manager::getStream(const string& filename) noe
     }
 
     // Make a new stream object and add it to internal list
-    m_streams[filename] = make_shared<Stream>(tempFormat, index, tempCodec, m_bufferLength);
-    return m_streams[filename];
-}
-
-void Manager::releaseStream(const string& filename) noexcept
-{
-    // Check if stream exists in the list
-    if (const auto found = m_streams.find(filename); found != m_streams.end()) {
-        m_streams.erase(found);
-    }
+    return make_shared<Stream>(tempFormat, index, tempCodec, m_bufferLength);
 }
 } // namespace FfFrameReader
