@@ -32,7 +32,7 @@ namespace FfFrameReader {
 class Manager
 {
 public:
-    Manager() = default;
+    Manager();
 
     ~Manager() = default;
 
@@ -65,4 +65,23 @@ private:
     std::map<DecoderContext::DecodeType, std::shared_ptr<DecoderContext>> m_decoders;
     std::map<std::string, std::shared_ptr<Stream>> m_streams;
 };
+
+/** Values that represent log levels */
+enum class LogLevel : int
+{
+    Quiet = -8,
+    Panic = 0,
+    Fatal = 8,
+    Error = 16,
+    Warning = 24,
+    Info = 32,
+    Verbose = 40,
+    Debug = 48,
+};
+
+/**
+ * Sets log level for all functions within FfFrameReader.
+ * @param level The level.
+ */
+extern void setLogLevel(LogLevel level);
 } // namespace FfFrameReader

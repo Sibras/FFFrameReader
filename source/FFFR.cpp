@@ -15,9 +15,17 @@
  */
 #include "FfFrameReader.h"
 
+extern "C" {
+#include <libavutil/log.h>
+}
 using namespace std;
 
 namespace FfFrameReader {
+Manager::Manager()
+{
+    setLogLevel(LogLevel::Error);
+}
+
 variant<bool, shared_ptr<Stream>> Manager::getStream(
     const string& filename, const DecoderContext::DecodeType type) noexcept
 {
@@ -62,5 +70,10 @@ void Manager::releaseStream(const string& filename) noexcept
         }
     } catch (...) {
     }
+}
+
+void setLogLevel(const LogLevel level)
+{
+    av_log_set_level(static_cast<int>(level));
 }
 } // namespace FfFrameReader
