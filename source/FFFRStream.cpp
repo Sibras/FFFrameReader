@@ -131,12 +131,12 @@ variant<bool, shared_ptr<Frame>> Stream::getNextFrame() noexcept
     return ret;
 }
 
-variant<bool, vector<shared_ptr<Frame>>> Stream::getNextFrameSequence(const vector<uint64_t>& frameSequence) noexcept
+variant<bool, vector<shared_ptr<Frame>>> Stream::getNextFrameSequence(const vector<int64_t>& frameSequence) noexcept
 {
     // Note: for best performance when using this the buffer size should be small enough to not waste to much memeory
     lock_guard<recursive_mutex> lock(m_mutex);
     vector<shared_ptr<Frame>> ret;
-    uint64_t start = 0;
+    int64_t start = 0;
     for (const auto& i : frameSequence) {
         if (i < start) {
             // Invalid sequence list
@@ -145,7 +145,7 @@ variant<bool, vector<shared_ptr<Frame>>> Stream::getNextFrameSequence(const vect
             return false;
         }
         // Remove all frames until first in sequence
-        for (uint64_t j = start; j < i; j++) {
+        for (int64_t j = start; j < i; j++) {
             // Must peek to check there is actually a new frame
             auto err = peekNextFrame();
             if (err.index() == 0) {

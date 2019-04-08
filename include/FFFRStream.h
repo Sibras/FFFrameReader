@@ -134,7 +134,7 @@ public:
      * @returns A list of frames corresponding to the input sequence, or false if an error occured.
      */
     [[nodiscard]] std::variant<bool, std::vector<std::shared_ptr<Frame>>> getNextFrameSequence(
-        const std::vector<uint64_t>& frameSequence) noexcept;
+        const std::vector<int64_t>& frameSequence) noexcept;
 
     /**
      * Seeks the stream to the given time stamp.

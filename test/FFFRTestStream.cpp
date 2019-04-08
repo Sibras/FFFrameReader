@@ -260,6 +260,50 @@ TEST_F(StreamTest1, seekFrameLoop)
     }
 }
 
-// TODO: Test getNextFrameSequence
+TEST_F(StreamTest1, getNextFrameSequence)
+{
+    const std::vector<int64_t> framesList1 = {0, 1, 5, 7, 8};
+    const auto ret1 = m_stream->getNextFrameSequence(framesList1);
+    ASSERT_NE(ret1.index(), 0);
+    // Check that the returned frames are correct
+    const auto frames1 = std::get<1>(ret1);
+    auto j = 0;
+    for (auto& i : frames1) {
+        ASSERT_EQ(i->getFrameNumber(), framesList1[j]);
+        ++j;
+    }
+}
+
+TEST_F(StreamTest1, getNextFrameSequenceSeek)
+{
+    // First seek to a frame
+    ASSERT_TRUE(m_stream->seekFrame(80));
+    // Now get frame sequence off set from current
+    const std::vector<int64_t> framesList1 = {0, 1, 5, 7, 8};
+    const auto ret1 = m_stream->getNextFrameSequence(framesList1);
+    ASSERT_NE(ret1.index(), 0);
+    // Check that the returned frames are correct
+    const auto frames1 = std::get<1>(ret1);
+    auto j = 0;
+    for (auto& i : frames1) {
+        ASSERT_EQ(i->getFrameNumber(), framesList1[j] + 80);
+        ++j;
+    }
+}
+
+TEST_F(StreamTest1, getNextFrameSequence2)
+{
+    // Ensure that value in list is greater than buffer size
+    const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
+    const auto ret1 = m_stream->getNextFrameSequence(framesList1);
+    ASSERT_NE(ret1.index(), 0);
+    // Check that the returned frames are correct
+    const auto frames1 = std::get<1>(ret1);
+    auto j = 0;
+    for (auto& i : frames1) {
+        ASSERT_EQ(i->getFrameNumber(), framesList1[j]);
+        ++j;
+    }
+}
 
 // TODO: do all the same tests for each of the input data files
