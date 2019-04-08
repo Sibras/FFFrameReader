@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #pragma once
+#include <array>
 #include <cstdint>
 
 struct AVFrame;
@@ -90,7 +91,7 @@ public:
      * Gets frame data pointer.
      * @returns The internal frame data.
      */
-    [[nodiscard]] uint8_t* getFrameData() const noexcept;
+    [[nodiscard]] uint8_t* const* getFrameData() const noexcept;
 
     /**
      * Gets the frame width.

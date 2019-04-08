@@ -15,8 +15,6 @@
  */
 #include "FFFRFrame.h"
 
-#include <memory>
-
 extern "C" {
 #include <libavutil/frame.h>
 }
@@ -91,7 +89,7 @@ int64_t Frame::getFrameNumber() const noexcept
     return m_frameNum;
 }
 
-uint8_t* Frame::getFrameData() const noexcept
+uint8_t* const* Frame::getFrameData() const noexcept
 {
     // TODO: Need to determine type of memory pointer requested and perform a memory move to the required memory space
     /*
@@ -106,7 +104,7 @@ uint8_t* Frame::getFrameData() const noexcept
     else { tmp_frame = frame; }
     */
     // TODO: Need to convert to proper colour space format
-    return m_frame->data[0];
+    return m_frame->data;
 }
 
 uint32_t Frame::getWidth() const noexcept
