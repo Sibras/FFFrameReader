@@ -128,7 +128,7 @@ public:
 
     /**
      * Gets a sequence of frames offset from the current stream position.
-     * @param frameSequence The frame sequence. This is a monototincly increasing list of offset indices used to
+     * @param frameSequence The frame sequence. This is a monotonically increasing list of offset indices used to
      * specify which frames to retrieve. e.g. A sequence value of {0, 3, 6} will get the current next frame  as well as
      * the 3rd frame after this and then the third frame after that.
      * @returns A list of frames corresponding to the input sequence, or false if an error occured.
@@ -218,6 +218,22 @@ private:
      * @note This requires that peekNextFrame() be called first to ensure there is a valid frame to pop.
      */
     void popFrame() noexcept;
+
+    /**
+     * Seeks the stream to the given time stamp.
+     * @param timeStamp The time stamp to seek to (in micro-seconds).
+     * @param recursed  True if function has recursed into itself.
+     * @returns True if it succeeds, false if it fails.
+     */
+    [[nodiscard]] bool seekInternal(int64_t timeStamp, bool recursed) noexcept;
+
+    /**
+     * Seeks the stream to the given frame number.
+     * @param frame The zero-indexed frame number to seek to.
+     * @param recursed  True if function has recursed into itself.
+     * @returns True if it succeeds, false if it fails.
+     */
+    [[nodiscard]] bool seekFrameInternal(int64_t frame, bool recursed) noexcept;
 
     /**
      * Return the maximum number of input frames needed by this stream's codec before it can produce output.
