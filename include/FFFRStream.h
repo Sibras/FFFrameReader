@@ -115,6 +115,12 @@ public:
     [[nodiscard]] int64_t getDuration() const noexcept;
 
     /**
+     * Gets the frame rate (fps) of the video stream.
+     * @returns The duration.
+     */
+    [[nodiscard]] double getFrameRate() const noexcept;
+
+    /**
      * Get the next frame in the stream without removing it from stream buffer.
      * @returns The next frame in current stream, or false if an error occured.
      */

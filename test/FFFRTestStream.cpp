@@ -66,6 +66,11 @@ TEST_F(StreamTest1, getDuration)
     ASSERT_EQ(m_stream->getDuration(), 2073600000);
 }
 
+TEST_F(StreamTest1, getFrameRate)
+{
+    ASSERT_DOUBLE_EQ(m_stream->getFrameRate(), 25.0);
+}
+
 TEST_F(StreamTest1, getNextFrame)
 {
     ASSERT_NE(m_stream->getNextFrame().index(), 0);
