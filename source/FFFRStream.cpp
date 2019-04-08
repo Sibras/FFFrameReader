@@ -220,7 +220,7 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
-        av_log(nullptr, AV_LOG_ERROR, "Failed to seek to specified time stamp %d: %s", timeStamp,
+        av_log(nullptr, AV_LOG_ERROR, "Failed to seek to specified time stamp %" PRId64 ": %s", timeStamp,
             av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, err));
         return false;
     }
@@ -354,7 +354,7 @@ bool Stream::decodeNextBlock() noexcept
 
 void Stream::popFrame() noexcept
 {
-    if (m_bufferPingHead < m_bufferPing.size()) {
+    if (m_bufferPingHead >= m_bufferPing.size()) {
         av_log(nullptr, AV_LOG_ERROR, "No more frames to pop");
         return;
     }
