@@ -20,19 +20,6 @@
 #include <vector>
 
 namespace FfFrameReader {
-#ifdef _DEBUG
-#    define FFFRASSERT(cond, text, ret)     \
-        {                                   \
-            if (!(cond)) {                  \
-                Interface::logError(text);  \
-                Interface::logStackTrace(); \
-                return ret;                 \
-            }                               \
-        }
-#else
-#    define FFFRASSERT(cond, text, ret)
-#endif
-
 class Frame;
 class Stream;
 
@@ -204,43 +191,5 @@ public:
      * @param filename Filename of the file.
      */
     static void releaseStream(const std::string& filename) noexcept;
-
-    enum class LogLevel
-    {
-        Info,
-        Warning,
-        Error
-    };
-    /**
-     * Outputs desired text to the log file.
-     * @param text     The text to log to file.
-     * @param severity (Optional) The severity of the message.
-     */
-    static void logMessage(const std::string& text, LogLevel severity = LogLevel::Info) noexcept;
-
-    /**
-     * Outputs general information text to log file.
-     * @param text The text.
-     */
-    static void logInfo(const std::string& text) noexcept;
-
-    /**
-     * Outputs warning text to log file.
-     * @param text The text.
-     */
-    static void logWarning(const std::string& text) noexcept;
-
-    /**
-     * Outputs error text to log file.
-     * @param text The text.
-     */
-    static void logError(const std::string& text) noexcept;
-
-    /**
-     * Outputs the current stack trace to file.
-     * @note This is used for debugging purposes as it allows for printing the current
-     *   stack trace after an error message is received.
-     */
-    static void logStackTrace() noexcept;
 };
 } // namespace FfFrameReader

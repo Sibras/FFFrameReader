@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 #pragma once
-#include "FFFRLog.h"
 #include "FFFRStream.h"
 
 #include <map>

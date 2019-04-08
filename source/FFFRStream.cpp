@@ -15,14 +15,12 @@
  */
 #include "FFFRStream.h"
 
-#include "FFFRLog.h"
-#include "FfFrameReader.h"
-
 using namespace std;
 
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/log.h>
 }
 
 namespace FfFrameReader {
@@ -142,7 +140,7 @@ Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecCon
     // Set stream start time and numbers of frames
     m_startTimeStamp = getStreamStartTime();
     if (m_startTimeStamp != 0) {
-        Interface::logWarning("Untested video with non zero-index start time");
+        av_log(nullptr, AV_LOG_WARNING, "Untested video with non zero-index start time");
     }
     m_totalFrames = getStreamFrames();
     m_totalDuration = getStreamDuration();
@@ -216,7 +214,7 @@ variant<bool, vector<shared_ptr<Frame>>> Stream::getNextFrameSequence(const vect
     for (const auto& i : frameSequence) {
         if (i < start) {
             // Invalid sequence list
-            Interface::logError(
+            av_log(nullptr, AV_LOG_ERROR,
                 "Invalid sequence list passed to getNextFrameSequence(). Sequences in the list must be in ascending order.");
             return false;
         }
@@ -295,8 +293,9 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     const auto localTimeStamp = timeToTimeStamp(timeStamp);
     const auto err = avformat_seek_file(*m_formatContext, m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
-        Interface::logError(
-            "Failed to seek to specified time stamp "s + to_string(timeStamp) + ": " + Log::getFfmpegErrorString(err));
+        char buffer[AV_ERROR_MAX_STRING_SIZE];
+        av_log(nullptr, AV_LOG_ERROR, "Failed to seek to specified time stamp %d: %s", timeStamp,
+            av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, err));
         return false;
     }
 
@@ -364,7 +363,9 @@ bool Stream::decodeNextBlock() noexcept
         int32_t ret = av_read_frame(*m_formatContext, &packet);
         if (ret < 0) {
             if (ret != AVERROR_EOF) {
-                Interface::logError("Failed to retrieve new frame: " + Log::getFfmpegErrorString(ret));
+                char buffer[AV_ERROR_MAX_STRING_SIZE];
+                av_log(nullptr, AV_LOG_ERROR, "Failed to retrieve new frame: %s",
+                    av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
                 return false;
             }
             return true;
@@ -374,7 +375,9 @@ bool Stream::decodeNextBlock() noexcept
             ret = avcodec_send_packet(*m_codecContext, &packet);
             av_packet_unref(&packet);
             if (ret < 0) {
-                Interface::logError("Failed to send packet to decoder: " + Log::getFfmpegErrorString(ret));
+                char buffer[AV_ERROR_MAX_STRING_SIZE];
+                av_log(nullptr, AV_LOG_ERROR, "Failed to send packet to decoder: %s",
+                    av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
                 return false;
             }
 
@@ -382,7 +385,7 @@ bool Stream::decodeNextBlock() noexcept
                 if (*frame == nullptr) {
                     *frame = av_frame_alloc();
                     if (*frame == nullptr) {
-                        Interface::logError("Failed to allocate new frame");
+                        av_log(nullptr, AV_LOG_ERROR, "Failed to allocate new frame");
                         return false;
                     }
                 }
@@ -401,7 +404,9 @@ bool Stream::decodeNextBlock() noexcept
                         }
                         break;
                     }
-                    Interface::logError("Failed to receive decoded frame: " + Log::getFfmpegErrorString(ret));
+                    char buffer[AV_ERROR_MAX_STRING_SIZE];
+                    av_log(nullptr, AV_LOG_ERROR, "Failed to receive decoded frame: %s",
+                        av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
                     return false;
                 }
 
@@ -423,7 +428,10 @@ bool Stream::decodeNextBlock() noexcept
 
 void Stream::popFrame() noexcept
 {
-    FFFRASSERT(m_bufferPingHead < m_bufferPing.size(), "No more frames to pop", );
+    if (m_bufferPingHead < m_bufferPing.size()) {
+        av_log(nullptr, AV_LOG_ERROR, "No more frames to pop");
+        return;
+    }
     // Release reference and pop frame
     m_bufferPing[m_bufferPingHead++] = make_shared<Frame>();
 }

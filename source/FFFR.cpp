@@ -14,11 +14,8 @@
  * limitations under the License.
  */
 #include "FFFRDecoderContext.h"
-#include "FFFRLog.h"
 #include "FfFrameReader.h"
 
-#include <cstdarg>
-#include <cstdio>
 #include <map>
 #include <mutex>
 
@@ -28,35 +25,13 @@ extern "C" {
 
 using namespace std;
 
-void logCallback(void*, const int level, const char* format, const va_list vl)
-{
-    if (level > av_log_get_level()) {
-        return;
-    }
-    char pTempChar[1024];
-    if (vsnprintf(pTempChar, 1024 * sizeof(char), format, vl) > 0) {
-        if (level >= AV_LOG_ERROR) {
-            FfFrameReader::Interface::logError(pTempChar);
-        } else if (level >= AV_LOG_WARNING) {
-            FfFrameReader::Interface::logWarning(pTempChar);
-        } else {
-            FfFrameReader::Interface::logInfo(pTempChar);
-        }
-    }
-}
-
 namespace FfFrameReader {
 class Module
 {
     friend class Interface;
 
 public:
-    Module() noexcept
-    {
-        // Setup FFmpeg logging
-        av_log_set_level(AV_LOG_WARNING);
-        av_log_set_callback(logCallback);
-    }
+    Module() noexcept {}
 
     ~Module() noexcept = default;
 
@@ -72,7 +47,6 @@ protected:
     mutex m_mutex;
     map<Interface::DecoderType, shared_ptr<DecoderContext>> m_managers;
     map<string, shared_ptr<DecoderContext>> m_filenames;
-    Log m_log;
 };
 
 Module g_module;
@@ -84,7 +58,10 @@ FrameInterface::FrameInterface(shared_ptr<Frame> frame) noexcept
 int64_t FrameInterface::getTimeStamp() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_frame.get() != nullptr, "Frame operation requested on null frame", 0);
+    if (m_frame.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_frame->getTimeStamp();
@@ -93,7 +70,10 @@ int64_t FrameInterface::getTimeStamp() const noexcept
 int64_t FrameInterface::getFrameNumber() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_frame.get() != nullptr, "Frame operation requested on null frame", 0);
+    if (m_frame.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_frame->getFrameNumber();
@@ -102,7 +82,10 @@ int64_t FrameInterface::getFrameNumber() const noexcept
 uint8_t* FrameInterface::getFrameData() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_frame.get() != nullptr, "Frame operation requested on null frame", nullptr);
+    if (m_frame.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_frame->getFrameData();
@@ -111,7 +94,10 @@ uint8_t* FrameInterface::getFrameData() const noexcept
 uint32_t FrameInterface::getWidth() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_frame.get() != nullptr, "Frame operation requested on null frame", 0);
+    if (m_frame.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_frame->getWidth();
@@ -120,7 +106,10 @@ uint32_t FrameInterface::getWidth() const noexcept
 uint32_t FrameInterface::getHeight() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_frame.get() != nullptr, "Frame operation requested on null frame", 0);
+    if (m_frame.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_frame->getHeight();
@@ -129,7 +118,10 @@ uint32_t FrameInterface::getHeight() const noexcept
 double FrameInterface::getAspectRatio() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_frame.get() != nullptr, "Frame operation requested on null frame", 0.0);
+    if (m_frame.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0.0;
+    }
 
     // Call the member function
     return m_frame->getAspectRatio();
@@ -138,7 +130,10 @@ double FrameInterface::getAspectRatio() const noexcept
 uint32_t StreamInterface::getWidth() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+    if (m_stream.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_stream->getWidth();
@@ -147,7 +142,10 @@ uint32_t StreamInterface::getWidth() const noexcept
 uint32_t StreamInterface::getHeight() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+    if (m_stream.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_stream->getHeight();
@@ -156,7 +154,10 @@ uint32_t StreamInterface::getHeight() const noexcept
 double StreamInterface::getAspectRatio() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+    if (m_stream.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_stream->getAspectRatio();
@@ -165,7 +166,10 @@ double StreamInterface::getAspectRatio() const noexcept
 int64_t StreamInterface::getTotalFrames() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+    if (m_stream.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_stream->getTotalFrames();
@@ -174,7 +178,10 @@ int64_t StreamInterface::getTotalFrames() const noexcept
 int64_t StreamInterface::getDuration() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+    if (m_stream.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_stream->getDuration();
@@ -183,7 +190,10 @@ int64_t StreamInterface::getDuration() const noexcept
 variant<bool, FrameInterface> StreamInterface::getNextFrame() const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+    if (m_stream.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     const auto frame = m_stream->getNextFrame();
@@ -200,7 +210,10 @@ variant<bool, vector<FrameInterface>> StreamInterface::getNextFrameSequence(cons
     noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+    if (m_stream.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     const auto frames = m_stream->getNextFrameSequence(frameSequence);
@@ -220,7 +233,10 @@ variant<bool, vector<FrameInterface>> StreamInterface::getNextFrameSequence(cons
 bool StreamInterface::seek(const int64_t timeStamp) const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+    if (m_stream.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_stream->seek(timeStamp);
@@ -229,7 +245,10 @@ bool StreamInterface::seek(const int64_t timeStamp) const noexcept
 bool StreamInterface::seekFrame(const int64_t frame) const noexcept
 {
     // Check if initialised to a valid stream
-    FFFRASSERT(m_stream.get() != nullptr, "Stream operation requested on null stream", 0);
+    if (m_stream.get() != nullptr) {
+        av_log(nullptr, AV_LOG_ERROR, "Frame operation requested on null frame");
+        return 0;
+    }
 
     // Call the member function
     return m_stream->seekFrame(frame);
@@ -254,7 +273,8 @@ variant<bool, StreamInterface> Interface::getStream(const string& filename, cons
                 if (type == DecoderType::Nvdec) {
                     decodeType = DecoderContext::DecodeType::Nvdec;
                 } else if (type != DecoderType::Software) {
-                    FFFRASSERT(false, "Decoder type conversion not implemeneted", false);
+                    av_log(nullptr, AV_LOG_ERROR, "Decoder type conversion not implemented");
+                    return false;
                 }
                 g_module.m_managers.emplace(type, make_shared<DecoderContext>(decodeType));
                 found = g_module.m_managers.find(type)->second;
@@ -288,30 +308,5 @@ void Interface::releaseStream(const string& filename) noexcept
         }
     } catch (...) {
     }
-}
-
-void Interface::logMessage(const string& text, LogLevel severity) noexcept
-{
-    g_module.m_log.logMessage(text, static_cast<Log::LogLevel>(severity));
-}
-
-void Interface::logInfo(const string& text) noexcept
-{
-    g_module.m_log.logInfo(text);
-}
-
-void Interface::logWarning(const string& text) noexcept
-{
-    g_module.m_log.logWarning(text);
-}
-
-void Interface::logError(const string& text) noexcept
-{
-    g_module.m_log.logError(text);
-}
-
-void Interface::logStackTrace() noexcept
-{
-    g_module.m_log.logStackTrace();
 }
 } // namespace FfFrameReader

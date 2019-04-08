@@ -61,7 +61,6 @@ set(SOURCES
       source/FFFR.cpp
       source/FFFRStream.cpp
       source/FFFRDecoderContext.cpp
-      source/FFFRLog.cpp
       source/FFFRFrame.cpp
 )
 
@@ -72,7 +71,6 @@ set(HEADERS
 set(PRIVATE_HEADERS
       include/FFFRStream.h
       include/FFFRDecoderContext.h
-      include/FFFRLog.h
       include/FFFRFrame.h
 )
 
