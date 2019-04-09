@@ -37,9 +37,6 @@ Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecCon
 
     // Set stream start time and numbers of frames
     m_startTimeStamp = getStreamStartTime();
-    if (m_startTimeStamp != 0) {
-        av_log(nullptr, AV_LOG_WARNING, "Untested video with non zero-index start time\n");
-    }
     m_totalFrames = getStreamFrames();
     m_totalDuration = getStreamDuration();
 }
@@ -120,6 +117,11 @@ variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
         m_bufferPingHead = 0;
         // Reset the pong buffer
         m_bufferPong.resize(0);
+        // Check if there are any new frames or we reached EOF
+        if (m_bufferPing.size() == 0) {
+            av_log(nullptr, AV_LOG_ERROR, "Cannot get a new frame, End of file has been reached.\n");
+            return false;
+        }
     }
     // Get frame from ping buffer
     return m_bufferPing[m_bufferPingHead];
@@ -181,13 +183,15 @@ bool Stream::seekFrame(const int64_t frame) noexcept
 int64_t Stream::timeToTimeStamp(const int64_t time) const noexcept
 {
     // Rescale a timestamp that is stored in microseconds (AV_TIME_BASE) to the stream timebase
-    return av_rescale_q(time, av_make_q(1, AV_TIME_BASE), m_formatContext->streams[m_index]->time_base);
+    return m_startTimeStamp +
+        av_rescale_q(time, av_make_q(1, AV_TIME_BASE), m_formatContext->streams[m_index]->time_base);
 }
 
 int64_t Stream::timeStampToTime(const int64_t timeStamp) const noexcept
 {
     // Perform opposite operation to timeToTimeStamp
-    return av_rescale_q(timeStamp, m_formatContext->streams[m_index]->time_base, av_make_q(1, AV_TIME_BASE));
+    return av_rescale_q(
+        timeStamp - m_startTimeStamp, m_formatContext->streams[m_index]->time_base, av_make_q(1, AV_TIME_BASE));
 }
 
 int64_t Stream::frameToTimeStamp(const int64_t frame) const noexcept
@@ -197,15 +201,20 @@ int64_t Stream::frameToTimeStamp(const int64_t frame) const noexcept
             m_formatContext->streams[m_index]->time_base);
 }
 
-int64_t Stream::frameToTime(const int64_t frame) const noexcept
-{
-    return timeStampToTime(frameToTimeStamp(frame));
-}
-
 int64_t Stream::timeStampToFrame(const int64_t timeStamp) const noexcept
 {
     return av_rescale_q(timeStamp - m_startTimeStamp, m_formatContext->streams[m_index]->r_frame_rate,
         av_inv_q(m_formatContext->streams[m_index]->time_base));
+}
+
+int64_t Stream::frameToTime(const int64_t frame) const noexcept
+{
+    return av_rescale_q(frame, av_make_q(AV_TIME_BASE, 1), m_formatContext->streams[m_index]->r_frame_rate);
+}
+
+int64_t Stream::timeToFrame(const int64_t time) const noexcept
+{
+    return av_rescale_q(time, av_make_q(1, AV_TIME_BASE), av_inv_q(m_formatContext->streams[m_index]->r_frame_rate));
 }
 
 bool Stream::decodeNextBlock() noexcept
@@ -325,25 +334,24 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
         // Check if this is a forward seek within some predefined small range. If so then just continue reading
         // packets from the current position into buffer.
         if (timeStamp > m_bufferPing.back()->getTimeStamp()) {
-            // Loop through until the requested timestamp is found (or nearest timestamp rounded up if exact match could
-            // not be found). Discard all frames occuring before timestamp
-            const auto frameRange = timeStampToFrame(m_bufferPing.back()->getTimeStamp()) + m_bufferLength;
-            // Forward decode if less than or equal to 2 buffer lengths
-            const auto timeRange = frameToTimeStamp(frameRange * 2);
+            // Forward decode if less than or equal to 10x buffer lengths
+            const auto timeRange = frameToTimeStamp(m_bufferLength * 10);
+            // TODO: Should not be *2 as need to have enough to handle getCodecDelay
             if (timeStamp <= m_bufferPing.back()->getTimeStamp() + timeRange) {
-                while (true) {
-                    auto ret = peekNextFrame();
-                    if (ret.index() == 0) {
-                        return false;
-                    }
-                    // Check if we have found our requested time stamp
-                    if (timeStamp <= get<1>(ret)->getTimeStamp()) {
-                        break;
-                    }
-                    // Remove frames from ping buffer
-                    popFrame();
+                // Loop through until the requested timestamp is found (or nearest timestamp rounded up if exact match
+                // could not be found). Discard all frames occuring before timestamp
+
+                // Clean out current buffer
+                m_bufferPing.resize(0);
+                m_bufferPingHead = 0;
+
+                // Decode the next block of frames
+                if (peekNextFrame().index() == 0) {
+                    return false;
                 }
-                return true;
+
+                // Search through buffer until time stamp is found
+                return seekInternal(timeStamp, true);
             }
         }
     }
@@ -351,6 +359,7 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
     // If we have recursed and still havnt found the frame then we never will
     if (recursed) {
         av_log(nullptr, AV_LOG_ERROR, "Failed to seek to specified time stamp %" PRId64 "\n", timeStamp);
+        return false;
     }
 
     // Seek to desired timestamp
@@ -432,6 +441,8 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
             m_frameSeekSupported = false;
             av_log(nullptr, AV_LOG_ERROR,
                 "Failed to seek to specified frame %" PRId64 " (retrying using timestamp based seek)\n", frame);
+        } else if (recursed) {
+            return false;
         }
 
         // Try and seek just using a timestamp
@@ -481,29 +492,33 @@ int64_t Stream::getStreamStartTime() const noexcept
     }
     // Seek to the first frame in the video to get information directly from it
     avcodec_flush_buffers(m_codecContext.get());
-    if (av_seek_frame(m_formatContext.get(), m_index, 0, 0) >= 0) {
-        AVPacket packet;
-        av_init_packet(&packet);
-        // Read frames until we get one for the video stream that contains a valid PTS or DTS.
-        auto startTimeStamp = int64_t(AV_NOPTS_VALUE);
-        do {
-            if (av_read_frame(m_formatContext.get(), &packet) < 0) {
-                return 0;
-            }
-            if (packet.stream_index == m_index) {
-                // Get the DTS for the packet, if this value is not set then try the PTS
-                if (packet.dts != int64_t(AV_NOPTS_VALUE)) {
-                    startTimeStamp = packet.dts;
-                }
-                if (packet.pts != int64_t(AV_NOPTS_VALUE)) {
-                    startTimeStamp = packet.pts;
-                }
-            }
-            av_packet_unref(&packet);
-        } while (startTimeStamp == int64_t(AV_NOPTS_VALUE));
-        return startTimeStamp;
+    if (av_seek_frame(m_formatContext.get(), m_index, 0, 0) < 0) {
+        av_log(nullptr, AV_LOG_ERROR, "Failed to determine stream start time\n");
+        return 0;
     }
-    return 0;
+    AVPacket packet;
+    av_init_packet(&packet);
+    // Read frames until we get one for the video stream that contains a valid PTS or DTS.
+    auto startTimeStamp = int64_t(AV_NOPTS_VALUE);
+    do {
+        if (av_read_frame(m_formatContext.get(), &packet) < 0) {
+            return 0;
+        }
+        if (packet.stream_index == m_index) {
+            // Get the DTS for the packet, if this value is not set then try the PTS
+            //TODO: Need to find the first keyframes dts as that is actually the start. For broken streams the first packet may not be a keyframe
+            if (packet.dts != int64_t(AV_NOPTS_VALUE)) {
+                startTimeStamp = packet.dts;
+            }
+            if (packet.pts != int64_t(AV_NOPTS_VALUE)) {
+                startTimeStamp = packet.pts;
+            }
+        }
+        av_packet_unref(&packet);
+    } while (startTimeStamp == int64_t(AV_NOPTS_VALUE));
+    // Seek back to start of file so future reads continue back at start
+    av_seek_frame(m_formatContext.get(), m_index, 0, 0);
+    return startTimeStamp;
 }
 
 int64_t Stream::getStreamFrames() const noexcept
@@ -517,21 +532,19 @@ int64_t Stream::getStreamFrames() const noexcept
         // Since duration is stored in time base integer format there may have been some rounding performed when
         // calculating this value. We check for this by comparing to the number of frames reported by the stream and if
         // they are within 1 frame of each other then use the stream frame count value.
-        if (stream->nb_frames > 0 && abs(frames - stream->nb_frames) <= 1) {
-            return stream->nb_frames;
+        if (abs(frames - stream->nb_frames) > 1) {
+            return frames - timeStampToFrame(m_startTimeStamp * 2); //*2 To avoid the minus in timeStampToFrame
         }
-        return frames;
     }
 
     // Check if the number of frames is specified in the stream
     if (stream->nb_frames > 0) {
-        return stream->nb_frames;
+        return stream->nb_frames - timeStampToFrame(m_startTimeStamp * 2);
     }
 
     // Attempt to calculate from stream duration, time base and fps
-    const int64_t frames = av_rescale_q(int64_t(stream->duration), stream->r_frame_rate, av_inv_q(stream->time_base));
-    if (frames > 0) {
-        return frames;
+    if (stream->duration > 0) {
+        return timeStampToFrame(int64_t(stream->duration));
     }
 
     // If we are at this point then the only option is to scan the entire file and check the DTS/PTS.
@@ -539,7 +552,10 @@ int64_t Stream::getStreamFrames() const noexcept
 
     // Seek last key-frame.
     avcodec_flush_buffers(m_codecContext.get());
-    av_seek_frame(m_formatContext.get(), m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD);
+    if (av_seek_frame(m_formatContext.get(), m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD) < 0) {
+        av_log(nullptr, AV_LOG_ERROR, "Failed to determine number of frames in stream\n");
+        return 0;
+    }
 
     // Read up to last frame, extending max PTS for every valid PTS value found for the video stream.
     AVPacket packet;
@@ -557,6 +573,9 @@ int64_t Stream::getStreamFrames() const noexcept
         av_packet_unref(&packet);
     }
 
+    // Seek back to start of file so future reads continue back at start
+    av_seek_frame(m_formatContext.get(), m_index, 0, 0);
+
     // The detected value is the index of the last frame so the total frames is 1 more than this.
     return 1 + timeStampToFrame(foundTimeStamp);
 }
@@ -567,7 +586,8 @@ int64_t Stream::getStreamDuration() const noexcept
     // specified within each stream which is why it should be checked first.
     AVStream* stream = m_formatContext->streams[m_index];
     if (m_formatContext->duration > 0) {
-        return timeStampToTime(m_formatContext->duration);
+        return m_formatContext->duration -
+            timeStampToTime(m_startTimeStamp * 2); //*2 To avoid the minus in timeStampToTime
     }
 
     // Check if the duration is specified in the stream
@@ -580,7 +600,10 @@ int64_t Stream::getStreamDuration() const noexcept
 
     // Seek last key-frame.
     avcodec_flush_buffers(m_codecContext.get());
-    av_seek_frame(m_formatContext.get(), m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD);
+    if (av_seek_frame(m_formatContext.get(), m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD) < 0) {
+        av_log(nullptr, AV_LOG_ERROR, "Failed to determine stream duration\n");
+        return 0;
+    }
 
     // Read up to last frame, extending max PTS for every valid PTS value found for the video stream.
     AVPacket packet;
@@ -598,7 +621,10 @@ int64_t Stream::getStreamDuration() const noexcept
         av_packet_unref(&packet);
     }
 
-    // The detected value is timestamp of the last detected packet.
-    return timeStampToTime(foundTimeStamp);
+    // Seek back to start of file so future reads continue back at start
+    av_seek_frame(m_formatContext.get(), m_index, 0, 0);
+
+    // The detected value is timestamp of the last detected packet plus its display time.
+    return timeStampToTime(foundTimeStamp) + frameToTime(1);
 }
 } // namespace FfFrameReader
