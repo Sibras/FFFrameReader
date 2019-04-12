@@ -102,6 +102,11 @@ double Stream::getFrameRate() const noexcept
     return av_q2d(m_formatContext->streams[m_index]->r_frame_rate);
 }
 
+int64_t Stream::getFrameTime() const noexcept
+{
+    return frameToTime(1);
+}
+
 variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
 {
     lock_guard<recursive_mutex> lock(m_mutex);
