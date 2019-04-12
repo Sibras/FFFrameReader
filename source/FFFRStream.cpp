@@ -400,8 +400,9 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
         // Check if this is a forward seek within some predefined small range. If so then just continue reading
         // packets from the current position into buffer.
         if (timeStamp > m_bufferPing.back()->getTimeStamp()) {
-            // Forward decode if within some predefined range of existing point
-            constexpr int64_t forwardRange = 25;
+            // Forward decode if within some predefined range of existing point. If this is a recurse then we need to
+            // compensate for potentially huge gaps between seek frames.
+            const int64_t forwardRange = (!recursed) ? m_bufferLength * 3 : 1000;
             const auto timeRange = frameToTime(forwardRange);
             if (timeStamp <= m_bufferPing.back()->getTimeStamp() + timeRange) {
                 // Loop through until the requested timestamp is found (or nearest timestamp rounded up if exact match
@@ -480,9 +481,9 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
         // Check if this is a forward seek within some predefined small range. If so then just continue reading
         // packets from the current position into buffer.
         if (frame > m_bufferPing.back()->getFrameNumber()) {
-            // Loop through until the requested frame is found.
-            // Forward decode if less than or equal to 2 buffer lengths
-            const auto frameRange = m_bufferLength * 2;
+            // Forward decode if within some predefined range of existing point. If this is a recurse then we need to
+            // compensate for potentially huge gaps between seek frames.
+            const int64_t frameRange = (!recursed) ? m_bufferLength * 3 : 1000;
             if (frame <= m_bufferPing.back()->getFrameNumber() + frameRange) {
                 while (true) {
                     auto ret = peekNextFrame();
