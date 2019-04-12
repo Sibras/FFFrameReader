@@ -241,8 +241,9 @@ bool Stream::decodeNextBlock() noexcept
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
         // We do getCodecDelay() packets at a time for performance even though this may result in more than
         // m_bufferLength frames being actually decoded
-        const auto maxPackets = getCodecDelay();
-        for (int32_t i = 0; i < maxPackets;) {
+        auto maxPackets = getCodecDelay();
+        int32_t i = 0;
+        do {
             auto ret = av_read_frame(m_formatContext.get(), &packet);
             if (ret < 0) {
                 if (ret != AVERROR_EOF) {
@@ -272,9 +273,15 @@ bool Stream::decodeNextBlock() noexcept
                         av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
                     return false;
                 }
+                // Increase the number of maxPackets if we are really close to just finishing the stream anyway
+                if (i == (maxPackets - 1)) {
+                    if (timeStampToFrame(packet.pts) >= (m_totalFrames - 2)) {
+                        maxPackets += 2;
+                    }
+                }
             }
             av_packet_unref(&packet);
-        }
+        } while (i < maxPackets);
 
         // Decode any pending frames
         if (!decodeNextFrames()) {
