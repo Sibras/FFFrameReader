@@ -544,20 +544,7 @@ int64_t Stream::getStreamStartTime() const noexcept
 
 int64_t Stream::getStreamFrames() const noexcept
 {
-    // First try and get the format duration if specified. For some formats this durations can override the duration
-    // specified within each stream which is why it should be checked first.
     AVStream* stream = m_formatContext->streams[m_index];
-    if (m_formatContext->duration > 0) {
-        const int64_t frames =
-            av_rescale_q(m_formatContext->duration, stream->r_frame_rate, av_inv_q(av_make_q(1, AV_TIME_BASE)));
-        // Since duration is stored in time base integer format there may have been some rounding performed when
-        // calculating this value. We check for this by comparing to the number of frames reported by the stream and if
-        // they are within 1 frame of each other then use the stream frame count value.
-        if (abs(frames - stream->nb_frames) > 1) {
-            return frames - timeStampToFrame(m_startTimeStamp * 2); //*2 To avoid the minus in timeStampToFrame
-        }
-    }
-
     // Check if the number of frames is specified in the stream
     if (stream->nb_frames > 0) {
         return stream->nb_frames - timeStampToFrame(m_startTimeStamp * 2);
@@ -573,7 +560,8 @@ int64_t Stream::getStreamFrames() const noexcept
 
     // Seek last key-frame.
     avcodec_flush_buffers(m_codecContext.get());
-    if (av_seek_frame(m_formatContext.get(), m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD) < 0) {
+    const auto maxSeek = frameToTimeStamp(1UL << 29UL);
+    if (avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, maxSeek, maxSeek, 0) < 0) {
         av_log(nullptr, AV_LOG_ERROR, "Failed to determine number of frames in stream\n");
         return 0;
     }
@@ -583,9 +571,9 @@ int64_t Stream::getStreamFrames() const noexcept
     av_init_packet(&packet);
     while (av_read_frame(m_formatContext.get(), &packet) >= 0) {
         if (packet.stream_index == m_index) {
-            auto found = packet.dts;
-            if (found != int64_t(AV_NOPTS_VALUE)) {
-                found = packet.pts;
+            auto found = packet.pts;
+            if (found == int64_t(AV_NOPTS_VALUE)) {
+                found = packet.dts;
             }
             if (found > foundTimeStamp) {
                 foundTimeStamp = found;
@@ -595,10 +583,14 @@ int64_t Stream::getStreamFrames() const noexcept
     }
 
     // Seek back to start of file so future reads continue back at start
-    av_seek_frame(m_formatContext.get(), m_index, 0, 0);
+    int64_t startDts = 0LL;
+    if (stream->first_dts != int64_t(AV_NOPTS_VALUE)) {
+        startDts = std::min(startDts, stream->first_dts);
+    }
+    av_seek_frame(m_formatContext.get(), m_index, startDts, AVSEEK_FLAG_BACKWARD);
 
-    // The detected value is the index of the last frame so the total frames is 1 more than this.
-    return 1 + timeStampToFrame(foundTimeStamp);
+    // The detected value is the index of the last frame plus one
+    return timeStampToFrame(foundTimeStamp) + 1;
 }
 
 int64_t Stream::getStreamDuration() const noexcept
