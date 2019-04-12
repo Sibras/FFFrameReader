@@ -71,13 +71,6 @@ TEST_P(StreamTest1, getFrameRate)
     ASSERT_DOUBLE_EQ(m_stream->getFrameRate(), GetParam().m_frameRate);
 }
 
-TEST_P(StreamTest1, getFrameTime)
-{
-    ASSERT_EQ(m_stream->getFrameTime(), GetParam().m_frameTime);
-}
-
-// TODO: Add stream->getFrameTime
-
 TEST_P(StreamTest1, getNextFrame)
 {
     ASSERT_NE(m_stream->getNextFrame().index(), 0);
@@ -89,7 +82,6 @@ TEST_P(StreamTest1, getNextFrame2)
     ASSERT_NE(ret1.index(), 0);
     const auto ret2 = m_stream->getNextFrame();
     ASSERT_NE(ret2.index(), 0);
-    // TODO: Check that the frames are in fact different
 }
 
 TEST_P(StreamTest1, getNextFrameLoop)
@@ -111,7 +103,8 @@ TEST_P(StreamTest1, getLoop)
         ASSERT_NE(ret1.index(), 0);
         const auto frame1 = std::get<1>(ret1);
         ASSERT_EQ(frame1->getTimeStamp(), timeStamp);
-        timeStamp += GetParam().m_frameTime;
+        const double timeStamp1 = (static_cast<double>(i + 1) * (1000000.0 / GetParam().m_frameRate));
+        timeStamp = llround(timeStamp1);
         ASSERT_EQ(frame1->getFrameNumber(), frameNum);
         ++frameNum;
     }
@@ -131,7 +124,8 @@ TEST_P(StreamTest1, getLoopAll)
         ASSERT_NE(ret1.index(), 0);
         const auto frame1 = std::get<1>(ret1);
         ASSERT_EQ(frame1->getTimeStamp(), timeStamp);
-        timeStamp += GetParam().m_frameTime;
+        const double timeStamp1 = (static_cast<double>(i + 1) * (1000000.0 / GetParam().m_frameRate));
+        timeStamp = llround(timeStamp1);
         ASSERT_EQ(frame1->getFrameNumber(), frameNum);
         ++frameNum;
     }
@@ -139,7 +133,8 @@ TEST_P(StreamTest1, getLoopAll)
 
 TEST_P(StreamTest1, seek)
 {
-    const int64_t time1 = GetParam().m_frameTime * 80;
+    const double timeStamp1 = (static_cast<double>(80) * (1000000.0 / GetParam().m_frameRate));
+    const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
     const auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
@@ -152,7 +147,8 @@ TEST_P(StreamTest1, seekSmall)
     // First fill the buffer
     ASSERT_NE(m_stream->getNextFrame().index(), 0);
     // Seek forward 2 frames only. This should just increment the existing buffer
-    const int64_t time1 = GetParam().m_frameTime * 2;
+    const double timeStamp1 = (static_cast<double>(2) * (1000000.0 / GetParam().m_frameRate));
+    const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
     const auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
@@ -165,7 +161,8 @@ TEST_P(StreamTest1, seekMedium)
     // First fill the buffer
     ASSERT_NE(m_stream->getNextFrame().index(), 0);
     // Seek forward 1.5 * bufferSize frame TODO**********
-    const int64_t time1 = GetParam().m_frameTime * 15;
+    const double timeStamp1 = (static_cast<double>(15) * (1000000.0 / GetParam().m_frameRate));
+    const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
     const auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
@@ -180,34 +177,39 @@ TEST_P(StreamTest1, seekFail)
 
 TEST_P(StreamTest1, seekEnd)
 {
-    ASSERT_TRUE(m_stream->seek(m_stream->getDuration() - GetParam().m_frameTime));
+    ASSERT_TRUE(m_stream->seek(
+        m_stream->getDuration() - GetParam().m_frameTime - ((((GetParam().m_frameTime / 3) & 0x3) == 2) ? 1 : 0)));
     const auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
 }
 
 TEST_P(StreamTest1, seekLoop)
 {
-    int64_t timeStamp = 0;
+    double timeStamp1 = 0.0;
+    int64_t time1 = 0;
     // Perform multiple forward seeks
     for (uint32_t i = 0; i < 5; i++) {
-        ASSERT_TRUE(m_stream->seek(timeStamp));
+        ASSERT_TRUE(m_stream->seek(time1));
         // Check that multiple sequential frames can be read
-        int64_t timeStamp2 = timeStamp;
+        int64_t time2 = time1;
         for (uint32_t j = 0; j < 25; j++) {
             const auto ret1 = m_stream->getNextFrame();
             ASSERT_NE(ret1.index(), 0);
             const auto frame1 = std::get<1>(ret1);
-            ASSERT_EQ(frame1->getTimeStamp(), timeStamp2);
-            timeStamp2 += GetParam().m_frameTime;
+            ASSERT_EQ(frame1->getTimeStamp(), time2);
+            const double timeStamp2 = timeStamp1 + (static_cast<double>(j + 1) * (1000000.0 / GetParam().m_frameRate));
+            time2 = llround(timeStamp2);
         }
-        timeStamp += GetParam().m_frameTime * 40;
+        timeStamp1 = (static_cast<double>(i + 1) * 40.0 * (1000000.0 / GetParam().m_frameRate));
+        time1 = llround(timeStamp1);
     }
 }
 
 TEST_P(StreamTest1, seekBack)
 {
     // Seek forward
-    const int64_t time1 = GetParam().m_frameTime * 80;
+    const double timeStamp1 = (static_cast<double>(80) * (1000000.0 / GetParam().m_frameRate));
+    const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
     auto ret1 = m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
