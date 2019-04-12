@@ -65,6 +65,7 @@ DecoderContext::DecoderContext(const DecodeType type, const uint32_t bufferLengt
         // Create device specific options
         const string device = "0";
         // TODO: Allow specifying the device to use
+        // TODO: Allow specifying a filter chain of color conversion, scale and cropping
 
         // Create the hardware context for decoding
         const int err =
@@ -150,6 +151,8 @@ variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filena
     }
 
     // Setup any required hardware decoding parameters
+    AVDictionary* opts = nullptr;
+    av_dict_set(&opts, "refcounted_frames", "1", 0);
     if (m_deviceType != DecodeType::Software) {
         if (m_deviceType == DecodeType::Nvdec) {
             tempCodec->get_format = getHardwareFormatNvdec;
@@ -158,8 +161,10 @@ variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filena
             return false;
         }
         tempCodec->hw_device_ctx = av_buffer_ref(m_deviceContext);
+    } else {
+        av_dict_set(&opts, "threads", "auto", 0);
     }
-    ret = avcodec_open2(tempCodec.get(), decoder, nullptr);
+    ret = avcodec_open2(tempCodec.get(), decoder, &opts);
     if (ret < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
         av_log(nullptr, AV_LOG_ERROR, "Failed opening decoder for %s: %s\n", filename.c_str(),
