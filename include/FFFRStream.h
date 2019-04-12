@@ -109,14 +109,15 @@ public:
     [[nodiscard]] int64_t getTotalFrames() const noexcept;
 
     /**
-     * Gets the duration of the video stream in microseconds.
+     * Gets the duration of the video stream in micro-seconds.
      * @returns The duration.
      */
     [[nodiscard]] int64_t getDuration() const noexcept;
 
     /**
      * Gets the frame rate (fps) of the video stream.
-     * @returns The duration.
+     * @note This will not be fully accurate when dealing with VFR video streams.
+     * @returns The frame rate in frames per second.
      */
     [[nodiscard]] double getFrameRate() const noexcept;
 
@@ -150,7 +151,8 @@ public:
         const std::vector<int64_t>& frameSequence) noexcept;
 
     /**
-     * Seeks the stream to the given time stamp.
+     * Seeks the stream to the given time stamp. If timestamp does not exactly match a frame then the timestamp rounded
+     * down to nearest frame is used instead.
      * @param timeStamp The time stamp to seek to (in micro-seconds).
      * @returns True if it succeeds, false if it fails.
      */
@@ -183,7 +185,6 @@ private:
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to the stream timebase.
-     * @note This will not be fully accurate when dealing with VFR video streams
      * @param time The time in microseconds (AV_TIME_BASE).
      * @return The converted time stamp.
      */
@@ -191,7 +192,6 @@ private:
 
     /**
      * Convert a stream timebase to a time value represented in microseconds (AV_TIME_BASE).
-     * @note This will not be fully accurate when dealing with VFR video streams
      * @param timeStamp The time stamp represented in the streams internal time base.
      * @return The converted time.
      */
@@ -199,7 +199,7 @@ private:
 
     /**
      * Convert a zero-based frame number to the stream timebase.
-     * @note This will not be fully accurate when dealing with VFR video streams
+     * @note This will not be fully accurate when dealing with VFR video streams.
      * @param frame The zero-based frame number
      * @return The converted time stamp.
      */
@@ -207,7 +207,7 @@ private:
 
     /**
      * Convert stream based time stamp to an equivalent zero-based frame number.
-     * @note This will not be fully accurate when dealing with VFR video streams
+     * @note This will not be fully accurate when dealing with VFR video streams.
      * @param timeStamp The time stamp represented in the streams internal time base.
      * @return The converted frame index.
      */
@@ -215,7 +215,7 @@ private:
 
     /**
      * Convert a zero-based frame number to time value represented in microseconds (AV_TIME_BASE).
-     * @note This will not be fully accurate when dealing with VFR video streams
+     * @note This will not be fully accurate when dealing with VFR video streams.
      * @param frame The zero-based frame number
      * @return The converted time.
      */
@@ -223,7 +223,7 @@ private:
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to a zero-based frame number.
-     * @note This will not be fully accurate when dealing with VFR video streams
+     * @note This will not be fully accurate when dealing with VFR video streams.
      * @param time The time in microseconds (AV_TIME_BASE).
      * @return The converted frame index.
      */
