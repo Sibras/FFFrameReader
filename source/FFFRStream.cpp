@@ -317,7 +317,7 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
     // Check if we actually have any frames in the current buffer
     if (m_bufferPing.size() > 0) {
         // Check if the frame is in the current buffer
-        if ((timeStamp >= m_bufferPing[m_bufferPingHead]->getTimeStamp()) &&
+        if ((m_bufferPingHead < m_bufferPing.size()) && (timeStamp >= m_bufferPing[m_bufferPingHead]->getTimeStamp()) &&
             (timeStamp <= m_bufferPing.back()->getTimeStamp())) {
             // Dump all frames before requested one
             while (true) {
@@ -327,7 +327,12 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
                     return false;
                 }
                 // Check if we have found our requested time stamp
-                if (timeStamp <= get<1>(ret)->getTimeStamp()) {
+                const auto frame = get<1>(ret);
+                if (timeStamp <= frame->getTimeStamp()) {
+                    break;
+                }
+                // Check if the timestamp does not exactly match but is within the timestamp range of the next frame
+                if ((timeStamp > frame->getTimeStamp()) && (timeStamp < (frame->getTimeStamp() + getFrameTime()))) {
                     break;
                 }
                 // Remove frames from ping buffer
@@ -339,9 +344,9 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
         // Check if this is a forward seek within some predefined small range. If so then just continue reading
         // packets from the current position into buffer.
         if (timeStamp > m_bufferPing.back()->getTimeStamp()) {
-            // Forward decode if less than or equal to 10x buffer lengths
-            const auto timeRange = frameToTimeStamp(m_bufferLength * 10);
-            // TODO: Should not be *2 as need to have enough to handle getCodecDelay
+            // Forward decode if within some predefined range of existing point
+            constexpr int64_t forwardRange = 25;
+            const auto timeRange = frameToTime(forwardRange);
             if (timeStamp <= m_bufferPing.back()->getTimeStamp() + timeRange) {
                 // Loop through until the requested timestamp is found (or nearest timestamp rounded up if exact match
                 // could not be found). Discard all frames occuring before timestamp
@@ -369,7 +374,7 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
 
     // Seek to desired timestamp
     avcodec_flush_buffers(m_codecContext.get());
-    const auto localTimeStamp = timeToTimeStamp(timeStamp);
+    const auto localTimeStamp = timeToTimeStamp(timeStamp) + m_startTimeStamp;
     const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
         char buffer[AV_ERROR_MAX_STRING_SIZE];
@@ -397,7 +402,7 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
     // Check if we actually have any frames in the current buffer
     if (m_bufferPing.size() > 0) {
         // Check if the frame is in the current buffer
-        if ((frame >= m_bufferPing[m_bufferPingHead]->getFrameNumber()) &&
+        if ((m_bufferPingHead < m_bufferPing.size()) && (frame >= m_bufferPing[m_bufferPingHead]->getFrameNumber()) &&
             (frame <= m_bufferPing.back()->getFrameNumber())) {
             // Dump all frames before requested one
             while (true) {
@@ -456,7 +461,9 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
 
     // Seek to desired timestamp
     avcodec_flush_buffers(m_codecContext.get());
-    const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, frame, frame, AVSEEK_FLAG_FRAME);
+    const auto frameInternal = frame + timeStampToFrame(m_startTimeStamp);
+    const auto err =
+        avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
     if (err < 0) {
         m_frameSeekSupported = false;
         char buffer[AV_ERROR_MAX_STRING_SIZE];
