@@ -481,12 +481,12 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
     return seekFrameInternal(frame, true);
 }
 
-/*
-int Stream::getCodecDelay() const noexcept
+int32_t Stream::getCodecDelay() const noexcept
 {
-    return ((uint32_t(m_codec->capabilities) & uint32_t(AV_CODEC_CAP_DELAY)) ? m_codecContext->delay : 0) +
-        m_codecContext->has_b_frames;
-}*/
+    return std::max(((m_codecContext->codec->capabilities & AV_CODEC_CAP_DELAY) ? m_codecContext->delay : 0) +
+            m_codecContext->has_b_frames,
+        1);
+}
 
 int64_t Stream::getStreamStartTime() const noexcept
 {

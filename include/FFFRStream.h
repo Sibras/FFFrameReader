@@ -262,7 +262,7 @@ private:
      * @note We expect to have to wait this many frames to receive output; any more and a decode stall is detected.
      * @returns The codec delay.
      */
-    //[[nodiscard]] int getCodecDelay() const noexcept;
+    [[nodiscard]] int32_t getCodecDelay() const noexcept;
 
     /**
      * Gets stream start time in the stream timebase.
