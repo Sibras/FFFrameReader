@@ -236,6 +236,12 @@ private:
     [[nodiscard]] bool decodeNextBlock() noexcept;
 
     /**
+     * Decodes any frames currently pending in the decoder.
+     * @returns True if it succeeds, false if it fails.
+     */
+    [[nodiscard]] bool decodeNextFrames() noexcept;
+
+    /**
      * Pops the next available frame from the buffer.
      * @note This requires that peekNextFrame() be called first to ensure there is a valid frame to pop.
      */

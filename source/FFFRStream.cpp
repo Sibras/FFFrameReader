@@ -32,8 +32,8 @@ Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecCon
     , m_codecContext(move(codecContext))
 {
     // Allocate ping and pong buffers
-    m_bufferPing.reserve(m_bufferLength);
-    m_bufferPong.reserve(m_bufferLength);
+    m_bufferPing.reserve(m_bufferLength * 2);
+    m_bufferPong.reserve(m_bufferLength * 2);
 
     // Set stream start time and numbers of frames
     m_startTimeStamp = getStreamStartTime();
@@ -111,7 +111,7 @@ variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
 {
     lock_guard<recursive_mutex> lock(m_mutex);
     // Check if we actually have any frames in the current buffer
-    if (m_bufferPingHead == m_bufferPing.size()) {
+    if (m_bufferPingHead >= m_bufferPing.size()) {
         // TODO: Async decode of next block, should start once reached the last couple of frames in a buffer
         // The swap buffer only should occur when ping buffer is exhausted and pong decode has completed
         if (!decodeNextBlock()) {
@@ -231,73 +231,125 @@ bool Stream::decodeNextBlock() noexcept
 
     // Decode the next buffer sequence
     AVPacket packet;
-    Frame::FramePtr frame;
     av_init_packet(&packet);
+    bool eof = false;
     while (true) {
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
-        int32_t ret = av_read_frame(m_formatContext.get(), &packet);
-        if (ret < 0) {
-            if (ret != AVERROR_EOF) {
-                char buffer[AV_ERROR_MAX_STRING_SIZE];
-                av_log(nullptr, AV_LOG_ERROR, "Failed to retrieve new frame: %s\n",
-                    av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
-                return false;
-            }
-            return true;
-        }
-
-        if (m_index == packet.stream_index) {
-            ret = avcodec_send_packet(m_codecContext.get(), &packet);
-            av_packet_unref(&packet);
+        // We do getCodecDelay() packets at a time for performance even though this may result in more than
+        // m_bufferLength frames being actually decoded
+        const auto maxPackets = getCodecDelay();
+        for (int32_t i = 0; i < maxPackets;) {
+            auto ret = av_read_frame(m_formatContext.get(), &packet);
             if (ret < 0) {
-                char buffer[AV_ERROR_MAX_STRING_SIZE];
-                av_log(nullptr, AV_LOG_ERROR, "Failed to send packet to decoder: %s\n",
-                    av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
-                return false;
-            }
-
-            while (true) {
-                if (*frame == nullptr) {
-                    *frame = av_frame_alloc();
-                    if (*frame == nullptr) {
-                        av_log(nullptr, AV_LOG_ERROR, "Failed to allocate new frame\n");
-                        return false;
-                    }
-                }
-
-                ret = avcodec_receive_frame(m_codecContext.get(), *frame);
-                if (ret < 0) {
-                    av_frame_unref(*frame);
-                    if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF)) {
-                        // We allow for more frames to be returned than requested to ensure that the decoder has been
-                        // flushed
-                        if (m_bufferPong.size() >= m_bufferLength) {
-                            // TODO: Check all the timestamps in the buffer to make sure they are sorted correctly
-                            // This may require a buffer overflow area as the last few frames from one buffer should be
-                            // added to the start of the next buffer in case they need sorting.
-                            return true;
-                        }
-                        break;
-                    }
+                if (ret != AVERROR_EOF) {
                     char buffer[AV_ERROR_MAX_STRING_SIZE];
-                    av_log(nullptr, AV_LOG_ERROR, "Failed to receive decoded frame: %s\n",
+                    av_log(nullptr, AV_LOG_ERROR, "Failed to retrieve new frame: %s\n",
                         av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
                     return false;
                 }
-
-                // Calculate time stamp for frame
-                const auto timeStamp = timeStampToTime(frame->best_effort_timestamp);
-                const auto frameNum = timeStampToFrame(frame->best_effort_timestamp);
-
-                // Add the new frame to the pong buffer
-                m_bufferPong.emplace_back(make_shared<Frame>(frame, timeStamp, frameNum));
+                eof = true;
+                break;
             }
-        } else {
+
+            if (m_index == packet.stream_index) {
+                ++i;
+                ret = avcodec_send_packet(m_codecContext.get(), &packet);
+                if (ret == AVERROR(EAGAIN)) {
+                    // Cannot add any more packets as must decode what we have first
+                    if (!decodeNextFrames()) {
+                        return false;
+                    }
+                    ret = avcodec_send_packet(m_codecContext.get(), &packet);
+                }
+                if (ret < 0) {
+                    av_packet_unref(&packet);
+                    char buffer[AV_ERROR_MAX_STRING_SIZE];
+                    av_log(nullptr, AV_LOG_ERROR, "Failed to send packet to decoder: %s\n",
+                        av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+                    return false;
+                }
+            }
             av_packet_unref(&packet);
+        }
+
+        // Decode any pending frames
+        if (!decodeNextFrames()) {
+            return false;
+        }
+        // Check if we need to flush any remaining frames
+        if (eof) {
+            // Send flush packet to decoder
+            avcodec_send_packet(m_codecContext.get(), &packet);
+            if (!decodeNextFrames()) {
+                return false;
+            }
+            // Check if we got more frames than we should have. This occurs when there are missing frames that are
+            // padded in resulting in more output frames than expected.
+            while (!m_bufferPong.empty()) {
+                if (m_bufferPong.back()->getTimeStamp() < this->getDuration()) {
+                    break;
+                }
+                m_bufferPong.pop_back();
+            }
+        }
+        // Check if we have reached the buffer limit
+        if ((m_bufferPong.size() >= m_bufferLength) || eof) {
+            return true;
         }
 
         // TODO: The maximum number of frames that are needed to get a valid frame is calculated using getCodecDelay().
         // If more than that are passed without a returned frame then an error has occured.
+    }
+}
+
+bool Stream::decodeNextFrames() noexcept
+{
+    // Loop through and retrieve all decoded frames
+    Frame::FramePtr frame;
+    while (true) {
+        if (*frame == nullptr) {
+            *frame = av_frame_alloc();
+            if (*frame == nullptr) {
+                av_log(nullptr, AV_LOG_ERROR, "Failed to allocate new frame\n");
+                return false;
+            }
+        }
+        const auto ret = avcodec_receive_frame(m_codecContext.get(), *frame);
+        if (ret < 0) {
+            av_frame_unref(*frame);
+            if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF)) {
+                return true;
+            }
+            char buffer[AV_ERROR_MAX_STRING_SIZE];
+            av_log(nullptr, AV_LOG_ERROR, "Failed to receive decoded frame: %s\n",
+                av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+            return false;
+        }
+
+        // Calculate time stamp for frame
+        const auto timeStamp = timeStampToTime(frame->best_effort_timestamp);
+        const auto frameNum = timeStampToFrame(frame->best_effort_timestamp);
+
+        // Check if we have skipped a frame
+        if (!m_bufferPong.empty()) {
+            // TODO: Handle case where pong is empty but a frame was still skipped between now and last entry in ping
+            // (which has already been popped by the time this function is called)
+            const auto previous = m_bufferPong.back();
+            if (frameNum != previous->getFrameNumber() + 1) {
+                // Fill in missing frames by duplicating the old one
+                auto fillFrameNum = previous->getFrameNumber();
+                auto fillTimeStamp = previous->getTimeStamp();
+                for (auto i = previous->getFrameNumber() + 1; i < frameNum; i++) {
+                    fillTimeStamp += getFrameTime();
+                    ++fillFrameNum;
+                    Frame::FramePtr frameClone(av_frame_clone(*frame));
+                    m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum));
+                }
+            }
+        }
+
+        // Add the new frame to the pong buffer
+        m_bufferPong.emplace_back(make_shared<Frame>(frame, timeStamp, frameNum));
     }
 }
 
