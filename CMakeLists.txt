@@ -44,9 +44,6 @@ option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
 
 # Build test related commands?
 option(BUILD_TESTING "Create tests using CMake" ON)
-if(BUILD_TESTING)
-    enable_testing()
-endif()
 
 # Default to a release build if desired configuration is not specified.
 if(NOT CMAKE_CONFIGURATION_TYPES)
@@ -137,6 +134,7 @@ install(TARGETS FfFrameReader
 
 # Add tests
 if(BUILD_TESTING)
+    enable_testing()
     find_package(GTest REQUIRED)
     include(GoogleTest)
 
@@ -167,6 +165,6 @@ if(BUILD_TESTING)
     add_dependencies(FFFRTest FfFrameReader)
 
     gtest_discover_tests(FFFRTest
-        WORKING_DIRECTORY test
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test"
     )
 endif()
