@@ -31,6 +31,10 @@ Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecCon
     , m_index(streamID)
     , m_codecContext(move(codecContext))
 {
+    // Ensure buffer length is long enough to handle the maximum number of frames a video may require
+    const uint32_t minFrames = getCodecDelay();
+    m_bufferLength = (m_bufferLength >= minFrames) ? m_bufferLength : minFrames;
+
     // Allocate ping and pong buffers
     m_bufferPing.reserve(m_bufferLength * 2);
     m_bufferPong.reserve(m_bufferLength * 2);
