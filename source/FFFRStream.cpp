@@ -613,7 +613,8 @@ int64_t Stream::getStreamDuration() const noexcept
 
     // Seek last key-frame.
     avcodec_flush_buffers(m_codecContext.get());
-    if (av_seek_frame(m_formatContext.get(), m_index, frameToTimeStamp(1UL << 29UL), AVSEEK_FLAG_BACKWARD) < 0) {
+    const auto maxSeek = frameToTimeStamp(1UL << 29UL);
+    if (avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, maxSeek, maxSeek, 0) < 0) {
         av_log(nullptr, AV_LOG_ERROR, "Failed to determine stream duration\n");
         return 0;
     }
@@ -623,9 +624,9 @@ int64_t Stream::getStreamDuration() const noexcept
     av_init_packet(&packet);
     while (av_read_frame(m_formatContext.get(), &packet) >= 0) {
         if (packet.stream_index == m_index) {
-            auto found = packet.dts;
-            if (found != int64_t(AV_NOPTS_VALUE)) {
-                found = packet.pts;
+            auto found = packet.pts;
+            if (found == int64_t(AV_NOPTS_VALUE)) {
+                found = packet.dts;
             }
             if (found > foundTimeStamp) {
                 foundTimeStamp = found;
@@ -635,9 +636,13 @@ int64_t Stream::getStreamDuration() const noexcept
     }
 
     // Seek back to start of file so future reads continue back at start
-    av_seek_frame(m_formatContext.get(), m_index, 0, 0);
+    int64_t startDts = 0LL;
+    if (stream->first_dts != int64_t(AV_NOPTS_VALUE)) {
+        startDts = std::min(startDts, stream->first_dts);
+    }
+    av_seek_frame(m_formatContext.get(), m_index, startDts, AVSEEK_FLAG_BACKWARD);
 
-    // The detected value is timestamp of the last detected packet plus its display time.
+    // The detected value is timestamp of the last detected packet plus the duration of that frame
     return timeStampToTime(foundTimeStamp) + frameToTime(1);
 }
 } // namespace FfFrameReader
