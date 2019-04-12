@@ -504,7 +504,11 @@ int64_t Stream::getStreamStartTime() const noexcept
     }
     // Seek to the first frame in the video to get information directly from it
     avcodec_flush_buffers(m_codecContext.get());
-    if (av_seek_frame(m_formatContext.get(), m_index, 0, 0) < 0) {
+    int64_t startDts = 0LL;
+    if (stream->first_dts != int64_t(AV_NOPTS_VALUE)) {
+        startDts = std::min(startDts, stream->first_dts);
+    }
+    if (av_seek_frame(m_formatContext.get(), m_index, startDts, AVSEEK_FLAG_BACKWARD) < 0) {
         av_log(nullptr, AV_LOG_ERROR, "Failed to determine stream start time\n");
         return 0;
     }
@@ -512,25 +516,30 @@ int64_t Stream::getStreamStartTime() const noexcept
     av_init_packet(&packet);
     // Read frames until we get one for the video stream that contains a valid PTS or DTS.
     auto startTimeStamp = int64_t(AV_NOPTS_VALUE);
-    do {
+    const auto maxPackets = getCodecDelay();
+    // Loop through multiple packets to take into account b-frame reordering issues
+    for (int32_t i = 0; i < maxPackets;) {
         if (av_read_frame(m_formatContext.get(), &packet) < 0) {
             return 0;
         }
         if (packet.stream_index == m_index) {
-            // Get the DTS for the packet, if this value is not set then try the PTS
-            //TODO: Need to find the first keyframes dts as that is actually the start. For broken streams the first packet may not be a keyframe
-            if (packet.dts != int64_t(AV_NOPTS_VALUE)) {
-                startTimeStamp = packet.dts;
+            // Get the Presentation time stamp for the packet, if this value is not set then try the Decompression time
+            // stamp
+            auto pts = packet.pts;
+            if (pts == int64_t(AV_NOPTS_VALUE)) {
+                pts = packet.dts;
             }
-            if (packet.pts != int64_t(AV_NOPTS_VALUE)) {
-                startTimeStamp = packet.pts;
+            if ((pts != int64_t(AV_NOPTS_VALUE)) &&
+                ((pts < startTimeStamp) || (startTimeStamp == int64_t(AV_NOPTS_VALUE)))) {
+                startTimeStamp = pts;
             }
+            ++i;
         }
         av_packet_unref(&packet);
-    } while (startTimeStamp == int64_t(AV_NOPTS_VALUE));
+    }
     // Seek back to start of file so future reads continue back at start
-    av_seek_frame(m_formatContext.get(), m_index, 0, 0);
-    return startTimeStamp;
+    av_seek_frame(m_formatContext.get(), m_index, startDts, AVSEEK_FLAG_BACKWARD);
+    return (startTimeStamp != int64_t(AV_NOPTS_VALUE)) ? startTimeStamp : 0;
 }
 
 int64_t Stream::getStreamFrames() const noexcept
