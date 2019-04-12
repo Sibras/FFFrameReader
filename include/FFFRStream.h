@@ -122,13 +122,6 @@ public:
     [[nodiscard]] double getFrameRate() const noexcept;
 
     /**
-     * Gets the duration of each frame in the video stream in micro-seconds.
-     * @note This will not be fully accurate when dealing with VFR video streams.
-     * @returns The frame rate in frames per second.
-     */
-    [[nodiscard]] int64_t getFrameTime() const noexcept;
-
-    /**
      * Get the next frame in the stream without removing it from stream buffer.
      * @returns The next frame in current stream, or false if an error occured.
      */
