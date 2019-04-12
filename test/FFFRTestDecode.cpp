@@ -70,5 +70,6 @@ TEST_P(FrameTest1, getAspectRatio)
 }
 
 // TODO: Get output frames and check they have decoded properly
+// TODO: Create seek loop and test each output frame is correct
 
 INSTANTIATE_TEST_SUITE_P(FrameTestData, FrameTest1, ::testing::ValuesIn(g_testData));

@@ -88,7 +88,9 @@ public:
     [[nodiscard]] int64_t getFrameNumber() const noexcept;
 
     /**
-     * Gets frame data pointer.
+     * Gets frame data pointer. This is an array of pointers to each layer of the output frame. The number of layers is
+     * based on the frames internal format. The memory address of these frames will be in a memory space dependent on
+     * what settings where used when the parent stream was created. (e.g. cuda pointer if using nvdec etc.).
      * @returns The internal frame data.
      */
     [[nodiscard]] uint8_t* const* getFrameData() const noexcept;

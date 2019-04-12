@@ -91,19 +91,6 @@ int64_t Frame::getFrameNumber() const noexcept
 
 uint8_t* const* Frame::getFrameData() const noexcept
 {
-    // TODO: Need to determine type of memory pointer requested and perform a memory move to the required memory space
-    /*
-
-    if (m_frame->format == hw_pix_fmt) {
-        AVFrame *sw_frame = av_frame_alloc()
-        if ((ret = av_hwframe_transfer_data(sw_frame, m_frame, 0)) < 0) {
-            error
-        }
-        tmp_frame = sw_frame;
-    }
-    else { tmp_frame = frame; }
-    */
-    // TODO: Need to convert to proper colour space format
     return m_frame->data;
 }
 

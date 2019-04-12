@@ -27,7 +27,9 @@ namespace FfFrameReader {
  * An optional manager class that can be used to store and remember DecoderContext's and Stream's. This can be used
  * to simplify storing and retrieving streams as it removes the need to store the Stream objects in user code.
  * However this does require that a user explicitly remove a used stream once finished with it. This differs from
- * streams created normally as these objects will automatically destroy themselves once the object goes out of scope.
+ * streams created directly from a manual DecoderContext as those objects will automatically destroy themselves once
+ * the object goes out of scope. It also differs in that only 1 stream can be created for each file unlike manual
+ * DecoderContext objects which can create multiple.
  */
 class Manager
 {
