@@ -14,3 +14,5 @@
  * limitations under the License.
  */
 #include "FfFrameReader.h"
+
+#include <gtest/gtest.h>
