@@ -342,10 +342,10 @@ bool Stream::decodeNextFrames() noexcept
             if (frameNum != previous->getFrameNumber() + 1) {
                 // Fill in missing frames by duplicating the old one
                 auto fillFrameNum = previous->getFrameNumber();
-                auto fillTimeStamp = previous->getTimeStamp();
+                int64_t fillTimeStamp;
                 for (auto i = previous->getFrameNumber() + 1; i < frameNum; i++) {
-                    fillTimeStamp += getFrameTime();
                     ++fillFrameNum;
+                    fillTimeStamp = frameToTime(fillFrameNum);
                     Frame::FramePtr frameClone(av_frame_clone(*frame));
                     m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum));
                 }
