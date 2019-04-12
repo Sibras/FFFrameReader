@@ -31,4 +31,7 @@
 *.out
 *.app
 
+# Build folders
 .vs/
+build/
+install/
