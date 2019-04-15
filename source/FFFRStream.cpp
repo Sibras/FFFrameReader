@@ -32,12 +32,12 @@ Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecCon
     , m_codecContext(move(codecContext))
 {
     // Ensure buffer length is long enough to handle the maximum number of frames a video may require
-    const uint32_t minFrames = getCodecDelay();
-    m_bufferLength = (m_bufferLength >= minFrames) ? m_bufferLength : minFrames;
+    uint32_t minFrames = getCodecDelay();
+    minFrames = (m_bufferLength >= minFrames) ? m_bufferLength : minFrames;
 
     // Allocate ping and pong buffers
-    m_bufferPing.reserve(m_bufferLength * 2);
-    m_bufferPong.reserve(m_bufferLength * 2);
+    m_bufferPing.reserve(minFrames * 2);
+    m_bufferPong.reserve(minFrames * 2);
 
     // Set stream start time and numbers of frames
     m_startTimeStamp = getStreamStartTime();
@@ -234,10 +234,10 @@ bool Stream::decodeNextBlock() noexcept
     bool eof = false;
     while (true) {
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
-        // We do getCodecDelay() packets at a time for performance even though this may result in more than
+        // We do m_bufferLength packets at a time for performance even though this may result in more than
         // m_bufferLength frames being actually decoded
-        auto maxPackets = getCodecDelay();
-        int32_t i = 0;
+        auto maxPackets = m_bufferLength;
+        uint32_t i = 0;
         do {
             auto ret = av_read_frame(m_formatContext.get(), &packet);
             if (ret < 0) {
