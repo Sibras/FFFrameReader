@@ -27,7 +27,7 @@ Manager::Manager()
 }
 
 variant<bool, shared_ptr<Stream>> Manager::getStream(
-    const string& filename, const DecoderContext::DecodeType type) noexcept
+    const string& filename, const DecoderContext::DecoderOptions& options) noexcept
 {
     try {
         lock_guard<mutex> lock(m_mutex);
@@ -36,10 +36,10 @@ variant<bool, shared_ptr<Stream>> Manager::getStream(
         shared_ptr<DecoderContext> found;
         if (foundFile == m_streams.end()) {
             // Check if a manager already registered for type
-            const auto foundManager = m_decoders.find(type);
+            const auto foundManager = m_decoders.find(options);
             if (foundManager == m_decoders.end()) {
-                m_decoders.emplace(type, make_shared<DecoderContext>(type));
-                found = m_decoders.find(type)->second;
+                m_decoders.emplace(options, make_shared<DecoderContext>(options));
+                found = m_decoders.find(options)->second;
             } else {
                 found = foundManager->second;
             }

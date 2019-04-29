@@ -49,12 +49,11 @@ public:
     /**
      * Opens a new stream from a file or retrieves an existing one if already open.
      * @param filename Filename of the file to open.
-     * @param type     (Optional) The type of decoding to use. If a stream has already been created then this parameter
-     *                 is ignored.
+     * @param options  (Optional) Options for controlling decoding.
      * @returns The stream if succeeded, false otherwise.
      */
     std::variant<bool, std::shared_ptr<Stream>> getStream(
-        const std::string& filename, DecoderContext::DecodeType type = DecoderContext::DecodeType::Software) noexcept;
+        const std::string& filename, const DecoderContext::DecoderOptions& options = {}) noexcept;
 
     /**
      * Releases the stream described by filename
@@ -64,7 +63,7 @@ public:
 
 private:
     std::mutex m_mutex;
-    std::map<DecoderContext::DecodeType, std::shared_ptr<DecoderContext>> m_decoders;
+    std::map<DecoderContext::DecoderOptions, std::shared_ptr<DecoderContext>> m_decoders;
     std::map<std::string, std::shared_ptr<Stream>> m_streams;
 };
 

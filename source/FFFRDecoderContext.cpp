@@ -15,10 +15,14 @@
  */
 #include "FFFRDecoderContext.h"
 
+#include <cuda.h>
+#include <string>
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/hwcontext.h>
+#include <libavutil/hwcontext_cuda.h>
 #include <libavutil/log.h>
 }
 
@@ -57,34 +61,130 @@ static enum AVHWDeviceType decodeTypeToFFmpeg(const DecoderContext::DecodeType t
     return AV_HWDEVICE_TYPE_NONE;
 }
 
-DecoderContext::DecoderContext(const DecodeType type, const uint32_t bufferLength) noexcept
-    : m_deviceType(type)
-    , m_bufferLength(bufferLength)
-{
-    if (m_deviceType != DecodeType::Software) {
-        // Create device specific options
-        const string device = "0";
-        // TODO: Allow specifying the device to use
-        // TODO: Allow specifying a filter chain of color conversion, scale and cropping
+DecoderContext::DecoderOptions::DecoderOptions(const DecodeType type) noexcept
+    : m_type(type)
+{}
 
-        // Create the hardware context for decoding
-        const int err =
-            av_hwdevice_ctx_create(&m_deviceContext, decodeTypeToFFmpeg(m_deviceType), device.c_str(), nullptr, 0);
-        if (err < 0) {
-            char buffer[AV_ERROR_MAX_STRING_SIZE];
-            av_log(nullptr, AV_LOG_ERROR, "Failed to create specified hardware device: %s\n",
-                av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, err));
-            return;
-            // TODO: need is Valid
-        }
+bool DecoderContext::DecoderOptions::operator==(const DecoderOptions& other) const noexcept
+{
+    const bool ret = this->m_type == other.m_type && this->m_bufferLength == other.m_bufferLength &&
+        this->m_device == other.m_device;
+    if (!ret) {
+        return ret;
     }
+    if (this->m_type == DecodeType::Software) {
+        return true;
+    }
+    try {
+        if (this->m_type == DecodeType::Nvdec) {
+            return any_cast<CUcontext>(this->m_context) == any_cast<CUcontext>(other.m_context);
+        }
+    } catch (...) {
+        return false;
+    }
+    return false;
 }
 
-DecoderContext::~DecoderContext() noexcept
+bool DecoderContext::DecoderOptions::operator!=(const DecoderOptions& other) const noexcept
 {
-    // Release the contexts
-    if (m_deviceContext != nullptr) {
-        av_buffer_unref(&m_deviceContext);
+    return !(*this == other);
+}
+
+bool DecoderContext::DecoderOptions::operator<(const DecoderOptions& other) const noexcept
+{
+    if (this->m_type < other.m_type) {
+        return true;
+    }
+    if (other.m_type < this->m_type) {
+        return false;
+    }
+    if (this->m_bufferLength < other.m_bufferLength) {
+        return true;
+    }
+    if (other.m_bufferLength < this->m_bufferLength) {
+        return false;
+    }
+    try {
+        if (this->m_type == DecodeType::Nvdec) {
+            if (any_cast<CUcontext>(this->m_context) < any_cast<CUcontext>(other.m_context)) {
+                return true;
+            }
+            if (any_cast<CUcontext>(other.m_context) < any_cast<CUcontext>(this->m_context)) {
+                return false;
+            }
+        }
+    } catch (...) {
+        return false;
+    }
+    return this->m_device < other.m_device;
+}
+
+DecoderContext::DeviceContextPtr::DeviceContextPtr(AVBufferRef* deviceContext) noexcept
+    : m_deviceContext(deviceContext, [](AVBufferRef* p) { av_buffer_unref(&p); })
+{}
+
+AVBufferRef* DecoderContext::DeviceContextPtr::operator->() const noexcept
+{
+    return m_deviceContext.get();
+}
+
+AVBufferRef* DecoderContext::DeviceContextPtr::get() const noexcept
+{
+    return m_deviceContext.get();
+}
+
+DecoderContext::DecoderContext(const DecoderOptions& options) noexcept
+    : m_bufferLength(options.m_bufferLength)
+{
+    // TODO: Allow specifying a filter chain of color conversion, scale and cropping
+    if (options.m_type != DecodeType::Software) {
+        // Create device specific options
+        string device;
+        try {
+            device = to_string(options.m_device);
+        } catch (...) {
+        }
+        const auto type = decodeTypeToFFmpeg(options.m_type);
+
+        // Check if we should create a custom hwdevice
+        if (options.m_context.has_value()) {
+            DeviceContextPtr tempDevice(av_hwdevice_ctx_alloc(type));
+            if (tempDevice.get() == nullptr) {
+                av_log(nullptr, AV_LOG_ERROR, "Failed to create custom hardware device\n");
+                return;
+            }
+            auto* deviceContext = reinterpret_cast<AVHWDeviceContext*>(tempDevice->data);
+            deviceContext->free = nullptr;
+            if (type == AV_HWDEVICE_TYPE_CUDA) {
+                if (options.m_context.type() != typeid(CUcontext)) {
+                    av_log(nullptr, AV_LOG_ERROR, "Specified device context does not match the required type\n");
+                    return;
+                }
+                auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(deviceContext->hwctx);
+                try {
+                    cudaDevice->cuda_ctx = std::any_cast<CUcontext>(options.m_context);
+                } catch (...) {
+                }
+            }
+            const auto ret = av_hwdevice_ctx_init(tempDevice.get());
+            if (ret < 0) {
+                av_log(nullptr, AV_LOG_ERROR, "Failed to init custom hardware device\n");
+                return;
+            }
+            // Move the temp device to the internal one
+            m_deviceContext = move(tempDevice);
+        } else {
+            // Create the hardware context for decoding
+            AVBufferRef* deviceContext;
+            const int err = av_hwdevice_ctx_create(&deviceContext, type, device.c_str(), nullptr, 0);
+            if (err < 0) {
+                av_log(nullptr, AV_LOG_ERROR, "Failed to create specified hardware device\n");
+                return;
+            }
+            m_deviceContext = DeviceContextPtr(deviceContext);
+        }
+        // Set internal values now we have successfully created a hardware device (otherwise stays at default)
+        m_deviceType = options.m_type;
     }
 }
 
@@ -160,7 +260,10 @@ variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filena
             av_log(nullptr, AV_LOG_ERROR, "Hardware Device not properly implemented\n");
             return false;
         }
-        tempCodec->hw_device_ctx = av_buffer_ref(m_deviceContext);
+        tempCodec->hw_device_ctx = av_buffer_ref(m_deviceContext.get());
+        // Enable extra hardware frames to ensure we don't run out of buffers
+        const string buffers = to_string(m_bufferLength);
+        av_dict_set(&opts, "extra_hw_frames", buffers.c_str(), 0);
     } else {
         av_dict_set(&opts, "threads", "auto", 0);
     }

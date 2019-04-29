@@ -16,6 +16,8 @@
 #pragma once
 #include "FFFRStream.h"
 
+#include <any>
+
 struct AVBufferRef;
 
 namespace FfFrameReader {
@@ -38,16 +40,45 @@ public:
 #endif
     };
 
+    class DecoderOptions
+    {
+    public:
+        DecodeType m_type = DecodeType::Software; /**< The type of decoding to use. */
+        uint32_t m_bufferLength = 10;             /**< Number of frames in the the decode buffer.
+                                                  This should be optimised based on reading/seeking pattern so as to minimise frame
+                                                  storage requirements but also maximise decode throughput. */
+        std::any m_context;    /**< Pointer to an existing context to be used for hardware decoding. This must
+                                match the hardware type specified in @m_type. */
+        uint32_t m_device = 0; /**< The device index for the desired hardware device. */
+
+        DecoderOptions() = default;
+
+        explicit DecoderOptions(DecodeType type) noexcept;
+
+        ~DecoderOptions() = default;
+
+        DecoderOptions(const DecoderOptions& other) = default;
+
+        DecoderOptions(DecoderOptions&& other) noexcept = default;
+
+        DecoderOptions& operator=(const DecoderOptions& other) = default;
+
+        DecoderOptions& operator=(DecoderOptions&& other) noexcept = default;
+
+        bool operator==(const DecoderOptions& other) const noexcept;
+
+        bool operator!=(const DecoderOptions& other) const noexcept;
+
+        bool operator<(const DecoderOptions& other) const noexcept;
+    };
+
     /**
      * Constructor.
-     * @note bufferLength should be optimised based on reading/seeking pattern so as to minimise frame storage
-     * requirements but also maximise decode throughput.
-     * @param type         (Optional) The type of decoding to use.
-     * @param bufferLength (Optional) Number of frames in the the decode buffer.
+     * @param options (Optional) Options for controlling decoding.
      */
-    explicit DecoderContext(DecodeType type = DecodeType::Software, uint32_t bufferLength = 10) noexcept;
+    explicit DecoderContext(const DecoderOptions& options = {}) noexcept;
 
-    ~DecoderContext() noexcept;
+    ~DecoderContext() noexcept = default;
 
     DecoderContext(const DecoderContext& other) noexcept = default;
 
@@ -65,8 +96,22 @@ public:
     [[nodiscard]] std::variant<bool, std::shared_ptr<Stream>> getStream(const std::string& filename) const noexcept;
 
 private:
+    class DeviceContextPtr
+    {
+        friend class DecoderContext;
+
+    private:
+        explicit DeviceContextPtr(AVBufferRef* deviceContext) noexcept;
+
+        [[nodiscard]] AVBufferRef* get() const noexcept;
+
+        AVBufferRef* operator->() const noexcept;
+
+        std::shared_ptr<AVBufferRef> m_deviceContext = nullptr;
+    };
+
     DecodeType m_deviceType = DecodeType::Software;
     uint32_t m_bufferLength = 10;
-    AVBufferRef* m_deviceContext = nullptr;
+    DeviceContextPtr m_deviceContext = DeviceContextPtr(nullptr);
 };
 } // namespace FfFrameReader
