@@ -6,6 +6,7 @@ cmake_minimum_required (VERSION 3.11)
 project(FfFrameReader
     VERSION 0.1
     DESCRIPTION "FFmpeg based library for reading frames from a video source"
+    LANGUAGES CXX
 )
 
 # Use vcpkg if available
@@ -17,8 +18,17 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Export all symbold from Windows dlls into corresponding lib fiel
-set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+# Build position independent code.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Disable C and C++ compiler specific extensions.
+set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Export all symbols from Windows dlls into corresponding lib file
+if(MSVC)
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
 
 # Defines the CMAKE_INSTALL_LIBDIR, CMAKE_INSTALL_BINDIR and many other useful macros.
 include(GNUInstallDirs)
@@ -31,13 +41,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}"
 if(MSVC)
     set(CMAKE_DEBUG_POSTFIX "d")
 endif()
-
-# Build position independent code.
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# Disable C and C++ compiler specific extensions.
-set(CMAKE_C_EXTENSIONS OFF)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Shared/Dynamic or Static library?
 option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
@@ -54,14 +57,14 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # Add project source files
-set(SOURCES
+set(FFFR_SOURCES
       source/FFFR.cpp
       source/FFFRStream.cpp
       source/FFFRDecoderContext.cpp
       source/FFFRFrame.cpp
 )
 
-set(HEADERS
+set(FFFR_HEADERS
     include/FfFrameReader.h
     include/FFFRStream.h
     include/FFFRDecoderContext.h
@@ -72,14 +75,14 @@ set(HEADERS
 if(BUILD_SHARED_LIBS)
     add_library(FfFrameReader
         SHARED
-        ${SOURCES}
-        ${HEADERS}
+        ${FFFR_SOURCES}
+        ${FFFR_HEADERS}
     )
 else()
     add_library(FfFrameReader
         STATIC
-        ${SOURCES}
-        ${HEADERS}
+        ${FFFR_SOURCES}
+        ${FFFR_HEADERS}
     )
 endif()
 
@@ -87,7 +90,7 @@ set_target_properties(FfFrameReader PROPERTIES
     FRAMEWORK ON
     SOVERSION 0
     VERSION ${PROJECT_VERSION} 
-    PUBLIC_HEADER "${HEADERS}"
+    PUBLIC_HEADER "${FFFR_HEADERS}"
 )
 
 # Enable all compile warnings
@@ -107,11 +110,15 @@ find_library(AVFORMAT_LIBRARY NAMES avformat)
 find_path(AVUTIL_INCLUDE_DIR NAMES libavutil/avutil.h)
 find_library(AVUTIL_LIBRARY NAMES avutil)
 
-target_include_directories(FfFrameReader PUBLIC
+# Find additional dependencies
+find_package(CUDA QUIET REQUIRED)
+
+target_include_directories(FfFrameReader PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${AVCODEC_INCLUDE_DIR}
     ${AVFORMAT_INCLUDE_DIR}
     ${AVUTIL_INCLUDE_DIR}
+    ${CUDA_INCLUDE_DIRS}
 )
 target_link_libraries(FfFrameReader
     PRIVATE ${AVCODEC_LIBRARY}
@@ -120,9 +127,9 @@ target_link_libraries(FfFrameReader
 )
 
 if("${CMAKE_INSTALL_PREFIX}" STREQUAL "")
-message("Installing into source folder")
-# Temp set the install location to the source location
-set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install CACHE PATH "..." FORCE)
+    message("Installing into source folder")
+    # Temp set the install location to the source location
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install CACHE PATH "..." FORCE)
 endif()
 
 # Install targets.
@@ -138,16 +145,23 @@ if(BUILD_TESTING)
     find_package(GTest REQUIRED)
     include(GoogleTest)
 
-    set(TEST_SOURCES
+    set(FFFR_TEST_SOURCES
         test/FFFRTestStream.cpp
         test/FFFRTestDecode.cpp
         test/FFFRTestNVDec.cpp
     )
 
-    add_executable(FFFRTest ${TEST_SOURCES})
+    add_executable(FFFRTest ${FFFR_TEST_SOURCES})
 
-    target_include_directories(FFFRTest PUBLIC
+    target_include_directories(FFFRTest PRIVATE
         ${PROJECT_SOURCE_DIR}/include
+        ${CUDA_INCLUDE_DIRS}
+    )
+
+    #Find the cuda driver library
+    find_library(CUDA_DRIVER_LIBRARY NAMES cuda
+        PATHS ${CUDA_SDK_ROOT_DIR} ${CUDA_TOOLKIT_ROOT_DIR}
+        PATH_SUFFIXES lib
     )
 
     target_link_libraries(
@@ -155,6 +169,8 @@ if(BUILD_TESTING)
         PRIVATE FfFrameReader
         PRIVATE GTest::GTest
         PRIVATE GTest::Main
+        PRIVATE ${CUDA_LIBRARY}
+        PRIVATE ${CUDA_DRIVER_LIBRARY}
     )
 
     set_target_properties(
