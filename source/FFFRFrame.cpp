@@ -109,4 +109,9 @@ double Frame::getAspectRatio() const noexcept
     // TODO: Handle this with anamorphic
     return static_cast<double>(getWidth()) / static_cast<double>(getHeight());
 }
+
+int Frame::getPixelFormat() const noexcept
+{
+    return m_frame->format;
+}
 } // namespace FfFrameReader

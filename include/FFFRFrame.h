@@ -114,6 +114,14 @@ public:
      */
     [[nodiscard]] double getAspectRatio() const noexcept;
 
+    /**
+     * Gets the pixel format of the frame data.
+     * @note This is used to determine the format of the data returned by @getFrameData. Currently this returns the pixel
+     * format using ffmpegs internal format macros.
+     * @returns The pixel format.
+     */
+    [[nodiscard]] int getPixelFormat() const noexcept;
+
 private:
     FramePtr m_frame;
     int64_t m_timeStamp = 0;
