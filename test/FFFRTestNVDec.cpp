@@ -23,11 +23,19 @@ using namespace FfFrameReader;
 struct TestParamsNVDec : TestParams
 {
     bool m_useContext;
+    bool m_useAllocator;
 };
 
 static std::vector<TestParamsNVDec> g_testDataNVDec = {
-    {{"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333}, false},
-    //{{"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333}, true},
+    {{"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333}, false,
+        false},
+    //{{"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333}, false,
+    // true},
+    //{{"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333}, true,
+    // false},
+    // {{"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333}, true,
+    // true},
+    ////currently broken
 };
 
 class NVDecTest1 : public ::testing::TestWithParam<TestParamsNVDec>
@@ -50,9 +58,27 @@ protected:
 
             options.m_context = m_cudaContext;
         }
-        auto ret = m_manager.getStream(GetParam().m_fileName, options);
+        if (GetParam().m_useAllocator) {
+            const std::function<uint8_t*(uint32_t)> allocator =
+                std::bind(&NVDecTest1::allocateCuda, this, std::placeholders::_1);
+            const std::function<void(uint8_t*)> free = std::bind(&NVDecTest1::freeCuda, this, std::placeholders::_1);
+            options.m_allocator = std::optional<DecoderContext::DecoderOptions::Allocator>({allocator, free});
+        }
+        ASSERT_NO_THROW(m_context = std::make_shared<DecoderContext>(options));
+        auto ret = m_context->getStream(GetParam().m_fileName);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
+    }
+
+    void TearDown() override
+    {
+        m_stream = nullptr;
+        m_context = nullptr;
+        ASSERT_EQ(m_allocateNum, m_freeNum);
+        if (GetParam().m_useAllocator) {
+            ASSERT_TRUE(m_allocatorCalled);
+            ASSERT_GT(m_allocateNum, 0UL);
+        }
     }
 
     ~NVDecTest1() override
@@ -60,12 +86,43 @@ protected:
         if (m_cudaContext != nullptr) {
             cuCtxDestroy(m_cudaContext);
         }
-        m_manager.releaseStream(GetParam().m_fileName);
     }
 
-    Manager m_manager;
-    std::shared_ptr<Stream> m_stream;
+    uint8_t* allocateCuda(const uint32_t size)
+    {
+        m_allocatorCalled = true;
+        CUcontext dummy = nullptr;
+        auto err = cuCtxPushCurrent(m_cudaContext);
+        if (err < 0) {
+            return nullptr;
+        }
+        CUdeviceptr data;
+        uint8_t* ret = nullptr;
+        err = cuMemAlloc(&data, size);
+        if (err >= 0) {
+            ret = reinterpret_cast<uint8_t*>(data);
+        }
+
+        cuCtxPopCurrent(&dummy);
+        ++m_allocateNum;
+        return ret;
+    }
+
+    void freeCuda(uint8_t* data)
+    {
+        CUcontext dummy;
+        cuCtxPushCurrent(m_cudaContext);
+        cuMemFree(reinterpret_cast<CUdeviceptr>(data));
+        cuCtxPopCurrent(&dummy);
+        ++m_freeNum;
+    }
+
+    std::shared_ptr<DecoderContext> m_context = nullptr;
+    std::shared_ptr<Stream> m_stream = nullptr;
     CUcontext m_cudaContext = nullptr;
+    bool m_allocatorCalled = false;
+    uint32_t m_allocateNum = 0;
+    uint32_t m_freeNum = 0;
 };
 
 TEST_P(NVDecTest1, getNextFrame)
