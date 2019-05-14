@@ -122,6 +122,12 @@ public:
     [[nodiscard]] double getFrameRate() const noexcept;
 
     /**
+     * Gets the storage size of each decoded frame in the video stream.
+     * @returns The frame size in bytes.
+     */
+    [[nodiscard]] uint32_t getFrameSize() const noexcept;
+
+    /**
      * Get the next frame in the stream without removing it from stream buffer.
      * @returns The next frame in current stream, or false if an error occured.
      */

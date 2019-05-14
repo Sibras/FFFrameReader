@@ -20,6 +20,7 @@ using namespace std;
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/imgutils.h>
 #include <libavutil/log.h>
 }
 
@@ -104,6 +105,12 @@ int64_t Stream::getDuration() const noexcept
 double Stream::getFrameRate() const noexcept
 {
     return av_q2d(m_formatContext->streams[m_index]->r_frame_rate);
+}
+
+uint32_t Stream::getFrameSize() const noexcept
+{
+    return av_image_get_buffer_size(static_cast<AVPixelFormat>(m_formatContext->streams[m_index]->codecpar->format),
+        m_formatContext->streams[m_index]->codecpar->width, m_formatContext->streams[m_index]->codecpar->height, 0);
 }
 
 variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
