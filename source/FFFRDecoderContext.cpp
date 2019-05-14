@@ -15,7 +15,6 @@
  */
 #include "FFFRDecoderContext.h"
 
-#include <cuda.h>
 #include <string>
 
 extern "C" {
@@ -30,12 +29,12 @@ extern "C" {
 using namespace std;
 
 namespace FfFrameReader {
-static const DecoderContext::DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept
+const DecoderContext::DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept
 {
     return context->m_deviceContext;
 }
 
-static const optional<DecoderContext::DecoderOptions::Allocator>& getAllocator(DecoderContext* context) noexcept
+const optional<DecoderContext::DecoderOptions::Allocator>& getAllocator(DecoderContext* context) noexcept
 {
     return context->m_allocator;
 }

@@ -17,6 +17,7 @@
 #include "FFFRStream.h"
 
 #include <any>
+#include <functional>
 #include <optional>
 struct AVBufferRef;
 
@@ -43,13 +44,33 @@ public:
     class DecoderOptions
     {
     public:
+        DecoderOptions(){};
+
+        explicit DecoderOptions(DecodeType type) noexcept;
+
+        ~DecoderOptions() = default;
+
+        DecoderOptions(const DecoderOptions& other) = default;
+
+        DecoderOptions(DecoderOptions&& other) = default;
+
+        DecoderOptions& operator=(const DecoderOptions& other) = default;
+
+        DecoderOptions& operator=(DecoderOptions&& other) = default;
+
+        bool operator==(const DecoderOptions& other) const noexcept;
+
+        bool operator!=(const DecoderOptions& other) const noexcept;
+
+        bool operator<(const DecoderOptions& other) const noexcept;
+
         DecodeType m_type = DecodeType::Software; /**< The type of decoding to use. */
         uint32_t m_bufferLength = 10;             /**< Number of frames in the the decode buffer.
                                                   This should be optimised based on reading/seeking pattern so as to minimise frame
                                                   storage requirements but also maximise decode throughput. */
-        std::any m_context;    /**< Pointer to an existing context to be used for hardware decoding. This must
-                                match the hardware type specified in @m_type. */
-        uint32_t m_device = 0; /**< The device index for the desired hardware device. */
+        std::any m_context;                       /**< Pointer to an existing context to be used for hardware
+                                                   decoding. This must match the hardware type specified in @m_type. */
+        uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */
         struct Allocator
         {
             std::function<uint8_t*(uint32_t)> m_allocate;
@@ -58,43 +79,23 @@ public:
 
         std::optional<Allocator> m_allocator =
             std::nullopt; /**< The allocator used to allocate/free hardware buffers. */
-
-        DecoderOptions() = default;
-
-        explicit DecoderOptions(DecodeType type) noexcept;
-
-        ~DecoderOptions() = default;
-
-        DecoderOptions(const DecoderOptions& other) = default;
-
-        DecoderOptions(DecoderOptions&& other) noexcept = default;
-
-        DecoderOptions& operator=(const DecoderOptions& other) = default;
-
-        DecoderOptions& operator=(DecoderOptions&& other) noexcept = default;
-
-        bool operator==(const DecoderOptions& other) const noexcept;
-
-        bool operator!=(const DecoderOptions& other) const noexcept;
-
-        bool operator<(const DecoderOptions& other) const noexcept;
     };
 
     /**
      * Constructor.
      * @param options (Optional) Options for controlling decoding.
      */
-    explicit DecoderContext(const DecoderOptions& options = {}) noexcept;
+    explicit DecoderContext(const DecoderOptions& options = DecoderOptions()) noexcept;
 
     ~DecoderContext() noexcept = default;
 
-    DecoderContext(const DecoderContext& other) noexcept = default;
+    DecoderContext(const DecoderContext& other) = default;
 
-    DecoderContext(DecoderContext&& other) noexcept = default;
+    DecoderContext(DecoderContext&& other) = default;
 
-    DecoderContext& operator=(const DecoderContext& other) noexcept = default;
+    DecoderContext& operator=(const DecoderContext& other) = default;
 
-    DecoderContext& operator=(DecoderContext&& other) noexcept = default;
+    DecoderContext& operator=(DecoderContext&& other) = default;
 
     /**
      * Gets a stream from a file.
@@ -124,8 +125,8 @@ private:
     DeviceContextPtr m_deviceContext = DeviceContextPtr(nullptr);
     std::optional<DecoderOptions::Allocator> m_allocator = std::nullopt;
 
-    friend static const DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept;
+    friend const DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept;
 
-    friend static const std::optional<DecoderOptions::Allocator>& getAllocator(DecoderContext* context) noexcept;
+    friend const std::optional<DecoderOptions::Allocator>& getAllocator(DecoderContext* context) noexcept;
 };
 } // namespace FfFrameReader

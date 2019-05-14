@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 #pragma once
-#include <array>
 #include <cstdint>
 
 struct AVFrame;
@@ -71,7 +70,7 @@ public:
 
     Frame(Frame&& other) noexcept = default;
 
-    Frame& operator=(const Frame& other) noexcept = default;
+    Frame& operator=(Frame& other) noexcept = default;
 
     Frame& operator=(Frame&& other) noexcept = default;
 
@@ -116,8 +115,8 @@ public:
 
     /**
      * Gets the pixel format of the frame data.
-     * @note This is used to determine the format of the data returned by @getFrameData. Currently this returns the pixel
-     * format using ffmpegs internal format macros.
+     * @note This is used to determine the format of the data returned by @getFrameData. Currently this returns the
+     * pixel format using ffmpegs internal format macros.
      * @returns The pixel format.
      */
     [[nodiscard]] int getPixelFormat() const noexcept;

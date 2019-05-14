@@ -17,6 +17,7 @@
 #include "FFFRFrame.h"
 
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <variant>
 #include <vector>
@@ -32,8 +33,8 @@ class Stream
 private:
     class FormatContextPtr
     {
-        friend class FfFrameReader::DecoderContext;
-        friend class FfFrameReader::Stream;
+        friend class DecoderContext;
+        friend class Stream;
 
     private:
         explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
@@ -47,8 +48,8 @@ private:
 
     class CodecContextPtr
     {
-        friend class FfFrameReader::DecoderContext;
-        friend class FfFrameReader::Stream;
+        friend class DecoderContext;
+        friend class Stream;
 
     private:
         explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;

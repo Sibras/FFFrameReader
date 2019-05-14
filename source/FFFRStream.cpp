@@ -15,6 +15,7 @@
  */
 #include "FFFRStream.h"
 
+#include <algorithm>
 using namespace std;
 
 extern "C" {
@@ -364,7 +365,6 @@ bool Stream::decodeNextFrames() noexcept
         // TODO: Need to determine type of memory pointer requested and perform a memory move to the required memory
         // space
         /*
-
         if (m_frame->format == hw_pix_fmt) {
             AVFrame *sw_frame = av_frame_alloc()
             if ((ret = av_hwframe_transfer_data(sw_frame, m_frame, 0)) < 0) {

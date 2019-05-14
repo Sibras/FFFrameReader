@@ -15,6 +15,8 @@
  */
 #include "FFFRFrame.h"
 
+#include <algorithm>
+
 extern "C" {
 #include <libavutil/frame.h>
 }
