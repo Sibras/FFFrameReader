@@ -21,56 +21,6 @@ extern "C" {
 using namespace std;
 
 namespace FfFrameReader {
-Manager::Manager()
-{
-    setLogLevel(LogLevel::Error);
-}
-
-variant<bool, shared_ptr<Stream>> Manager::getStream(
-    const string& filename, const DecoderContext::DecoderOptions& options) noexcept
-{
-    try {
-        lock_guard<mutex> lock(m_mutex);
-        // Check if file already open
-        const auto foundFile = m_streams.find(filename);
-        shared_ptr<DecoderContext> found;
-        if (foundFile == m_streams.end()) {
-            // Check if a manager already registered for type
-            const auto foundManager = m_decoders.find(options);
-            if (foundManager == m_decoders.end()) {
-                m_decoders.emplace(options, make_shared<DecoderContext>(options));
-                found = m_decoders.find(options)->second;
-            } else {
-                found = foundManager->second;
-            }
-        } else {
-            return foundFile->second;
-        }
-
-        // Create a new stream using the requested manager
-        const auto newStream = found->getStream(filename);
-        if (newStream.index() != 0) {
-            if (foundFile == m_streams.end()) {
-                m_streams.emplace(filename, get<1>(newStream));
-            }
-            return get<1>(newStream);
-        }
-    } catch (...) {
-    }
-    return false;
-}
-
-void Manager::releaseStream(const string& filename) noexcept
-{
-    try {
-        lock_guard<mutex> lock(m_mutex);
-        const auto found = m_streams.find(filename);
-        if (found != m_streams.end()) {
-            m_streams.erase(found);
-        }
-    } catch (...) {
-    }
-}
 
 void setLogLevel(const LogLevel level)
 {
