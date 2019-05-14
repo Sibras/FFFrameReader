@@ -1,7 +1,7 @@
 ﻿# CMakeList.txt : CMake project for FFFR, include source and define
 # project specific logic here.
 #
-cmake_minimum_required (VERSION 3.11)
+cmake_minimum_required (VERSION 3.10.2)
 
 project(FfFrameReader
     VERSION 0.1
@@ -46,7 +46,7 @@ endif()
 option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
 
 # Build test related commands?
-option(BUILD_TESTING "Create tests using CMake" ON)
+option(BUILD_TESTING "Create test programs" OFF)
 
 # Default to a release build if desired configuration is not specified.
 if(NOT CMAKE_CONFIGURATION_TYPES)
@@ -148,7 +148,7 @@ if(BUILD_TESTING)
     set(FFFR_TEST_SOURCES
         test/FFFRTestStream.cpp
         test/FFFRTestDecode.cpp
-        test/FFFRTestNVDec.cpp
+        test/FFFRTestFrame.cpp
     )
 
     add_executable(FFFRTest ${FFFR_TEST_SOURCES})
@@ -159,9 +159,22 @@ if(BUILD_TESTING)
     )
 
     #Find the cuda driver library
+    if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+        if(CMAKE_CL_64 OR ${CMAKE_SIZEOF_VOID_P} EQUAL "8")
+            set(FFFR_CUDA_DRIVER_PATHS
+                ${CUDA_SDK_ROOT_DIR}/lib/x64 ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64
+            )
+        else()
+            set(FFFR_CUDA_DRIVER_PATHS
+                ${CUDA_SDK_ROOT_DIR}/lib/Win32 ${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32
+            )
+        endif()
+    else()
+        set(FFFR_CUDA_DRIVER_PATHS 
+        )
+    endif()
     find_library(CUDA_DRIVER_LIBRARY NAMES cuda
-        PATHS ${CUDA_SDK_ROOT_DIR} ${CUDA_TOOLKIT_ROOT_DIR}
-        PATH_SUFFIXES lib
+        PATHS ${CUDA_SDK_ROOT_DIR} ${CUDA_TOOLKIT_ROOT_DIR} ${FFFR_CUDA_DRIVER_PATHS}
     )
 
     target_link_libraries(

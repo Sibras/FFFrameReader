@@ -16,60 +16,138 @@
 #include "FFFRTestData.h"
 #include "FfFrameReader.h"
 
+#include <cuda.h>
 #include <gtest/gtest.h>
-
 using namespace FfFrameReader;
 
-class FrameTest1 : public ::testing::TestWithParam<TestParams>
+struct TestParamsDecode
+{
+    uint32_t m_testDataIndex;
+    bool m_useNvdec;
+    bool m_useContext;
+    bool m_useAllocator;
+};
+
+static std::vector<TestParamsDecode> g_testDataDecode = {
+    {0, false, false, false},
+    {0, true, false, false},
+    {0, true, false, true},
+    {0, true, true, false},
+    {0, true, true, true},
+};
+
+class DecodeTest1 : public ::testing::TestWithParam<TestParamsDecode>
 {
 protected:
-    FrameTest1() = default;
+    DecodeTest1() = default;
 
     void SetUp() override
     {
-        const auto ret = m_manager.getStream(GetParam().m_fileName);
+        setLogLevel(LogLevel::Error);
+
+        DecoderContext::DecoderOptions options;
+        if (GetParam().m_useNvdec) {
+            options.m_type = DecoderContext::DecodeType::Nvdec;
+            if (GetParam().m_useContext) {
+                // Create a cuda context
+                auto err = cuInit(0);
+                ASSERT_EQ(err, CUDA_SUCCESS);
+                CUdevice device;
+                err = cuDeviceGet(&device, 0);
+                ASSERT_EQ(err, CUDA_SUCCESS);
+                err = cuCtxCreate(&m_cudaContext, CU_CTX_SCHED_BLOCKING_SYNC, device);
+                ASSERT_EQ(err, CUDA_SUCCESS);
+
+                options.m_context = m_cudaContext;
+            }
+            if (GetParam().m_useAllocator) {
+                const std::function<uint8_t*(uint32_t)> allocator =
+                    std::bind(&DecodeTest1::allocateCuda, this, std::placeholders::_1);
+                const std::function<void(uint8_t*)> free =
+                    std::bind(&DecodeTest1::freeCuda, this, std::placeholders::_1);
+                options.m_allocator = std::optional<DecoderContext::DecoderOptions::Allocator>({allocator, free});
+            }
+        }
+        ASSERT_NO_THROW(m_context = std::make_shared<DecoderContext>(options));
+        auto ret = m_context->getStream(g_testData[GetParam().m_testDataIndex].m_fileName);
         ASSERT_NE(ret.index(), 0);
-        const auto stream = std::get<1>(ret);
-        const auto ret1 = stream->getNextFrame();
-        ASSERT_NE(ret1.index(), 0);
-        m_frame = std::get<1>(ret1);
+        m_stream = std::get<1>(ret);
     }
 
-    ~FrameTest1() override
+    void TearDown() override
     {
-        m_manager.releaseStream(GetParam().m_fileName);
+        m_stream = nullptr;
+        m_context = nullptr;
+        ASSERT_EQ(m_allocateNum, m_freeNum);
+        if (GetParam().m_useAllocator) {
+            ASSERT_TRUE(m_allocatorCalled);
+            ASSERT_GT(m_allocateNum, 0UL);
+        }
     }
 
-    Manager m_manager;
-    std::shared_ptr<Frame> m_frame;
+    ~DecodeTest1() override
+    {
+        if (m_cudaContext != nullptr) {
+            cuCtxDestroy(m_cudaContext);
+        }
+    }
+
+    uint8_t* allocateCuda(const uint32_t size)
+    {
+        m_allocatorCalled = true;
+        CUcontext dummy = nullptr;
+        auto err = cuCtxPushCurrent(m_cudaContext);
+        if (err < 0) {
+            return nullptr;
+        }
+        CUdeviceptr data;
+        uint8_t* ret = nullptr;
+        err = cuMemAlloc(&data, size);
+        if (err >= 0) {
+            ret = reinterpret_cast<uint8_t*>(data);
+        }
+
+        cuCtxPopCurrent(&dummy);
+        ++m_allocateNum;
+        return ret;
+    }
+
+    void freeCuda(uint8_t* data)
+    {
+        CUcontext dummy;
+        cuCtxPushCurrent(m_cudaContext);
+        cuMemFree(reinterpret_cast<CUdeviceptr>(data));
+        cuCtxPopCurrent(&dummy);
+        ++m_freeNum;
+    }
+
+    std::shared_ptr<DecoderContext> m_context = nullptr;
+    std::shared_ptr<Stream> m_stream = nullptr;
+    CUcontext m_cudaContext = nullptr;
+    bool m_allocatorCalled = false;
+    uint32_t m_allocateNum = 0;
+    uint32_t m_freeNum = 0;
 };
 
-TEST_P(FrameTest1, getTimeStamp)
+TEST_P(DecodeTest1, getLoopAll)
 {
-    ASSERT_EQ(m_frame->getTimeStamp(), 0);
+    // Ensure that all frames can be read
+    int64_t timeStamp = 0;
+    int64_t frameNum = 0;
+    for (int64_t i = 0; i < m_stream->getTotalFrames(); i++) {
+        const auto ret1 = m_stream->getNextFrame();
+        if (ret1.index() == 0) {
+            ASSERT_EQ(timeStamp, m_stream->getDuration()); // Readout in case it failed
+            ASSERT_EQ(i, m_stream->getTotalFrames());
+        }
+        ASSERT_NE(ret1.index(), 0);
+        const auto frame1 = std::get<1>(ret1);
+        ASSERT_EQ(frame1->getTimeStamp(), timeStamp);
+        const double timeStamp1 =
+            (static_cast<double>(i + 1) * (1000000.0 / g_testData[GetParam().m_testDataIndex].m_frameRate));
+        timeStamp = llround(timeStamp1);
+        ASSERT_EQ(frame1->getFrameNumber(), frameNum);
+        ++frameNum;
+    }
 }
-
-TEST_P(FrameTest1, getFrameNumber)
-{
-    ASSERT_EQ(m_frame->getFrameNumber(), 0);
-}
-
-TEST_P(FrameTest1, getWidth)
-{
-    ASSERT_EQ(m_frame->getWidth(), GetParam().m_width);
-}
-
-TEST_P(FrameTest1, getHeight)
-{
-    ASSERT_EQ(m_frame->getHeight(), GetParam().m_height);
-}
-
-TEST_P(FrameTest1, getAspectRatio)
-{
-    ASSERT_DOUBLE_EQ(m_frame->getAspectRatio(), GetParam().m_aspectRatio);
-}
-
-// TODO: Get output frames and check they have decoded properly
-// TODO: Create seek loop and test each output frame is correct
-
-INSTANTIATE_TEST_SUITE_P(FrameTestData, FrameTest1, ::testing::ValuesIn(g_testData));
+INSTANTIATE_TEST_SUITE_P(DecodeTestData, DecodeTest1, ::testing::ValuesIn(g_testDataDecode));

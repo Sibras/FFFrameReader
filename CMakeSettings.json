@@ -11,7 +11,13 @@
             "ctestCommandArgs": "",
             "inheritEnvironments": [ "msvc_x64_x64" ],
             "intelliSenseMode": "windows-msvc-x64",
-            "variables": []
+            "variables": [
+                {
+                    "name": "BUILD_TESTING",
+                    "value": "true",
+                    "type": "BOOL"
+                }
+            ]
         },
         {
             "name": "x64-Release",

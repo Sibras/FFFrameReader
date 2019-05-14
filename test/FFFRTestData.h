@@ -31,6 +31,7 @@ struct TestParams
 };
 
 static std::vector<TestParams> g_testData = {
+    {"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333},
 #if 1
     {"data/CLIP0000818_000_77aabf.mkv", 3840, 2160, 16.0 / 9.0, 1116, 44640000, 25.0, 40000},
     {"data/MenMC_50BR_Finals_Canon - Cut.mp4", 3840, 2160, 16.0 / 9.0, 249, 9960000, 25.0, 40000},
@@ -38,5 +39,4 @@ static std::vector<TestParams> g_testData = {
     {"data/MVI_0048.MP4", 3840, 2160, 16.0 / 9.0, 8592, 171840000, 50.0, 20000},
     {"data/Women_400IM_Heat2_Sony.MXF", 3840, 2160, 16.0 / 9.0, 9204, 368160000, 25.0, 40000},
 #endif
-    {"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333},
 };
