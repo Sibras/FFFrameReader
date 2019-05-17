@@ -71,14 +71,6 @@ public:
         std::any m_context;                       /**< Pointer to an existing context to be used for hardware
                                                    decoding. This must match the hardware type specified in @m_type. */
         uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */
-        struct Allocator
-        {
-            std::function<uint8_t*(uint32_t)> m_allocate;
-            std::function<void(uint8_t*)> m_free;
-        };
-
-        std::optional<Allocator> m_allocator =
-            std::nullopt; /**< The allocator used to allocate/free hardware buffers. */
     };
 
     /**
@@ -123,10 +115,7 @@ private:
     DecodeType m_deviceType = DecodeType::Software;
     uint32_t m_bufferLength = 10;
     DeviceContextPtr m_deviceContext = DeviceContextPtr(nullptr);
-    std::optional<DecoderOptions::Allocator> m_allocator = std::nullopt;
 
     friend const DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept;
-
-    friend const std::optional<DecoderOptions::Allocator>& getAllocator(DecoderContext* context) noexcept;
 };
 } // namespace FfFrameReader

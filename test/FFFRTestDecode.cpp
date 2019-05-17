@@ -18,6 +18,7 @@
 
 #include <cuda.h>
 #include <gtest/gtest.h>
+
 using namespace FfFrameReader;
 
 struct TestParamsDecode
@@ -25,15 +26,12 @@ struct TestParamsDecode
     uint32_t m_testDataIndex;
     bool m_useNvdec;
     bool m_useContext;
-    bool m_useAllocator;
 };
 
 static std::vector<TestParamsDecode> g_testDataDecode = {
-    {0, false, false, false},
-    {0, true, false, false},
-    {0, true, false, true},
-    {0, true, true, false},
-    {0, true, true, true},
+    //{0, false, false},
+    {0, true, false},
+    //{0, true, true},
 };
 
 class DecodeTest1 : public ::testing::TestWithParam<TestParamsDecode>
@@ -48,24 +46,21 @@ protected:
         DecoderContext::DecoderOptions options;
         if (GetParam().m_useNvdec) {
             options.m_type = DecoderContext::DecodeType::Nvdec;
+            // Setup a cuda context
+            auto err = cuInit(0);
+            ASSERT_EQ(err, CUDA_SUCCESS);
+            CUdevice device;
+            err = cuDeviceGet(&device, 0);
+            ASSERT_EQ(err, CUDA_SUCCESS);
             if (GetParam().m_useContext) {
-                // Create a cuda context
-                auto err = cuInit(0);
-                ASSERT_EQ(err, CUDA_SUCCESS);
-                CUdevice device;
-                err = cuDeviceGet(&device, 0);
-                ASSERT_EQ(err, CUDA_SUCCESS);
                 err = cuCtxCreate(&m_cudaContext, CU_CTX_SCHED_BLOCKING_SYNC, device);
                 ASSERT_EQ(err, CUDA_SUCCESS);
 
                 options.m_context = m_cudaContext;
-            }
-            if (GetParam().m_useAllocator) {
-                const std::function<uint8_t*(uint32_t)> allocator =
-                    std::bind(&DecodeTest1::allocateCuda, this, std::placeholders::_1);
-                const std::function<void(uint8_t*)> free =
-                    std::bind(&DecodeTest1::freeCuda, this, std::placeholders::_1);
-                options.m_allocator = std::optional<DecoderContext::DecoderOptions::Allocator>({allocator, free});
+            } else {
+                // Use default cuda context
+                err = cuDevicePrimaryCtxRetain(&m_cudaContext, 0);
+                ASSERT_EQ(err, CUDA_SUCCESS);
             }
         }
         ASSERT_NO_THROW(m_context = std::make_shared<DecoderContext>(options));
@@ -78,11 +73,6 @@ protected:
     {
         m_stream = nullptr;
         m_context = nullptr;
-        ASSERT_EQ(m_allocateNum, m_freeNum);
-        if (GetParam().m_useAllocator) {
-            ASSERT_TRUE(m_allocatorCalled);
-            ASSERT_GT(m_allocateNum, 0UL);
-        }
     }
 
     ~DecodeTest1() override
@@ -92,41 +82,10 @@ protected:
         }
     }
 
-    uint8_t* allocateCuda(const uint32_t size)
-    {
-        m_allocatorCalled = true;
-        CUcontext dummy = nullptr;
-        auto err = cuCtxPushCurrent(m_cudaContext);
-        if (err < 0) {
-            return nullptr;
-        }
-        CUdeviceptr data;
-        uint8_t* ret = nullptr;
-        err = cuMemAlloc(&data, size);
-        if (err >= 0) {
-            ret = reinterpret_cast<uint8_t*>(data);
-        }
-
-        cuCtxPopCurrent(&dummy);
-        ++m_allocateNum;
-        return ret;
-    }
-
-    void freeCuda(uint8_t* data)
-    {
-        CUcontext dummy;
-        cuCtxPushCurrent(m_cudaContext);
-        cuMemFree(reinterpret_cast<CUdeviceptr>(data));
-        cuCtxPopCurrent(&dummy);
-        ++m_freeNum;
-    }
-
     std::shared_ptr<DecoderContext> m_context = nullptr;
     std::shared_ptr<Stream> m_stream = nullptr;
     CUcontext m_cudaContext = nullptr;
     bool m_allocatorCalled = false;
-    uint32_t m_allocateNum = 0;
-    uint32_t m_freeNum = 0;
 };
 
 TEST_P(DecodeTest1, getLoopAll)
@@ -147,6 +106,9 @@ TEST_P(DecodeTest1, getLoopAll)
             (static_cast<double>(i + 1) * (1000000.0 / g_testData[GetParam().m_testDataIndex].m_frameRate));
         timeStamp = llround(timeStamp1);
         ASSERT_EQ(frame1->getFrameNumber(), frameNum);
+        printf("  frame0: %p\n", frame1->getFrameData()[0]);
+        printf("  frame1: %p\n", frame1->getFrameData()[1]);
+        printf("  frame2: %p\n", frame1->getFrameData()[2]);
         ++frameNum;
     }
 }

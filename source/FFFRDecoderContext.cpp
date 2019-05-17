@@ -34,40 +34,6 @@ const DecoderContext::DeviceContextPtr& getDeviceContext(DecoderContext* context
     return context->m_deviceContext;
 }
 
-const optional<DecoderContext::DecoderOptions::Allocator>& getAllocator(DecoderContext* context) noexcept
-{
-    return context->m_allocator;
-}
-
-static void poolFree(void* opaque, uint8_t* data) noexcept
-{
-    const auto decoder = reinterpret_cast<DecoderContext*>(opaque);
-    // Call the custom free function
-    try {
-        getAllocator(decoder).value().m_free(data);
-    } catch (...) {
-    }
-}
-
-static AVBufferRef* poolAllocator(void* opaque, const int32_t size) noexcept
-{
-    const auto decoder = reinterpret_cast<DecoderContext*>(opaque);
-    // Call the custom allocator
-    uint8_t* data;
-    try {
-        data = getAllocator(decoder).value().m_allocate(size);
-    } catch (...) {
-        return nullptr;
-    }
-
-    const auto ret = av_buffer_create(data, size, poolFree, opaque, 0);
-    if (!ret) {
-        av_log(nullptr, AV_LOG_ERROR, "Failed to allocate frame using custom allocator\n");
-        return nullptr;
-    }
-    return ret;
-}
-
 static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const enum AVPixelFormat* pixelFormats)
 {
     enum AVPixelFormat pixelFormat;
@@ -85,50 +51,6 @@ static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const 
     }
     for (const enum AVPixelFormat* p = pixelFormats; *p != -1; p++) {
         if (*p == pixelFormat) {
-            if (context->opaque != nullptr) {
-                const auto opaque = reinterpret_cast<DecoderContext*>(context->opaque);
-                const auto& deviceContext = getDeviceContext(opaque);
-                // Create a custom frame pool
-                context->hw_frames_ctx = av_hwframe_ctx_alloc(deviceContext.get());
-                if (!context->hw_frames_ctx) {
-                    av_log(nullptr, AV_LOG_ERROR, "Failed to allocate custom hardware frame context\n");
-                    return AV_PIX_FMT_NONE;
-                }
-                auto framesContext = reinterpret_cast<AVHWFramesContext*>(context->hw_frames_ctx->data);
-
-                framesContext->format = AV_PIX_FMT_CUDA;
-                framesContext->sw_format = context->sw_pix_fmt;
-                framesContext->width = FFALIGN(context->coded_width, 2);
-                framesContext->height = FFALIGN(context->coded_height, 2);
-                framesContext->initial_pool_size = 32;
-
-                const auto size = av_image_get_buffer_size(
-                    framesContext->sw_format, framesContext->width, framesContext->height, 256);
-                if (size < 0) {
-                    av_buffer_unref(&context->hw_frames_ctx);
-                    char buffer[AV_ERROR_MAX_STRING_SIZE];
-                    av_log(nullptr, AV_LOG_ERROR, "Failed to get image size: %s\n",
-                        av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, size));
-                    return AV_PIX_FMT_NONE;
-                }
-
-                framesContext->pool = av_buffer_pool_init2(size, opaque, poolAllocator, nullptr);
-                if (framesContext->pool == nullptr) {
-                    av_buffer_unref(&context->hw_frames_ctx);
-                    av_log(nullptr, AV_LOG_ERROR, "Failed to allocate buffer pool\n");
-                    return AV_PIX_FMT_NONE;
-                }
-
-                const auto err = av_hwframe_ctx_init(context->hw_frames_ctx);
-                if (err < 0) {
-                    av_buffer_unref(&context->hw_frames_ctx);
-                    char buffer[AV_ERROR_MAX_STRING_SIZE];
-                    av_log(nullptr, AV_LOG_ERROR, "Failed to initialise custom hardware frame context: %s\n",
-                        av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, err));
-                    return AV_PIX_FMT_NONE;
-                }
-            }
-
             return *p;
         }
     }
@@ -268,8 +190,6 @@ DecoderContext::DecoderContext(const DecoderOptions& options) noexcept
         }
         // Set internal values now we have successfully created a hardware device (otherwise stays at default)
         m_deviceType = options.m_type;
-        // Set internal allocator
-        m_allocator = options.m_allocator;
     }
 }
 
@@ -341,11 +261,6 @@ variant<bool, shared_ptr<Stream>> DecoderContext::getStream(const string& filena
     if (m_deviceType != DecodeType::Software) {
         if (m_deviceType == DecodeType::Nvdec) {
             tempCodec->get_format = getHardwareFormatNvdec;
-            if (m_allocator.has_value()) {
-                tempCodec->opaque = const_cast<void*>(reinterpret_cast<const void*>(this));
-            } else {
-                tempCodec->opaque = nullptr;
-            }
         } else {
             av_log(nullptr, AV_LOG_ERROR, "Hardware Device not properly implemented\n");
             return false;
