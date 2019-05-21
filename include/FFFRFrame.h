@@ -18,7 +18,7 @@
 
 struct AVFrame;
 
-namespace FfFrameReader {
+namespace Ffr {
 class Frame
 {
     friend class Stream;
@@ -126,4 +126,4 @@ private:
     int64_t m_timeStamp = 0;
     int64_t m_frameNum = 0;
 };
-} // namespace FfFrameReader
+} // namespace Ffr

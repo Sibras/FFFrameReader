@@ -14,68 +14,27 @@
  * limitations under the License.
  */
 #pragma once
-#include "FFFRStream.h"
+#include "FFFrameReader.h"
 
-#include <any>
 #include <functional>
-#include <optional>
-struct AVBufferRef;
 
-namespace FfFrameReader {
+extern "C" {
+#include <libavutil/buffer.h>
+#include <libavutil/hwcontext.h>
+}
+
+namespace Ffr {
 class DecoderContext
 {
+    friend class FfFrameReader;
+
 public:
-    enum class DecodeType
-    {
-        Software,
-        Nvdec,
-#if 0
-#    if defined(WIN32)
-        Dxva2,
-        D3d11va,
-#    else
-        Vaapi,
-        Vdpau,
-#    endif
-        Qsv,
-#endif
-    };
-
-    class DecoderOptions
-    {
-    public:
-        DecoderOptions(){};
-
-        explicit DecoderOptions(DecodeType type) noexcept;
-
-        ~DecoderOptions() = default;
-
-        DecoderOptions(const DecoderOptions& other) = default;
-
-        DecoderOptions(DecoderOptions&& other) = default;
-
-        DecoderOptions& operator=(const DecoderOptions& other) = default;
-
-        DecoderOptions& operator=(DecoderOptions&& other) = default;
-
-        bool operator==(const DecoderOptions& other) const noexcept;
-
-        bool operator!=(const DecoderOptions& other) const noexcept;
-
-        bool operator<(const DecoderOptions& other) const noexcept;
-
-        DecodeType m_type = DecodeType::Software; /**< The type of decoding to use. */
-        uint32_t m_bufferLength = 10;             /**< Number of frames in the the decode buffer.
-                                                  This should be optimised based on reading/seeking pattern so as to minimise frame
-                                                  storage requirements but also maximise decode throughput. */
-        std::any m_context;                       /**< Pointer to an existing context to be used for hardware
-                                                   decoding. This must match the hardware type specified in @m_type. */
-        uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */
-    };
+    using DecoderOptions = FfFrameReader::DecoderOptions;
+    using DecodeType = FfFrameReader::DecodeType;
 
     /**
      * Constructor.
-     * @param options (Optional) Options for controlling decoding.
+     * @param options (Optional) Options for controlling the context.
      */
     explicit DecoderContext(const DecoderOptions& options = DecoderOptions()) noexcept;
 
@@ -89,17 +48,11 @@ public:
 
     DecoderContext& operator=(DecoderContext&& other) = default;
 
-    /**
-     * Gets a stream from a file.
-     * @param filename Filename of the file to open.
-     * @returns The stream if succeeded, false otherwise.
-     */
-    [[nodiscard]] std::variant<bool, std::shared_ptr<Stream>> getStream(const std::string& filename) const noexcept;
-
 private:
     class DeviceContextPtr
     {
         friend class DecoderContext;
+        friend class FfFrameReader;
 
     public:
         explicit DeviceContextPtr(AVBufferRef* deviceContext) noexcept;
@@ -112,10 +65,10 @@ private:
         std::shared_ptr<AVBufferRef> m_deviceContext = nullptr;
     };
 
-    DecodeType m_deviceType = DecodeType::Software;
-    uint32_t m_bufferLength = 10;
     DeviceContextPtr m_deviceContext = DeviceContextPtr(nullptr);
 
     friend const DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept;
+
+    static enum AVHWDeviceType decodeTypeToFFmpeg(DecodeType type);
 };
-} // namespace FfFrameReader
+} // namespace Ffr

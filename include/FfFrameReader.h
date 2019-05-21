@@ -14,26 +14,96 @@
  * limitations under the License.
  */
 #pragma once
-#include "FFFRDecoderContext.h"
 #include "FFFRStream.h"
 
-namespace FfFrameReader {
-/** Values that represent log levels */
-enum class LogLevel : int
-{
-    Quiet = -8,
-    Panic = 0,
-    Fatal = 8,
-    Error = 16,
-    Warning = 24,
-    Info = 32,
-    Verbose = 40,
-    Debug = 48,
-};
+#include <any>
+#include <map>
 
-/**
- * Sets log level for all functions within FfFrameReader.
- * @param level The level.
- */
-extern void setLogLevel(LogLevel level);
-} // namespace FfFrameReader
+namespace Ffr {
+class DecoderContext;
+
+class FfFrameReader
+{
+public:
+    FfFrameReader();
+
+    ~FfFrameReader() = default;
+
+    FfFrameReader(const FfFrameReader& other) = default;
+
+    FfFrameReader(FfFrameReader&& other) noexcept = default;
+
+    FfFrameReader& operator=(const FfFrameReader& other) = default;
+
+    FfFrameReader& operator=(FfFrameReader&& other) noexcept = default;
+
+    enum class DecodeType
+    {
+        Software,
+        CUDA,
+    };
+
+    class DecoderOptions
+    {
+    public:
+        DecoderOptions(){};
+
+        explicit DecoderOptions(DecodeType type) noexcept;
+
+        ~DecoderOptions() = default;
+
+        DecoderOptions(const DecoderOptions& other) = default;
+
+        DecoderOptions(DecoderOptions&& other) = default;
+
+        DecoderOptions& operator=(const DecoderOptions& other) = default;
+
+        DecoderOptions& operator=(DecoderOptions&& other) = default;
+
+        bool operator==(const DecoderOptions& other) const noexcept;
+
+        bool operator!=(const DecoderOptions& other) const noexcept;
+
+        bool operator<(const DecoderOptions& other) const noexcept;
+
+        DecodeType m_type = DecodeType::Software; /**< The type of decoding to use. */
+        uint32_t m_bufferLength = 10;             /**< Number of frames in the the decode buffer.
+                                                  This should be optimised based on reading/seeking pattern so as to minimise frame
+                                                  storage requirements but also maximise decode throughput. */
+        std::any m_context;                       /**< Pointer to an existing context to be used for hardware
+                                                   decoding. This must match the hardware type specified in @m_type. */
+        uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */
+    };
+
+    /**
+     * Gets a stream from a file.
+     * @param filename Filename of the file to open.
+     * @param options  (Optional) Options for controlling decoding.
+     * @returns The stream if succeeded, false otherwise.
+     */
+    [[nodiscard]] std::variant<bool, std::shared_ptr<Stream>> getStream(
+        const std::string& filename, const DecoderOptions& options = DecoderOptions()) const noexcept;
+
+    /** Values that represent log levels */
+    enum class LogLevel : int
+    {
+        Quiet = -8,
+        Panic = 0,
+        Fatal = 8,
+        Error = 16,
+        Warning = 24,
+        Info = 32,
+        Verbose = 40,
+        Debug = 48,
+    };
+
+    /**
+     * Sets log level for all functions within FFR.
+     * @param level The level.
+     */
+    static void setLogLevel(LogLevel level);
+
+private:
+    static std::map<DecodeType, std::shared_ptr<DecoderContext>> s_hardwareContexts;
+};
+} // namespace Ffr

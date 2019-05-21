@@ -23,7 +23,7 @@ extern "C" {
 
 using namespace std;
 
-namespace FfFrameReader {
+namespace Ffr {
 Frame::FramePtr::FramePtr(AVFrame* frame) noexcept
     : m_frame(frame)
 {}
@@ -116,4 +116,4 @@ int Frame::getPixelFormat() const noexcept
 {
     return m_frame->format;
 }
-} // namespace FfFrameReader
+} // namespace Ffr

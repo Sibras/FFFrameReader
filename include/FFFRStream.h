@@ -25,15 +25,15 @@
 struct AVFormatContext;
 struct AVCodecContext;
 
-namespace FfFrameReader {
+namespace Ffr {
 class Stream
 {
-    friend class DecoderContext;
+    friend class FfFrameReader;
 
 private:
     class FormatContextPtr
     {
-        friend class DecoderContext;
+        friend class FfFrameReader;
         friend class Stream;
 
     private:
@@ -48,7 +48,7 @@ private:
 
     class CodecContextPtr
     {
-        friend class DecoderContext;
+        friend class FfFrameReader;
         friend class Stream;
 
     private:
@@ -71,8 +71,7 @@ public:
      * @param [in,out] codecContext  Context for the codec. This is reset to nullptr on function exit.
      * @param          bufferLength  Length of the internal decode buffer.
      */
-    Stream(FormatContextPtr& formatContext, int32_t streamID, CodecContextPtr& codecContext,
-        uint32_t bufferLength) noexcept;
+    Stream(FormatContextPtr& formatContext, int32_t streamID, CodecContextPtr& codecContext, uint32_t bufferLength) noexcept;
 
     ~Stream() = default;
 
@@ -288,4 +287,4 @@ private:
      */
     [[nodiscard]] int64_t getStreamDuration() const noexcept;
 };
-} // namespace FfFrameReader
+} // namespace Ffr

@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 #include "FFFRTestData.h"
-#include "FfFrameReader.h"
+#include "FFFrameReader.h"
 
 #include <gtest/gtest.h>
 
-using namespace FfFrameReader;
+using namespace Ffr;
 
 class StreamTest1 : public ::testing::TestWithParam<TestParams>
 {
@@ -27,11 +27,8 @@ protected:
 
     void SetUp() override
     {
-        setLogLevel(LogLevel::Error);
-
-        DecoderContext::DecoderOptions options;
-        ASSERT_NO_THROW(m_context = std::make_shared<DecoderContext>(options));
-        auto ret = m_context->getStream(GetParam().m_fileName);
+        ASSERT_NO_THROW(m_frameReader = std::make_shared<FfFrameReader>());
+        auto ret = m_frameReader->getStream(GetParam().m_fileName);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
     }
@@ -39,10 +36,10 @@ protected:
     void TearDown() override
     {
         m_stream = nullptr;
-        m_context = nullptr;
+        m_frameReader = nullptr;
     }
 
-    std::shared_ptr<DecoderContext> m_context = nullptr;
+    std::shared_ptr<FfFrameReader> m_frameReader = nullptr;
     std::shared_ptr<Stream> m_stream = nullptr;
 };
 

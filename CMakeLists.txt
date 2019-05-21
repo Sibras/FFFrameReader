@@ -58,16 +58,16 @@ endif()
 
 # Add project source files
 set(FFFR_SOURCES
-      source/FFFR.cpp
-      source/FFFRStream.cpp
-      source/FFFRDecoderContext.cpp
-      source/FFFRFrame.cpp
+    source/FFFR.cpp
+    source/FFFRStream.cpp
+    source/FFFRDecoderContext.cpp
+    source/FFFRFrame.cpp
+    include/FFFRDecoderContext.h
 )
 
 set(FFFR_HEADERS
-    include/FfFrameReader.h
+    include/FFFrameReader.h
     include/FFFRStream.h
-    include/FFFRDecoderContext.h
     include/FFFRFrame.h
 )
 

@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 #include "FFFRTestData.h"
-#include "FfFrameReader.h"
+#include "FFFrameReader.h"
 
 #include <cuda.h>
 #include <gtest/gtest.h>
 
-using namespace FfFrameReader;
+using namespace Ffr;
 
 struct TestParamsDecode
 {
@@ -29,9 +29,9 @@ struct TestParamsDecode
 };
 
 static std::vector<TestParamsDecode> g_testDataDecode = {
-    //{0, false, false},
+    {0, false, false},
     {0, true, false},
-    //{0, true, true},
+    {0, true, true},
 };
 
 class DecodeTest1 : public ::testing::TestWithParam<TestParamsDecode>
@@ -41,11 +41,9 @@ protected:
 
     void SetUp() override
     {
-        setLogLevel(LogLevel::Error);
-
-        DecoderContext::DecoderOptions options;
+        FfFrameReader::DecoderOptions options;
         if (GetParam().m_useNvdec) {
-            options.m_type = DecoderContext::DecodeType::Nvdec;
+            options.m_type = FfFrameReader::DecodeType::CUDA;
             // Setup a cuda context
             auto err = cuInit(0);
             ASSERT_EQ(err, CUDA_SUCCESS);
@@ -63,8 +61,8 @@ protected:
                 ASSERT_EQ(err, CUDA_SUCCESS);
             }
         }
-        ASSERT_NO_THROW(m_context = std::make_shared<DecoderContext>(options));
-        auto ret = m_context->getStream(g_testData[GetParam().m_testDataIndex].m_fileName);
+        ASSERT_NO_THROW(m_frameReader = std::make_shared<FfFrameReader>());
+        auto ret = m_frameReader->getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
     }
@@ -72,7 +70,7 @@ protected:
     void TearDown() override
     {
         m_stream = nullptr;
-        m_context = nullptr;
+        m_frameReader = nullptr;
     }
 
     ~DecodeTest1() override
@@ -82,7 +80,7 @@ protected:
         }
     }
 
-    std::shared_ptr<DecoderContext> m_context = nullptr;
+    std::shared_ptr<FfFrameReader> m_frameReader = nullptr;
     std::shared_ptr<Stream> m_stream = nullptr;
     CUcontext m_cudaContext = nullptr;
     bool m_allocatorCalled = false;
@@ -106,9 +104,6 @@ TEST_P(DecodeTest1, getLoopAll)
             (static_cast<double>(i + 1) * (1000000.0 / g_testData[GetParam().m_testDataIndex].m_frameRate));
         timeStamp = llround(timeStamp1);
         ASSERT_EQ(frame1->getFrameNumber(), frameNum);
-        printf("  frame0: %p\n", frame1->getFrameData()[0]);
-        printf("  frame1: %p\n", frame1->getFrameData()[1]);
-        printf("  frame2: %p\n", frame1->getFrameData()[2]);
         ++frameNum;
     }
 }

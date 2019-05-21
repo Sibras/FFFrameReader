@@ -25,7 +25,7 @@ extern "C" {
 #include <libavutil/log.h>
 }
 
-namespace FfFrameReader {
+namespace Ffr {
 Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecContextPtr& codecContext,
     const uint32_t bufferLength) noexcept
     : m_bufferLength(bufferLength)
@@ -152,7 +152,7 @@ variant<bool, shared_ptr<Frame>> Stream::getNextFrame() noexcept
 
 variant<bool, vector<shared_ptr<Frame>>> Stream::getNextFrameSequence(const vector<int64_t>& frameSequence) noexcept
 {
-    // Note: for best performance when using this the buffer size should be small enough to not waste to much memeory
+    // Note: for best performance when using this the buffer size should be small enough to not waste to much memory
     lock_guard<recursive_mutex> lock(m_mutex);
     vector<shared_ptr<Frame>> ret;
     int64_t start = 0;
@@ -194,6 +194,7 @@ bool Stream::seekFrame(const int64_t frame) noexcept
 
 int64_t Stream::timeToTimeStamp(const int64_t time) const noexcept
 {
+    static_assert(AV_TIME_BASE == 1000000, "FFmpeg internal time_base does not match expected value");
     // Rescale a timestamp that is stored in microseconds (AV_TIME_BASE) to the stream timebase
     return m_startTimeStamp +
         av_rescale_q(time, av_make_q(1, AV_TIME_BASE), m_formatContext->streams[m_index]->time_base);
@@ -447,7 +448,7 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
         }
     }
 
-    // If we have recursed and still havnt found the frame then we never will
+    // If we have recursed and still haven't found the frame then we never will
     if (recursed) {
         av_log(nullptr, AV_LOG_ERROR, "Failed to seek to specified time stamp %" PRId64 "\n", timeStamp);
         return false;
@@ -526,7 +527,7 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
         }
     }
 
-    // If we have recursed and still havnt found the frame then we never will
+    // If we have recursed and still haven't found the frame then we never will
     if (recursed || !m_frameSeekSupported) {
         if (m_frameSeekSupported) {
             m_frameSeekSupported = false;
@@ -726,4 +727,4 @@ int64_t Stream::getStreamDuration() const noexcept
     // The detected value is timestamp of the last detected packet plus the duration of that frame
     return timeStampToTime(foundTimeStamp) + frameToTime(1);
 }
-} // namespace FfFrameReader
+} // namespace Ffr
