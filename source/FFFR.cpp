@@ -27,8 +27,6 @@ extern "C" {
 using namespace std;
 
 namespace Ffr {
-map<FfFrameReader::DecodeType, shared_ptr<DecoderContext>> FfFrameReader::s_hardwareContexts;
-
 static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const enum AVPixelFormat* pixelFormats)
 {
     enum AVPixelFormat pixelFormat;
@@ -184,19 +182,12 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
     AVDictionary* opts = nullptr;
     av_dict_set(&opts, "refcounted_frames", "1", 0);
     if (options.m_type != DecodeType::Software) {
-        // Check if decoder exists in list
-        auto deviceContext = s_hardwareContexts.find(options.m_type);
-        if (deviceContext == s_hardwareContexts.end()) {
-            // Create a new hardware context
-            s_hardwareContexts[options.m_type] = make_shared<DecoderContext>(options);
-            deviceContext = s_hardwareContexts.find(options.m_type);
-            if (deviceContext->second->m_deviceContext.get() == nullptr) {
-                // Device creation failed
-                s_hardwareContexts.erase(options.m_type);
-                return false;
-            }
+        const auto deviceContext = make_shared<DecoderContext>(options);
+        if (deviceContext->m_deviceContext.get() == nullptr) {
+            // Device creation failed
+            return false;
         }
-        tempCodec->hw_device_ctx = av_buffer_ref(deviceContext->second->m_deviceContext.get());
+        tempCodec->hw_device_ctx = av_buffer_ref(deviceContext->m_deviceContext.get());
         if (options.m_type == DecodeType::CUDA) {
             tempCodec->get_format = getHardwareFormatNvdec;
         } else {

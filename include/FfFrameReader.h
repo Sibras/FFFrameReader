@@ -103,8 +103,5 @@ public:
      * @param level The level.
      */
     static void setLogLevel(LogLevel level);
-
-private:
-    static std::map<DecodeType, std::shared_ptr<DecoderContext>> s_hardwareContexts;
 };
 } // namespace Ffr
