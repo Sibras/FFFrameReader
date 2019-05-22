@@ -15,7 +15,10 @@
  */
 #include "FFFRStream.h"
 
+#include "FFFrameReader.h"
+
 #include <algorithm>
+#include <string>
 using namespace std;
 
 extern "C" {
@@ -29,10 +32,10 @@ namespace Ffr {
 Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecContextPtr& codecContext,
     const uint32_t bufferLength, const bool outputHost) noexcept
     : m_bufferLength(bufferLength)
+    , m_outputHost(outputHost)
     , m_formatContext(move(formatContext))
     , m_index(streamID)
     , m_codecContext(move(codecContext))
-    , m_outputHost(outputHost)
 {
     // Ensure buffer length is long enough to handle the maximum number of frames a video may require
     uint32_t minFrames = getCodecDelay();
@@ -132,7 +135,7 @@ variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
         m_bufferPong.resize(0);
         // Check if there are any new frames or we reached EOF
         if (m_bufferPing.size() == 0) {
-            av_log(nullptr, AV_LOG_ERROR, "Cannot get a new frame, End of file has been reached.\n");
+            FfFrameReader::log("Cannot get a new frame, End of file has been reached"s, FfFrameReader::LogLevel::Error);
             return false;
         }
     }
@@ -160,8 +163,9 @@ variant<bool, vector<shared_ptr<Frame>>> Stream::getNextFrameSequence(const vect
     for (const auto& i : frameSequence) {
         if (i < start) {
             // Invalid sequence list
-            av_log(nullptr, AV_LOG_ERROR,
-                "Invalid sequence list passed to getNextFrameSequence(). Sequences in the list must be in ascending order.\n");
+            FfFrameReader::log(
+                "Invalid sequence list passed to getNextFrameSequence(). Sequences in the list must be in ascending order"s,
+                FfFrameReader::LogLevel::Error);
             return false;
         }
         // Remove all frames until first in sequence
@@ -252,9 +256,8 @@ bool Stream::decodeNextBlock() noexcept
             auto ret = av_read_frame(m_formatContext.get(), &packet);
             if (ret < 0) {
                 if (ret != AVERROR_EOF) {
-                    char buffer[AV_ERROR_MAX_STRING_SIZE];
-                    av_log(nullptr, AV_LOG_ERROR, "Failed to retrieve new frame: %s\n",
-                        av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+                    FfFrameReader::log("Failed to retrieve new frame: "s += FfFrameReader::getFfmpegErrorString(ret),
+                        FfFrameReader::LogLevel::Error);
                     return false;
                 }
                 eof = true;
@@ -273,9 +276,9 @@ bool Stream::decodeNextBlock() noexcept
                 }
                 if (ret < 0) {
                     av_packet_unref(&packet);
-                    char buffer[AV_ERROR_MAX_STRING_SIZE];
-                    av_log(nullptr, AV_LOG_ERROR, "Failed to send packet to decoder: %s\n",
-                        av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+                    FfFrameReader::log(
+                        "Failed to send packet to decoder: "s += FfFrameReader::getFfmpegErrorString(ret),
+                        FfFrameReader::LogLevel::Error);
                     return false;
                 }
                 // Increase the number of maxPackets if we are really close to just finishing the stream anyway
@@ -326,7 +329,7 @@ bool Stream::decodeNextFrames() noexcept
         if (*frame == nullptr) {
             *frame = av_frame_alloc();
             if (*frame == nullptr) {
-                av_log(nullptr, AV_LOG_ERROR, "Failed to allocate new frame\n");
+                FfFrameReader::log("Failed to allocate new frame"s, FfFrameReader::LogLevel::Error);
                 return false;
             }
         }
@@ -336,9 +339,8 @@ bool Stream::decodeNextFrames() noexcept
             if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF)) {
                 return true;
             }
-            char buffer[AV_ERROR_MAX_STRING_SIZE];
-            av_log(nullptr, AV_LOG_ERROR, "Failed to receive decoded frame: %s\n",
-                av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+            FfFrameReader::log("Failed to receive decoded frame: "s += FfFrameReader::getFfmpegErrorString(ret),
+                FfFrameReader::LogLevel::Error);
             return false;
         }
 
@@ -370,15 +372,14 @@ bool Stream::decodeNextFrames() noexcept
             *frame2 = av_frame_alloc();
             if (*frame == nullptr) {
                 av_frame_unref(*frame);
-                av_log(nullptr, AV_LOG_ERROR, "Failed to allocate new host frame\n");
+                FfFrameReader::log("Failed to allocate new host frame"s, FfFrameReader::LogLevel::Error);
                 return false;
             }
             const auto ret2 = av_hwframe_transfer_data(*frame2, *frame, 0);
             if (ret2 < 0) {
                 av_frame_unref(*frame);
-                char buffer[AV_ERROR_MAX_STRING_SIZE];
-                av_log(nullptr, AV_LOG_ERROR, "Failed to copy frame to host: %s\n",
-                    av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret2));
+                FfFrameReader::log("Failed to copy frame to host: "s += FfFrameReader::getFfmpegErrorString(ret),
+                    FfFrameReader::LogLevel::Error);
                 return false;
             }
             frame = frame2;
@@ -394,7 +395,7 @@ bool Stream::decodeNextFrames() noexcept
 void Stream::popFrame() noexcept
 {
     if (m_bufferPingHead >= m_bufferPing.size()) {
-        av_log(nullptr, AV_LOG_ERROR, "No more frames to pop\n");
+        FfFrameReader::log("No more frames to pop"s, FfFrameReader::LogLevel::Error);
         return;
     }
     // Release reference and pop frame
@@ -459,7 +460,8 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
 
     // If we have recursed and still haven't found the frame then we never will
     if (recursed) {
-        av_log(nullptr, AV_LOG_ERROR, "Failed to seek to specified time stamp %" PRId64 "\n", timeStamp);
+        FfFrameReader::log(
+            "Failed to seek to specified time stamp "s += to_string(timeStamp), FfFrameReader::LogLevel::Error);
         return false;
     }
 
@@ -468,9 +470,9 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
     const auto localTimeStamp = timeToTimeStamp(timeStamp) + m_startTimeStamp;
     const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
-        char buffer[AV_ERROR_MAX_STRING_SIZE];
-        av_log(nullptr, AV_LOG_ERROR, "Failed seeking to specified time stamp %" PRId64 ": %s\n", timeStamp,
-            av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, err));
+        FfFrameReader::log("Failed seeking to specified time stamp "s += to_string(timeStamp) +=
+            FfFrameReader::getFfmpegErrorString(err),
+            FfFrameReader::LogLevel::Error);
         return false;
     }
 
@@ -540,8 +542,9 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
     if (recursed || !m_frameSeekSupported) {
         if (m_frameSeekSupported) {
             m_frameSeekSupported = false;
-            av_log(nullptr, AV_LOG_ERROR,
-                "Failed to seek to specified frame %" PRId64 " (retrying using timestamp based seek)\n", frame);
+            FfFrameReader::log(
+                "Failed to seek to specified frame "s += to_string(frame) += " (retrying using timestamp based seek)"s,
+                FfFrameReader::LogLevel::Error);
         } else if (recursed) {
             return false;
         }
@@ -557,10 +560,9 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
         avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
     if (err < 0) {
         m_frameSeekSupported = false;
-        char buffer[AV_ERROR_MAX_STRING_SIZE];
-        av_log(nullptr, AV_LOG_ERROR,
-            "Failed to seek to specified frame %" PRId64 ": %s (retrying using timestamp based seek)\n", frame,
-            av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, err));
+        FfFrameReader::log("Failed to seek to specified frame "s += to_string(frame) += ": "s +=
+            FfFrameReader::getFfmpegErrorString(err) += " (retrying using timestamp based seek)"s,
+            FfFrameReader::LogLevel::Error);
 
         // Try and seek just using a timestamp
         return seek(frameToTime(frame));
@@ -600,7 +602,7 @@ int64_t Stream::getStreamStartTime() const noexcept
         startDts = std::min(startDts, stream->first_dts);
     }
     if (av_seek_frame(m_formatContext.get(), m_index, startDts, AVSEEK_FLAG_BACKWARD) < 0) {
-        av_log(nullptr, AV_LOG_ERROR, "Failed to determine stream start time\n");
+        FfFrameReader::log("Failed to determine stream start time"s, FfFrameReader::LogLevel::Error);
         return 0;
     }
     AVPacket packet;
@@ -653,7 +655,7 @@ int64_t Stream::getStreamFrames() const noexcept
     avcodec_flush_buffers(m_codecContext.get());
     const auto maxSeek = frameToTimeStamp(1UL << 29UL);
     if (avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, maxSeek, maxSeek, 0) < 0) {
-        av_log(nullptr, AV_LOG_ERROR, "Failed to determine number of frames in stream\n");
+        FfFrameReader::log("Failed to determine number of frames in stream"s, FfFrameReader::LogLevel::Error);
         return 0;
     }
 
@@ -706,7 +708,7 @@ int64_t Stream::getStreamDuration() const noexcept
     avcodec_flush_buffers(m_codecContext.get());
     const auto maxSeek = frameToTimeStamp(1UL << 29UL);
     if (avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, maxSeek, maxSeek, 0) < 0) {
-        av_log(nullptr, AV_LOG_ERROR, "Failed to determine stream duration\n");
+        FfFrameReader::log("Failed to determine stream duration"s, FfFrameReader::LogLevel::Error);
         return 0;
     }
 

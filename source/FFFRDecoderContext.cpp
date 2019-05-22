@@ -21,9 +21,7 @@
 
 extern "C" {
 #include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
 #include <libavutil/hwcontext_cuda.h>
-#include <libavutil/log.h>
 }
 
 using namespace std;
@@ -77,14 +75,15 @@ DecoderContext::DecoderContext(const ContextOptions& options) noexcept
         if (options.m_context.has_value()) {
             DeviceContextPtr tempDevice(av_hwdevice_ctx_alloc(type));
             if (tempDevice.get() == nullptr) {
-                av_log(nullptr, AV_LOG_ERROR, "Failed to create custom hardware device\n");
+                FfFrameReader::log("Failed to create custom hardware device"s, FfFrameReader::LogLevel::Error);
                 return;
             }
             auto* deviceContext = reinterpret_cast<AVHWDeviceContext*>(tempDevice->data);
             deviceContext->free = nullptr;
             if (type == AV_HWDEVICE_TYPE_CUDA) {
                 if (options.m_context.type() != typeid(CUcontext)) {
-                    av_log(nullptr, AV_LOG_ERROR, "Specified device context does not match the required type\n");
+                    FfFrameReader::log(
+                        "Specified device context does not match the required type"s, FfFrameReader::LogLevel::Error);
                     return;
                 }
                 auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(deviceContext->hwctx);
@@ -95,7 +94,7 @@ DecoderContext::DecoderContext(const ContextOptions& options) noexcept
             }
             const auto ret = av_hwdevice_ctx_init(tempDevice.get());
             if (ret < 0) {
-                av_log(nullptr, AV_LOG_ERROR, "Failed to init custom hardware device\n");
+                FfFrameReader::log("Failed to init custom hardware device"s, FfFrameReader::LogLevel::Error);
                 return;
             }
             // Move the temp device to the internal one
@@ -105,7 +104,7 @@ DecoderContext::DecoderContext(const ContextOptions& options) noexcept
             AVBufferRef* deviceContext;
             const int err = av_hwdevice_ctx_create(&deviceContext, type, device.c_str(), nullptr, 0);
             if (err < 0) {
-                av_log(nullptr, AV_LOG_ERROR, "Failed to create specified hardware device\n");
+                FfFrameReader::log("Failed to create specified hardware device"s, FfFrameReader::LogLevel::Error);
                 return;
             }
             m_deviceContext = DeviceContextPtr(deviceContext);

@@ -99,9 +99,22 @@ public:
     };
 
     /**
-     * Sets log level for all functions within FFR.
+     * Sets log level for all functions within FfFrameReader.
      * @param level The level.
      */
     static void setLogLevel(LogLevel level);
+
+    /**
+     * Logs text to default output.
+     * @param text  The text.
+     * @param level (Optional) The logging level.
+     */
+    static void log(const std::string& text, LogLevel level = LogLevel::Info);
+
+    /**
+     * Static constructor
+     * @param errorCode The error code.
+     */
+    static std::string getFfmpegErrorString(int errorCode);
 };
 } // namespace Ffr

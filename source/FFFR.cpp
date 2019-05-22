@@ -33,8 +33,9 @@ static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const 
     for (int i = 0;; i++) {
         const AVCodecHWConfig* config = avcodec_get_hw_config(context->codec, i);
         if (!config) {
-            av_log(nullptr, AV_LOG_ERROR, "Decoder does not support device type: %s, %s\n", context->codec->name,
-                av_hwdevice_get_type_name(AV_HWDEVICE_TYPE_CUDA));
+            FfFrameReader::log((("Decoder does not support device type: "s += context->codec->name) += ", "s) +=
+                av_hwdevice_get_type_name(AV_HWDEVICE_TYPE_CUDA),
+                FfFrameReader::LogLevel::Error);
             return AV_PIX_FMT_NONE;
         }
         if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX && config->device_type == AV_HWDEVICE_TYPE_CUDA) {
@@ -47,7 +48,7 @@ static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const 
             return *p;
         }
     }
-    av_log(nullptr, AV_LOG_ERROR, "Failed to get hardware surface format\n");
+    FfFrameReader::log("Failed to get hardware surface format"s, FfFrameReader::LogLevel::Error);
     return AV_PIX_FMT_NONE;
 }
 
@@ -122,16 +123,12 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
     auto ret = avformat_open_input(&formatPtr, filename.c_str(), nullptr, nullptr);
     Stream::FormatContextPtr tempFormat(formatPtr);
     if (ret < 0) {
-        char buffer[AV_ERROR_MAX_STRING_SIZE];
-        av_log(nullptr, AV_LOG_ERROR, "Failed to open input stream '%s': %s\n", filename.c_str(),
-            av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+        log(("Failed to open input stream "s += filename) += ", "s += getFfmpegErrorString(ret), LogLevel::Error);
         return false;
     }
     ret = avformat_find_stream_info(tempFormat.get(), nullptr);
     if (ret < 0) {
-        char buffer[AV_ERROR_MAX_STRING_SIZE];
-        av_log(nullptr, AV_LOG_ERROR, "Failed finding stream information '%s': %s\n", filename.c_str(),
-            av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+        log(("Failed finding stream information "s += filename) += ", "s += getFfmpegErrorString(ret), LogLevel::Error);
         return false;
     }
 
@@ -139,9 +136,8 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
     AVCodec* decoder = nullptr;
     ret = av_find_best_stream(tempFormat.get(), AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
     if (ret < 0) {
-        char buffer[AV_ERROR_MAX_STRING_SIZE];
-        av_log(nullptr, AV_LOG_ERROR, "Failed to find video stream in file '%s': %s\n", filename.c_str(),
-            av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+        log(("Failed to find video stream in file "s += filename) += ", "s += getFfmpegErrorString(ret),
+            LogLevel::Error);
         return false;
     }
     AVStream* stream = tempFormat->streams[ret];
@@ -152,8 +148,9 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
         for (int i = 0;; i++) {
             const AVCodecHWConfig* config = avcodec_get_hw_config(decoder, i);
             if (config == nullptr) {
-                av_log(nullptr, AV_LOG_ERROR, "Decoder does not support device type: %s, %s\n", decoder->name,
-                    av_hwdevice_get_type_name(DecoderContext::decodeTypeToFFmpeg(options.m_type)));
+                log(("Decoder does not support device type: "s += decoder->name) +=
+                    av_hwdevice_get_type_name(DecoderContext::decodeTypeToFFmpeg(options.m_type)),
+                    LogLevel::Error);
                 return false;
             }
             if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
@@ -166,15 +163,14 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
     // Create a decoder context
     Stream::CodecContextPtr tempCodec(avcodec_alloc_context3(decoder));
     if (tempCodec.get() == nullptr) {
-        av_log(nullptr, AV_LOG_ERROR, "Failed allocating decoder context %s\n", filename.c_str());
+        log("Failed allocating decoder context "s += filename, LogLevel::Error);
         return false;
     }
 
     ret = avcodec_parameters_to_context(tempCodec.get(), stream->codecpar);
     if (ret < 0) {
-        char buffer[AV_ERROR_MAX_STRING_SIZE];
-        av_log(nullptr, AV_LOG_ERROR, "Failed copying parameters to decoder context '%s': %s\n", filename.c_str(),
-            av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+        log(("Failed copying parameters to decoder context "s += filename) += ", "s += getFfmpegErrorString(ret),
+            LogLevel::Error);
         return false;
     }
 
@@ -191,7 +187,7 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
         if (options.m_type == DecodeType::CUDA) {
             tempCodec->get_format = getHardwareFormatNvdec;
         } else {
-            av_log(nullptr, AV_LOG_ERROR, "Hardware Device not properly implemented\n");
+            log("Hardware Device not properly implemented"s, LogLevel::Error);
             return false;
         }
         // Enable extra hardware frames to ensure we don't run out of buffers
@@ -202,9 +198,7 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
     }
     ret = avcodec_open2(tempCodec.get(), decoder, &opts);
     if (ret < 0) {
-        char buffer[AV_ERROR_MAX_STRING_SIZE];
-        av_log(nullptr, AV_LOG_ERROR, "Failed opening decoder for %s: %s\n", filename.c_str(),
-            av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret));
+        log(("Failed opening decoder for "s += filename) += ": "s += getFfmpegErrorString(ret), LogLevel::Error);
         return false;
     }
 
@@ -216,5 +210,17 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
 void FfFrameReader::setLogLevel(const LogLevel level)
 {
     av_log_set_level(static_cast<int>(level));
+}
+
+void FfFrameReader::log(const std::string& text, const LogLevel level)
+{
+    av_log(nullptr, static_cast<int>(level), "%s\n", text.c_str());
+}
+
+std::string FfFrameReader::getFfmpegErrorString(const int errorCode)
+{
+    char buffer[AV_ERROR_MAX_STRING_SIZE];
+    av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, errorCode);
+    return buffer;
 }
 } // namespace Ffr
