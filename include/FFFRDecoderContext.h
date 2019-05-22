@@ -29,14 +29,36 @@ class DecoderContext
     friend class FfFrameReader;
 
 public:
-    using DecoderOptions = FfFrameReader::DecoderOptions;
     using DecodeType = FfFrameReader::DecodeType;
+
+    class ContextOptions
+    {
+    public:
+        ContextOptions() = default;
+
+        ContextOptions(DecodeType type, std::any context, uint32_t device);
+
+        ~ContextOptions() = default;
+
+        ContextOptions(const ContextOptions& other) = default;
+
+        ContextOptions(ContextOptions&& other) = default;
+
+        ContextOptions& operator=(const ContextOptions& other) = default;
+
+        ContextOptions& operator=(ContextOptions&& other) = default;
+
+        DecodeType m_type = DecodeType::Software; /**< The type of decoding to use. */
+        std::any m_context;                       /**< Pointer to an existing context to be used for hardware
+                                                   decoding. This must match the hardware type specified in @m_type. */
+        uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */
+    };
 
     /**
      * Constructor.
-     * @param options (Optional) Options for controlling the context.
+     * @param options Options for controlling the context.
      */
-    explicit DecoderContext(const DecoderOptions& options = DecoderOptions()) noexcept;
+    explicit DecoderContext(const ContextOptions& options) noexcept;
 
     ~DecoderContext() noexcept = default;
 

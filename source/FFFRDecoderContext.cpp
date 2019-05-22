@@ -17,6 +17,7 @@
 
 #include <any>
 #include <string>
+#include <utility>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -55,7 +56,13 @@ AVBufferRef* DecoderContext::DeviceContextPtr::get() const noexcept
     return m_deviceContext.get();
 }
 
-DecoderContext::DecoderContext(const DecoderOptions& options) noexcept
+DecoderContext::ContextOptions::ContextOptions(const DecodeType type, std::any context, const uint32_t device)
+    : m_type(type)
+    , m_context(move(context))
+    , m_device(device)
+{}
+
+DecoderContext::DecoderContext(const ContextOptions& options) noexcept
 {
     if (options.m_type != DecodeType::Software) {
         // Create device specific options

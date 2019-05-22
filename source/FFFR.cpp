@@ -182,12 +182,12 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
     AVDictionary* opts = nullptr;
     av_dict_set(&opts, "refcounted_frames", "1", 0);
     if (options.m_type != DecodeType::Software) {
-        const auto deviceContext = make_shared<DecoderContext>(options);
-        if (deviceContext->m_deviceContext.get() == nullptr) {
+        const auto deviceContext = DecoderContext({options.m_type, options.m_context, options.m_device});
+        if (deviceContext.m_deviceContext.get() == nullptr) {
             // Device creation failed
             return false;
         }
-        tempCodec->hw_device_ctx = av_buffer_ref(deviceContext->m_deviceContext.get());
+        tempCodec->hw_device_ctx = av_buffer_ref(deviceContext.m_deviceContext.get());
         if (options.m_type == DecodeType::CUDA) {
             tempCodec->get_format = getHardwareFormatNvdec;
         } else {
