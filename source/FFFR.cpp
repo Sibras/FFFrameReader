@@ -218,7 +218,8 @@ variant<bool, shared_ptr<Stream>> FfFrameReader::getStream(const string& filenam
     }
 
     // Make a new stream object and return it
-    return make_shared<Stream>(tempFormat, index, tempCodec, options.m_bufferLength);
+    const bool outputHost = options.m_outputHost && (options.m_type != DecodeType::Software);
+    return make_shared<Stream>(tempFormat, index, tempCodec, options.m_bufferLength, outputHost);
 }
 
 void FfFrameReader::setLogLevel(const LogLevel level)

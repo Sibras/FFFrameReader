@@ -27,11 +27,12 @@ extern "C" {
 
 namespace Ffr {
 Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecContextPtr& codecContext,
-    const uint32_t bufferLength) noexcept
+    const uint32_t bufferLength, const bool outputHost) noexcept
     : m_bufferLength(bufferLength)
     , m_formatContext(move(formatContext))
     , m_index(streamID)
     , m_codecContext(move(codecContext))
+    , m_outputHost(outputHost)
 {
     // Ensure buffer length is long enough to handle the maximum number of frames a video may require
     uint32_t minFrames = getCodecDelay();
@@ -363,18 +364,26 @@ bool Stream::decodeNextFrames() noexcept
             }
         }
 
-        // TODO: Need to determine type of memory pointer requested and perform a memory move to the required memory
-        // space
-        /*
-        if (m_frame->format == hw_pix_fmt) {
-            AVFrame *sw_frame = av_frame_alloc()
-            if ((ret = av_hwframe_transfer_data(sw_frame, m_frame, 0)) < 0) {
-                error
+        // Check type of memory pointer requested and perform a memory move
+        if (m_outputHost) {
+            Frame::FramePtr frame2;
+            *frame2 = av_frame_alloc();
+            if (*frame == nullptr) {
+                av_frame_unref(*frame);
+                av_log(nullptr, AV_LOG_ERROR, "Failed to allocate new host frame\n");
+                return false;
             }
-            tmp_frame = sw_frame;
+            const auto ret2 = av_hwframe_transfer_data(*frame2, *frame, 0);
+            if (ret2 < 0) {
+                av_frame_unref(*frame);
+                char buffer[AV_ERROR_MAX_STRING_SIZE];
+                av_log(nullptr, AV_LOG_ERROR, "Failed to copy frame to host: %s\n",
+                    av_make_error_string(buffer, AV_ERROR_MAX_STRING_SIZE, ret2));
+                return false;
+            }
+            frame = frame2;
         }
-        else { tmp_frame = frame; }
-        */
+
         // TODO: Need to convert to proper colour space format
 
         // Add the new frame to the pong buffer

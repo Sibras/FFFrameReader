@@ -33,7 +33,7 @@ const DecoderContext::DeviceContextPtr& getDeviceContext(DecoderContext* context
     return context->m_deviceContext;
 }
 
-enum AVHWDeviceType DecoderContext::decodeTypeToFFmpeg(const DecoderContext::DecodeType type)
+enum AVHWDeviceType DecoderContext::decodeTypeToFFmpeg(const DecodeType type)
 {
     if (type == DecodeType::CUDA) {
         return AV_HWDEVICE_TYPE_CUDA;

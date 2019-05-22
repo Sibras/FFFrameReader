@@ -70,8 +70,10 @@ public:
      * @param          streamID      Index of the stream.
      * @param [in,out] codecContext  Context for the codec. This is reset to nullptr on function exit.
      * @param          bufferLength  Length of the internal decode buffer.
+     * @param          outputHost    True to output each frame to host CPU memory (only affects hardware decoding).
      */
-    Stream(FormatContextPtr& formatContext, int32_t streamID, CodecContextPtr& codecContext, uint32_t bufferLength) noexcept;
+    Stream(FormatContextPtr& formatContext, int32_t streamID, CodecContextPtr& codecContext, uint32_t bufferLength,
+        bool outputHost) noexcept;
 
     ~Stream() = default;
 
@@ -172,6 +174,7 @@ private:
     uint32_t m_bufferPingHead =
         0; /**< The position in the ping buffer of the next available frame in the decoded stream. */
     std::vector<std::shared_ptr<Frame>> m_bufferPong; /**< The secondary buffer used to store decoded frames */
+    bool m_outputHost = true; /**< True to output each frame to host CPU memory (only affects hardware decoding) */
 
     FormatContextPtr m_formatContext;
     int32_t m_index = -1; /**< Zero-based index of the video stream  */

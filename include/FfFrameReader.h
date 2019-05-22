@@ -73,6 +73,7 @@ public:
         std::any m_context;                       /**< Pointer to an existing context to be used for hardware
                                                    decoding. This must match the hardware type specified in @m_type. */
         uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */
+        bool m_outputHost = true; /**< True to output each frame to host CPU memory (only affects hardware decoding) */
     };
 
     /**
