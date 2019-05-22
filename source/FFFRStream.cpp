@@ -63,7 +63,7 @@ AVFormatContext* Stream::FormatContextPtr::get() const noexcept
 }
 
 Stream::CodecContextPtr::CodecContextPtr(AVCodecContext* codecContext) noexcept
-    : m_codecContext(codecContext, avcodec_close)
+    : m_codecContext(codecContext, [](AVCodecContext* p) { avcodec_free_context(&p); })
 {}
 
 AVCodecContext* Stream::CodecContextPtr::operator->() const noexcept
