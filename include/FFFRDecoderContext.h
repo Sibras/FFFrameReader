@@ -27,38 +27,19 @@ namespace Ffr {
 class DecoderContext
 {
     friend class FfFrameReader;
+    friend class Stream;
 
 public:
     using DecodeType = FfFrameReader::DecodeType;
 
-    class ContextOptions
-    {
-    public:
-        ContextOptions() = default;
-
-        ContextOptions(DecodeType type, std::any context, uint32_t device);
-
-        ~ContextOptions() = default;
-
-        ContextOptions(const ContextOptions& other) = default;
-
-        ContextOptions(ContextOptions&& other) = default;
-
-        ContextOptions& operator=(const ContextOptions& other) = default;
-
-        ContextOptions& operator=(ContextOptions&& other) = default;
-
-        DecodeType m_type = DecodeType::Software; /**< The type of decoding to use. */
-        std::any m_context;                       /**< Pointer to an existing context to be used for hardware
-                                                   decoding. This must match the hardware type specified in @m_type. */
-        uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */
-    };
-
     /**
      * Constructor.
-     * @param options Options for controlling the context.
+     * @param type    The type of decoding to use.
+     * @param context Pointer to an existing context to be used for hardware decoding. This must match the hardware
+     *  type specified in @m_type.
+     * @param device  The device index for the desired hardware device.
      */
-    explicit DecoderContext(const ContextOptions& options) noexcept;
+    explicit DecoderContext(DecodeType type, const std::any& context, uint32_t device) noexcept;
 
     ~DecoderContext() noexcept = default;
 
@@ -77,6 +58,8 @@ private:
         friend class FfFrameReader;
 
     public:
+        DeviceContextPtr() = default;
+
         explicit DeviceContextPtr(AVBufferRef* deviceContext) noexcept;
 
         [[nodiscard]] AVBufferRef* get() const noexcept;
@@ -92,5 +75,11 @@ private:
     friend const DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept;
 
     static enum AVHWDeviceType decodeTypeToFFmpeg(DecodeType type);
+
+    using FormatFunction = enum AVPixelFormat (*)(struct AVCodecContext*, const enum AVPixelFormat*);
+
+    [[nodiscard]] FormatFunction getFormatFunction() const noexcept;
+
+    [[nodiscard]] DecodeType getType() const noexcept;
 };
 } // namespace Ffr

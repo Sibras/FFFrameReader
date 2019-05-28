@@ -15,6 +15,9 @@
  */
 #include "FFFRStream.h"
 
+#include "FFFRDecoderContext.h"
+#include "FFFRFilter.h"
+#include "FFFRUtility.h"
 #include "FFFrameReader.h"
 
 #include <algorithm>
@@ -29,14 +32,97 @@ extern "C" {
 }
 
 namespace Ffr {
-Stream::Stream(FormatContextPtr& formatContext, const int32_t streamID, CodecContextPtr& codecContext,
-    const uint32_t bufferLength, const bool outputHost) noexcept
-    : m_bufferLength(bufferLength)
-    , m_outputHost(outputHost)
-    , m_formatContext(move(formatContext))
-    , m_index(streamID)
-    , m_codecContext(move(codecContext))
+Stream::Stream(const std::string& filename, const uint32_t bufferLength,
+    const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost) noexcept
 {
+    AVFormatContext* formatPtr = nullptr;
+    auto ret = avformat_open_input(&formatPtr, filename.c_str(), nullptr, nullptr);
+    FormatContextPtr tempFormat(formatPtr);
+    if (ret < 0) {
+        FfFrameReader::log(("Failed to open input stream "s += filename) += ", "s += getFfmpegErrorString(ret),
+            FfFrameReader::LogLevel::Error);
+        return;
+    }
+    ret = avformat_find_stream_info(tempFormat.get(), nullptr);
+    if (ret < 0) {
+        FfFrameReader::log(("Failed finding stream information "s += filename) += ", "s += getFfmpegErrorString(ret),
+            FfFrameReader::LogLevel::Error);
+        return;
+    }
+
+    // Get the primary video stream
+    AVCodec* decoder = nullptr;
+    ret = av_find_best_stream(tempFormat.get(), AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
+    if (ret < 0) {
+        FfFrameReader::log(("Failed to find video stream in file "s += filename) += ", "s += getFfmpegErrorString(ret),
+            FfFrameReader::LogLevel::Error);
+        return;
+    }
+    AVStream* stream = tempFormat->streams[ret];
+    const int32_t index = ret;
+
+    if (decoderContext.get() != nullptr) {
+        // Check if required codec is supported
+        for (int i = 0;; i++) {
+            const AVCodecHWConfig* config = avcodec_get_hw_config(decoder, i);
+            if (config == nullptr) {
+                FfFrameReader::log(("Decoder does not support device type: "s += decoder->name) +=
+                    av_hwdevice_get_type_name(DecoderContext::decodeTypeToFFmpeg(decoderContext->getType())),
+                    FfFrameReader::LogLevel::Error);
+                return;
+            }
+            if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+                config->device_type == AV_HWDEVICE_TYPE_CUDA) {
+                break;
+            }
+        }
+    }
+
+    // Create a decoder context
+    CodecContextPtr tempCodec(avcodec_alloc_context3(decoder));
+    if (tempCodec.get() == nullptr) {
+        FfFrameReader::log("Failed allocating decoder context "s += filename, FfFrameReader::LogLevel::Error);
+        return;
+    }
+
+    ret = avcodec_parameters_to_context(tempCodec.get(), stream->codecpar);
+    if (ret < 0) {
+        FfFrameReader::log(
+            ("Failed copying parameters to decoder context "s += filename) += ", "s += getFfmpegErrorString(ret),
+            FfFrameReader::LogLevel::Error);
+        return;
+    }
+
+    // Setup any required hardware decoding parameters
+    AVDictionary* opts = nullptr;
+    av_dict_set(&opts, "refcounted_frames", "1", 0);
+    if (decoderContext.get() != nullptr) {
+        tempCodec->hw_device_ctx = av_buffer_ref(decoderContext->m_deviceContext.get());
+        tempCodec->get_format = decoderContext->getFormatFunction();
+        if (tempCodec->get_format == nullptr) {
+            FfFrameReader::log("Hardware Device not properly implemented"s, FfFrameReader::LogLevel::Error);
+            return;
+        }
+        // Enable extra hardware frames to ensure we don't run out of buffers
+        const string buffers = to_string(bufferLength);
+        av_dict_set(&opts, "extra_hw_frames", buffers.c_str(), 0);
+    } else {
+        av_dict_set(&opts, "threads", "auto", 0);
+    }
+    ret = avcodec_open2(tempCodec.get(), decoder, &opts);
+    if (ret < 0) {
+        FfFrameReader::log(("Failed opening decoder for "s += filename) += ": "s += getFfmpegErrorString(ret),
+            FfFrameReader::LogLevel::Error);
+        return;
+    }
+
+    // Make the new stream
+    m_bufferLength = bufferLength;
+    m_outputHost = outputHost;
+    m_formatContext = move(tempFormat);
+    m_index = index;
+    m_codecContext = move(tempCodec);
+
     // Ensure buffer length is long enough to handle the maximum number of frames a video may require
     uint32_t minFrames = getCodecDelay();
     minFrames = (m_bufferLength >= minFrames) ? m_bufferLength : minFrames;
@@ -81,16 +167,25 @@ AVCodecContext* Stream::CodecContextPtr::get() const noexcept
 
 uint32_t Stream::getWidth() const noexcept
 {
+    if (m_filterGraph.get() != nullptr) {
+        return m_filterGraph->getWidth();
+    }
     return m_formatContext->streams[m_index]->codecpar->width;
 }
 
 uint32_t Stream::getHeight() const noexcept
 {
+    if (m_filterGraph.get() != nullptr) {
+        return m_filterGraph->getHeight();
+    }
     return m_formatContext->streams[m_index]->codecpar->height;
 }
 
 double Stream::getAspectRatio() const noexcept
 {
+    if (m_filterGraph.get() != nullptr) {
+        return m_filterGraph->getAspectRatio();
+    }
     if (m_formatContext->streams[m_index]->display_aspect_ratio.num) {
         return av_q2d(m_formatContext->streams[m_index]->display_aspect_ratio);
     }
@@ -109,11 +204,17 @@ int64_t Stream::getDuration() const noexcept
 
 double Stream::getFrameRate() const noexcept
 {
+    if (m_filterGraph.get() != nullptr) {
+        return m_filterGraph->getFrameRate();
+    }
     return av_q2d(m_formatContext->streams[m_index]->r_frame_rate);
 }
 
 uint32_t Stream::getFrameSize() const noexcept
 {
+    if (m_filterGraph.get() != nullptr) {
+        return m_filterGraph->getFrameSize();
+    }
     return av_image_get_buffer_size(static_cast<AVPixelFormat>(m_formatContext->streams[m_index]->codecpar->format),
         m_formatContext->streams[m_index]->codecpar->width, m_formatContext->streams[m_index]->codecpar->height, 0);
 }
@@ -197,6 +298,11 @@ bool Stream::seekFrame(const int64_t frame) noexcept
     return seekFrameInternal(frame, false);
 }
 
+void Stream::setFilter(const std::shared_ptr<Filter>& filter)
+{
+    m_filterGraph = filter;
+}
+
 int64_t Stream::timeToTimeStamp(const int64_t time) const noexcept
 {
     static_assert(AV_TIME_BASE == 1000000, "FFmpeg internal time_base does not match expected value");
@@ -256,8 +362,8 @@ bool Stream::decodeNextBlock() noexcept
             auto ret = av_read_frame(m_formatContext.get(), &packet);
             if (ret < 0) {
                 if (ret != AVERROR_EOF) {
-                    FfFrameReader::log("Failed to retrieve new frame: "s += FfFrameReader::getFfmpegErrorString(ret),
-                        FfFrameReader::LogLevel::Error);
+                    FfFrameReader::log(
+                        "Failed to retrieve new frame: "s += getFfmpegErrorString(ret), FfFrameReader::LogLevel::Error);
                     return false;
                 }
                 eof = true;
@@ -276,8 +382,7 @@ bool Stream::decodeNextBlock() noexcept
                 }
                 if (ret < 0) {
                     av_packet_unref(&packet);
-                    FfFrameReader::log(
-                        "Failed to send packet to decoder: "s += FfFrameReader::getFfmpegErrorString(ret),
+                    FfFrameReader::log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret),
                         FfFrameReader::LogLevel::Error);
                     return false;
                 }
@@ -339,8 +444,8 @@ bool Stream::decodeNextFrames() noexcept
             if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF)) {
                 return true;
             }
-            FfFrameReader::log("Failed to receive decoded frame: "s += FfFrameReader::getFfmpegErrorString(ret),
-                FfFrameReader::LogLevel::Error);
+            FfFrameReader::log(
+                "Failed to receive decoded frame: "s += getFfmpegErrorString(ret), FfFrameReader::LogLevel::Error);
             return false;
         }
 
@@ -366,8 +471,25 @@ bool Stream::decodeNextFrames() noexcept
             }
         }
 
+        // Perform any required filtering
+        if (m_filterGraph != nullptr) {
+            if (!m_filterGraph->sendFrame(frame)) {
+                av_frame_unref(*frame);
+                return false;
+            }
+            if (!m_filterGraph->receiveFrame(frame)) {
+                av_frame_unref(*frame);
+                return false;
+            }
+            // Check if we actually got a new frame or we need to continue
+            if (frame->height == 0) {
+                continue;
+            }
+        }
+
         // Check type of memory pointer requested and perform a memory move
         if (m_outputHost) {
+            // TODO: need some sort of buffer pool
             Frame::FramePtr frame2;
             *frame2 = av_frame_alloc();
             if (*frame == nullptr) {
@@ -378,14 +500,12 @@ bool Stream::decodeNextFrames() noexcept
             const auto ret2 = av_hwframe_transfer_data(*frame2, *frame, 0);
             if (ret2 < 0) {
                 av_frame_unref(*frame);
-                FfFrameReader::log("Failed to copy frame to host: "s += FfFrameReader::getFfmpegErrorString(ret),
-                    FfFrameReader::LogLevel::Error);
+                FfFrameReader::log(
+                    "Failed to copy frame to host: "s += getFfmpegErrorString(ret), FfFrameReader::LogLevel::Error);
                 return false;
             }
             frame = frame2;
         }
-
-        // TODO: Need to convert to proper colour space format
 
         // Add the new frame to the pong buffer
         m_bufferPong.emplace_back(make_shared<Frame>(frame, timeStamp, frameNum));
@@ -418,7 +538,13 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
                     return false;
                 }
                 // Check if we have found our requested time stamp
-                const auto frame = get<1>(ret);
+                shared_ptr<Frame> frame;
+                try {
+                    frame = get<1>(ret);
+                } catch (...) {
+                    // Should never get here
+                    return false;
+                }
                 if (timeStamp <= frame->getTimeStamp()) {
                     break;
                 }
@@ -470,8 +596,8 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
     const auto localTimeStamp = timeToTimeStamp(timeStamp) + m_startTimeStamp;
     const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
-        FfFrameReader::log("Failed seeking to specified time stamp "s += to_string(timeStamp) +=
-            FfFrameReader::getFfmpegErrorString(err),
+        FfFrameReader::log(
+            "Failed seeking to specified time stamp "s += to_string(timeStamp) += getFfmpegErrorString(err),
             FfFrameReader::LogLevel::Error);
         return false;
     }
@@ -561,7 +687,7 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
     if (err < 0) {
         m_frameSeekSupported = false;
         FfFrameReader::log("Failed to seek to specified frame "s += to_string(frame) += ": "s +=
-            FfFrameReader::getFfmpegErrorString(err) += " (retrying using timestamp based seek)"s,
+            getFfmpegErrorString(err) += " (retrying using timestamp based seek)"s,
             FfFrameReader::LogLevel::Error);
 
         // Try and seek just using a timestamp

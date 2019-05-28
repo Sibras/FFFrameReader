@@ -114,6 +114,7 @@ double Frame::getAspectRatio() const noexcept
 
 int Frame::getPixelFormat() const noexcept
 {
+    // TODO: Convert to internal PixelFormat
     return m_frame->format;
 }
 } // namespace Ffr

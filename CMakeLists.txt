@@ -61,8 +61,12 @@ set(FFFR_SOURCES
     source/FFFR.cpp
     source/FFFRStream.cpp
     source/FFFRDecoderContext.cpp
+    source/FFFRFilter.cpp
     source/FFFRFrame.cpp
+    source/FFFRUtility.cpp
     include/FFFRDecoderContext.h
+    include/FFFRFilter.h
+    include/FFFRUtility.h
 )
 
 set(FFFR_HEADERS
@@ -107,8 +111,14 @@ find_library(AVCODEC_LIBRARY NAMES avcodec)
 find_path(AVFORMAT_INCLUDE_DIR NAMES libavformat/avformat.h)
 find_library(AVFORMAT_LIBRARY NAMES avformat)
 
+find_path(AVFILTER_INCLUDE_DIR NAMES libavfilter/avfilter.h)
+find_library(AVFILTER_LIBRARY NAMES avfilter)
+
 find_path(AVUTIL_INCLUDE_DIR NAMES libavutil/avutil.h)
 find_library(AVUTIL_LIBRARY NAMES avutil)
+
+find_library(SWSCALE_LIBRARY NAMES swscale)
+find_library(POSTPROC_LIBRARY NAMES postproc)
 
 # Find additional dependencies
 find_package(CUDA QUIET REQUIRED)
@@ -117,13 +127,17 @@ target_include_directories(FfFrameReader PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${AVCODEC_INCLUDE_DIR}
     ${AVFORMAT_INCLUDE_DIR}
+    ${AVFILTER_INCLUDE_DIR}
     ${AVUTIL_INCLUDE_DIR}
     ${CUDA_INCLUDE_DIRS}
 )
 target_link_libraries(FfFrameReader
     PRIVATE ${AVCODEC_LIBRARY}
     PRIVATE ${AVFORMAT_LIBRARY}
+    PRIVATE ${AVFILTER_LIBRARY}
     PRIVATE ${AVUTIL_LIBRARY}
+    PRIVATE ${SWSCALE_LIBRARY}
+    PRIVATE ${POSTPROC_LIBRARY}
 )
 
 if("${CMAKE_INSTALL_PREFIX}" STREQUAL "")
@@ -149,6 +163,7 @@ if(BUILD_TESTING)
         test/FFFRTestStream.cpp
         test/FFFRTestDecode.cpp
         test/FFFRTestFrame.cpp
+        test/FFFRTestFilter.cpp
     )
 
     add_executable(FFFRTest ${FFFR_TEST_SOURCES})

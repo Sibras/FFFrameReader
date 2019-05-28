@@ -27,6 +27,31 @@ extern "C" {
 using namespace std;
 
 namespace Ffr {
+static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const enum AVPixelFormat* pixelFormats)
+{
+    enum AVPixelFormat pixelFormat;
+    for (int i = 0;; i++) {
+        const AVCodecHWConfig* config = avcodec_get_hw_config(context->codec, i);
+        if (!config) {
+            FfFrameReader::log((("Decoder does not support device type: "s += context->codec->name) += ", "s) +=
+                av_hwdevice_get_type_name(AV_HWDEVICE_TYPE_CUDA),
+                FfFrameReader::LogLevel::Error);
+            return AV_PIX_FMT_NONE;
+        }
+        if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX && config->device_type == AV_HWDEVICE_TYPE_CUDA) {
+            pixelFormat = config->pix_fmt;
+            break;
+        }
+    }
+    for (const enum AVPixelFormat* p = pixelFormats; *p != -1; p++) {
+        if (*p == pixelFormat) {
+            return *p;
+        }
+    }
+    FfFrameReader::log("Failed to get hardware surface format"s, FfFrameReader::LogLevel::Error);
+    return AV_PIX_FMT_NONE;
+}
+
 const DecoderContext::DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept
 {
     return context->m_deviceContext;
@@ -34,7 +59,7 @@ const DecoderContext::DeviceContextPtr& getDeviceContext(DecoderContext* context
 
 enum AVHWDeviceType DecoderContext::decodeTypeToFFmpeg(const DecodeType type)
 {
-    if (type == DecodeType::CUDA) {
+    if (type == DecodeType::Cuda) {
         return AV_HWDEVICE_TYPE_CUDA;
     }
     return AV_HWDEVICE_TYPE_NONE;
@@ -44,51 +69,67 @@ DecoderContext::DeviceContextPtr::DeviceContextPtr(AVBufferRef* deviceContext) n
     : m_deviceContext(deviceContext, [](AVBufferRef* p) { av_buffer_unref(&p); })
 {}
 
-AVBufferRef* DecoderContext::DeviceContextPtr::operator->() const noexcept
-{
-    return m_deviceContext.get();
-}
-
 AVBufferRef* DecoderContext::DeviceContextPtr::get() const noexcept
 {
     return m_deviceContext.get();
 }
 
-DecoderContext::ContextOptions::ContextOptions(const DecodeType type, std::any context, const uint32_t device)
-    : m_type(type)
-    , m_context(move(context))
-    , m_device(device)
-{}
-
-DecoderContext::DecoderContext(const ContextOptions& options) noexcept
+AVBufferRef* DecoderContext::DeviceContextPtr::operator->() const noexcept
 {
-    if (options.m_type != DecodeType::Software) {
+    return m_deviceContext.get();
+}
+
+DecoderContext::FormatFunction DecoderContext::getFormatFunction() const noexcept
+{
+    if (m_deviceContext.get() != nullptr) {
+        auto* deviceContext = reinterpret_cast<AVHWDeviceContext*>(m_deviceContext->data);
+        if (deviceContext->type == AV_HWDEVICE_TYPE_CUDA) {
+            return getHardwareFormatNvdec;
+        }
+    }
+    return nullptr;
+}
+
+DecoderContext::DecodeType DecoderContext::getType() const noexcept
+{
+    if (m_deviceContext.get() != nullptr) {
+        auto* deviceContext = reinterpret_cast<AVHWDeviceContext*>(m_deviceContext->data);
+        if (deviceContext->type == AV_HWDEVICE_TYPE_CUDA) {
+            return DecodeType::Cuda;
+        }
+    }
+    return DecodeType::Software;
+}
+
+DecoderContext::DecoderContext(const DecodeType type, const std::any& context, const uint32_t device) noexcept
+{
+    if (type != DecodeType::Software) {
         // Create device specific options
-        string device;
+        string deviceName;
         try {
-            device = to_string(options.m_device);
+            deviceName = to_string(device);
         } catch (...) {
         }
-        const auto type = decodeTypeToFFmpeg(options.m_type);
+        const auto typeInternal = decodeTypeToFFmpeg(type);
 
-        // Check if we should create a custom hwdevice
-        if (options.m_context.has_value()) {
-            DeviceContextPtr tempDevice(av_hwdevice_ctx_alloc(type));
+        // Check if we should create a custom hardware device
+        if (context.has_value()) {
+            DeviceContextPtr tempDevice(av_hwdevice_ctx_alloc(typeInternal));
             if (tempDevice.get() == nullptr) {
                 FfFrameReader::log("Failed to create custom hardware device"s, FfFrameReader::LogLevel::Error);
                 return;
             }
             auto* deviceContext = reinterpret_cast<AVHWDeviceContext*>(tempDevice->data);
             deviceContext->free = nullptr;
-            if (type == AV_HWDEVICE_TYPE_CUDA) {
-                if (options.m_context.type() != typeid(CUcontext)) {
+            if (typeInternal == AV_HWDEVICE_TYPE_CUDA) {
+                if (context.type() != typeid(CUcontext)) {
                     FfFrameReader::log(
                         "Specified device context does not match the required type"s, FfFrameReader::LogLevel::Error);
                     return;
                 }
                 auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(deviceContext->hwctx);
                 try {
-                    cudaDevice->cuda_ctx = any_cast<CUcontext>(options.m_context);
+                    cudaDevice->cuda_ctx = any_cast<CUcontext>(context);
                 } catch (...) {
                 }
             }
@@ -102,7 +143,7 @@ DecoderContext::DecoderContext(const ContextOptions& options) noexcept
         } else {
             // Create the hardware context for decoding
             AVBufferRef* deviceContext;
-            const int err = av_hwdevice_ctx_create(&deviceContext, type, device.c_str(), nullptr, 0);
+            const int err = av_hwdevice_ctx_create(&deviceContext, typeInternal, deviceName.c_str(), nullptr, 0);
             if (err < 0) {
                 FfFrameReader::log("Failed to create specified hardware device"s, FfFrameReader::LogLevel::Error);
                 return;

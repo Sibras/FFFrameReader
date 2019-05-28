@@ -26,17 +26,23 @@ struct AVFormatContext;
 struct AVCodecContext;
 
 namespace Ffr {
+class DecoderContext;
+
 class Stream
 {
     friend class FfFrameReader;
+    friend class Filter;
 
 private:
     class FormatContextPtr
     {
         friend class FfFrameReader;
         friend class Stream;
+        friend class Filter;
 
     private:
+        FormatContextPtr() = default;
+
         explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
 
         [[nodiscard]] AVFormatContext* get() const noexcept;
@@ -50,8 +56,11 @@ private:
     {
         friend class FfFrameReader;
         friend class Stream;
+        friend class Filter;
 
     private:
+        CodecContextPtr() = default;
+
         explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
 
         [[nodiscard]] AVCodecContext* get() const noexcept;
@@ -66,13 +75,13 @@ public:
 
     /**
      * Constructor.
-     * @param [in,out] formatContext Context for the format. This is reset to nullptr on function exit.
-     * @param          streamID      Index of the stream.
-     * @param [in,out] codecContext  Context for the codec. This is reset to nullptr on function exit.
-     * @param          bufferLength  Length of the internal decode buffer.
-     * @param          outputHost    True to output each frame to host CPU memory (only affects hardware decoding).
+     * @param filename       Filename of the file to open.
+     * @param bufferLength   Number of frames in the the decode buffer.
+     * @param decoderContext Pointer to an existing context to be used for hardware decoding.
+     * @param outputHost     True to output each frame to host CPU memory (only affects hardware decoding).
+     * @returns The new stream or false on error.
      */
-    Stream(FormatContextPtr& formatContext, int32_t streamID, CodecContextPtr& codecContext, uint32_t bufferLength,
+    Stream(const std::string& filename, uint32_t bufferLength, const std::shared_ptr<DecoderContext>& decoderContext,
         bool outputHost) noexcept;
 
     ~Stream() = default;
@@ -174,6 +183,7 @@ private:
     uint32_t m_bufferPingHead =
         0; /**< The position in the ping buffer of the next available frame in the decoded stream. */
     std::vector<std::shared_ptr<Frame>> m_bufferPong; /**< The secondary buffer used to store decoded frames */
+    std::shared_ptr<Filter> m_filterGraph = nullptr;  /**< The filter graph for optional transformations. */
     bool m_outputHost = true; /**< True to output each frame to host CPU memory (only affects hardware decoding) */
 
     FormatContextPtr m_formatContext;
@@ -184,6 +194,12 @@ private:
     bool m_frameSeekSupported = true; /**< True if frame seek supported */
     int64_t m_totalFrames = 0;        /**< Stream video duration in frames */
     int64_t m_totalDuration = 0;      /**< Stream video duration in microseconds (AV_TIME_BASE) */
+
+    /**
+     * Adds a filter graph to the stream.
+     * @param filter Specifies the filter.
+     */
+    void setFilter(const std::shared_ptr<Filter>& filter);
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to the stream timebase.

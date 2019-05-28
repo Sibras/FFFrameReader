@@ -22,6 +22,7 @@ namespace Ffr {
 class Frame
 {
     friend class Stream;
+    friend class Filter;
 
 private:
     class FramePtr
