@@ -118,8 +118,8 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format,
         return;
     }
 
+    AVFilterContext* nextFilter = bufferInContext;
     if (codecContext->hwaccel == nullptr) {
-        AVFilterContext* nextFilter = bufferInContext;
         if (cropRequired) {
             const auto cropFilter = avfilter_get_by_name("crop");
             if (cropFilter == nullptr) {
@@ -188,19 +188,12 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format,
             }
             nextFilter = scaleContext;
         }
-
-        // Link final filter sequence
-        ret = avfilter_link(nextFilter, 0, bufferOutContext, 0);
-        if (ret < 0) {
-            log("Could not set the filter links: "s += getFfmpegErrorString(ret), LogLevel::Error);
-            return;
-        }
     } else {
         auto* deviceContext = reinterpret_cast<AVHWDeviceContext*>(codecContext->hw_device_ctx->data);
         if (deviceContext->type == AV_HWDEVICE_TYPE_CUDA) {
-            // Scale and crop and performed by decoder
+            // Scale and crop are performed by decoder
             if (formatRequired) {
-                // TODO:***************
+                // TODO: Needs additions to ffmpegs filters for cuda accelerated format conversion
                 log("Feature not yet implemented for selected decoding type"s, LogLevel::Error);
                 return;
             }
@@ -208,6 +201,13 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format,
             log("Feature not yet implemented for selected decoding type"s, LogLevel::Error);
             return;
         }
+    }
+
+    // Link final filter sequence
+    ret = avfilter_link(nextFilter, 0, bufferOutContext, 0);
+    if (ret < 0) {
+        log("Could not set the filter links: "s += getFfmpegErrorString(ret), LogLevel::Error);
+        return;
     }
 
     // Configure the completed graph
