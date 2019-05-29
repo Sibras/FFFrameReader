@@ -30,9 +30,12 @@ struct TestParams
     int64_t m_frameTime;
 };
 
+// The following test files are made available as part of blender.org open movie projects.
+// To run tests you must first download the files from the corresponding web location
 static std::vector<TestParams> g_testData = {
     {"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333},
-#if 1
+#if 0
+    // These are internal testing files and are not redistributed
     {"data/CLIP0000818_000_77aabf.mkv", 3840, 2160, 16.0 / 9.0, 1116, 44640000, 25.0, 40000},
     {"data/MenMC_50BR_Finals_Canon - Cut.mp4", 3840, 2160, 16.0 / 9.0, 249, 9960000, 25.0, 40000},
     {"data/MenMC_50BR_Finals_Canon.MP4", 3840, 2160, 16.0 / 9.0, 2124, 84960000, 25.0, 40000},
