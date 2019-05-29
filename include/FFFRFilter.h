@@ -24,16 +24,13 @@ struct AVFilterContext;
 namespace Ffr {
 class Filter
 {
-    friend class FfFrameReader;
+    friend class Stream;
 
-private:
     class FilterGraphPtr
     {
-        friend class FfFrameReader;
         friend class Stream;
         friend class Filter;
 
-    private:
         FilterGraphPtr() = default;
 
         explicit FilterGraphPtr(AVFilterGraph* filterGraph) noexcept;
@@ -46,22 +43,20 @@ private:
     };
 
 public:
-    using Resolution = FfFrameReader::Resolution;
-    using Crop = FfFrameReader::Crop;
-    using PixelFormat = FfFrameReader::PixelFormat;
-    using DecodeType = FfFrameReader::DecodeType;
-
     Filter() = delete;
 
     /**
      * Constructor
-     * @param scale  The output resolution or (0, 0) if no scaling should be performed. Scaling is performed after
-     *  cropping.
-     * @param crop   The output cropping or (0) if no crop should be performed.
-     * @param format The required output pixel format.
-     * @param codec  The decoding configuration.
+     * @param scale         The output resolution or (0, 0) if no scaling should be performed. Scaling is performed
+     *  after cropping.
+     * @param crop          The output cropping or (0) if no crop should be performed.
+     * @param format        The required output pixel format.
+     * @param formatContext Context for the format.
+     * @param streamIndex   Zero-based index of the stream.
+     * @param codecContext  Context for the codec.
      */
-    Filter(Resolution scale, Crop crop, PixelFormat format, const std::shared_ptr<Stream>& stream) noexcept;
+    Filter(Resolution scale, Crop crop, PixelFormat format, const Stream::FormatContextPtr& formatContext,
+        uint32_t streamIndex, const Stream::CodecContextPtr& codecContext) noexcept;
 
     ~Filter() = default;
 

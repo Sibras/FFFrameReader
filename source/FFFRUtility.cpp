@@ -15,6 +15,8 @@
  */
 #include "FFFRUtility.h"
 
+#include "FFFrameReader.h"
+
 extern "C" {
 #include <libavutil/error.h>
 }
@@ -28,28 +30,42 @@ std::string getFfmpegErrorString(const int errorCode) noexcept
     return buffer;
 }
 
-FfFrameReader::PixelFormat getPixelFormat(const AVPixelFormat format) noexcept
+PixelFormat getPixelFormat(const AVPixelFormat format) noexcept
 {
     switch (format) {
         case AV_PIX_FMT_YUV420P:
-            return FfFrameReader::PixelFormat::YUV420P;
+            return PixelFormat::YUV420P;
         case AV_PIX_FMT_YUV422P:
-            return FfFrameReader::PixelFormat::YUV422P;
+            return PixelFormat::YUV422P;
         case AV_PIX_FMT_YUV444P:
-            return FfFrameReader::PixelFormat::YUV444P;
+            return PixelFormat::YUV444P;
         case AV_PIX_FMT_GBRP:
-            return FfFrameReader::PixelFormat::GBR8P;
+            return PixelFormat::GBR8P;
         case AV_PIX_FMT_RGB24:
-            return FfFrameReader::PixelFormat::RGB8;
+            return PixelFormat::RGB8;
         case AV_PIX_FMT_BGR24:
-            return FfFrameReader::PixelFormat::BGR8;
+            return PixelFormat::BGR8;
+        case AV_PIX_FMT_NV12:
+            return PixelFormat::NV12;
         default:
             try {
-                FfFrameReader::log(
-                    "Unsupported pixel format detected: "s += to_string(format), FfFrameReader::LogLevel::Error);
+                log("Unsupported pixel format detected: "s += to_string(format), LogLevel::Error);
             } catch (...) {
             }
-            return FfFrameReader::PixelFormat::Auto;
+            return PixelFormat::Auto;
     }
+}
+
+AVPixelFormat getPixelFormat(PixelFormat format) noexcept
+{
+    static_assert(static_cast<int>(PixelFormat::YUV420P) == AV_PIX_FMT_YUV420P, "Pixel format mismatch detected");
+    static_assert(static_cast<int>(PixelFormat::YUV422P) == AV_PIX_FMT_YUV422P, "Pixel format mismatch detected");
+    static_assert(static_cast<int>(PixelFormat::YUV444P) == AV_PIX_FMT_YUV444P, "Pixel format mismatch detected");
+    static_assert(static_cast<int>(PixelFormat::NV12) == AV_PIX_FMT_NV12, "Pixel format mismatch detected");
+    static_assert(static_cast<int>(PixelFormat::GBR8P) == AV_PIX_FMT_GBRP, "Pixel format mismatch detected");
+    static_assert(static_cast<int>(PixelFormat::RGB8) == AV_PIX_FMT_RGB24, "Pixel format mismatch detected");
+    static_assert(static_cast<int>(PixelFormat::BGR8) == AV_PIX_FMT_BGR24, "Pixel format mismatch detected");
+    // Can just do a direct cast
+    return static_cast<AVPixelFormat>(format);
 }
 } // namespace Ffr

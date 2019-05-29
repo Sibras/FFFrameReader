@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 #pragma once
-#include <cstdint>
+#include "FFFRTypes.h"
 
+#include <cstdint>
 struct AVFrame;
 
 namespace Ffr {
@@ -24,17 +25,21 @@ class Frame
     friend class Stream;
     friend class Filter;
 
-private:
     class FramePtr
     {
+        friend class Frame;
+        friend class Filter;
+        friend class Stream;
+
     public:
-        FramePtr() noexcept = default;
-
-        explicit FramePtr(AVFrame* frame) noexcept;
-
         ~FramePtr() noexcept;
 
         FramePtr(const FramePtr& other) noexcept = delete;
+
+    private:
+        FramePtr() noexcept = default;
+
+        explicit FramePtr(AVFrame* frame) noexcept;
 
         FramePtr(FramePtr&& other) noexcept;
 
@@ -50,7 +55,6 @@ private:
 
         const AVFrame* operator->() const noexcept;
 
-    private:
         AVFrame* m_frame = nullptr;
     };
 
@@ -116,11 +120,10 @@ public:
 
     /**
      * Gets the pixel format of the frame data.
-     * @note This is used to determine the format of the data returned by @getFrameData. Currently this returns the
-     * pixel format using ffmpegs internal format macros.
+     * @note This is used to determine the format of the data returned by @getFrameData.
      * @returns The pixel format.
      */
-    [[nodiscard]] int getPixelFormat() const noexcept;
+    [[nodiscard]] PixelFormat getPixelFormat() const noexcept;
 
 private:
     FramePtr m_frame;

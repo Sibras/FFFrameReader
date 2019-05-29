@@ -67,6 +67,7 @@ set(FFFR_SOURCES
     include/FFFRDecoderContext.h
     include/FFFRFilter.h
     include/FFFRUtility.h
+    include/FFFRTypes.h
 )
 
 set(FFFR_HEADERS
@@ -119,6 +120,7 @@ find_library(AVUTIL_LIBRARY NAMES avutil)
 
 find_library(SWSCALE_LIBRARY NAMES swscale)
 find_library(POSTPROC_LIBRARY NAMES postproc)
+find_library(SWRESAMPLE_LIBRARY NAMES swresample)
 
 # Find additional dependencies
 find_package(CUDA QUIET REQUIRED)
@@ -138,6 +140,7 @@ target_link_libraries(FfFrameReader
     PRIVATE ${AVUTIL_LIBRARY}
     PRIVATE ${SWSCALE_LIBRARY}
     PRIVATE ${POSTPROC_LIBRARY}
+    PRIVATE ${SWRESAMPLE_LIBRARY}
 )
 
 if("${CMAKE_INSTALL_PREFIX}" STREQUAL "")

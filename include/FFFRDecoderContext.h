@@ -26,11 +26,10 @@ extern "C" {
 namespace Ffr {
 class DecoderContext
 {
-    friend class FfFrameReader;
     friend class Stream;
 
 public:
-    using DecodeType = FfFrameReader::DecodeType;
+    using DecodeType = DecodeType;
 
     /**
      * Constructor.
@@ -55,9 +54,8 @@ private:
     class DeviceContextPtr
     {
         friend class DecoderContext;
-        friend class FfFrameReader;
+        friend class Stream;
 
-    public:
         DeviceContextPtr() = default;
 
         explicit DeviceContextPtr(AVBufferRef* deviceContext) noexcept;
@@ -66,7 +64,6 @@ private:
 
         AVBufferRef* operator->() const noexcept;
 
-    private:
         std::shared_ptr<AVBufferRef> m_deviceContext = nullptr;
     };
 

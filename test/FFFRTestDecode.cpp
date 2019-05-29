@@ -42,9 +42,10 @@ protected:
 
     void SetUp() override
     {
-        FfFrameReader::DecoderOptions options;
+        setLogLevel(LogLevel::Warning);
+        DecoderOptions options;
         if (GetParam().m_useNvdec) {
-            options.m_type = FfFrameReader::DecodeType::Cuda;
+            options.m_type = DecodeType::Cuda;
             // Setup a cuda context
             auto err = cuInit(0);
             ASSERT_EQ(err, CUDA_SUCCESS);
@@ -62,8 +63,7 @@ protected:
                 ASSERT_EQ(err, CUDA_SUCCESS);
             }
         }
-        ASSERT_NO_THROW(m_frameReader = std::make_shared<FfFrameReader>());
-        auto ret = m_frameReader->getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
+        auto ret = Stream::getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
     }
@@ -71,7 +71,6 @@ protected:
     void TearDown() override
     {
         m_stream = nullptr;
-        m_frameReader = nullptr;
     }
 
     ~DecodeTest1() override
@@ -81,18 +80,17 @@ protected:
         }
     }
 
-    std::shared_ptr<FfFrameReader> m_frameReader = nullptr;
     std::shared_ptr<Stream> m_stream = nullptr;
     CUcontext m_cudaContext = nullptr;
     bool m_allocatorCalled = false;
 };
 
-TEST_P(DecodeTest1, getLoopAll)
+TEST_P(DecodeTest1, getLoop25)
 {
-    // Ensure that all frames can be read
+    // Ensure that frames can be read
     int64_t timeStamp = 0;
     int64_t frameNum = 0;
-    for (int64_t i = 0; i < m_stream->getTotalFrames(); i++) {
+    for (int64_t i = 0; i < std::min(m_stream->getTotalFrames(), 25LL); i++) {
         const auto ret1 = m_stream->getNextFrame();
         if (ret1.index() == 0) {
             ASSERT_EQ(timeStamp, m_stream->getDuration()); // Readout in case it failed

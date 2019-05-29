@@ -35,5 +35,12 @@ std::string getFfmpegErrorString(int errorCode) noexcept;
  * @param format Describes the format to use.
  * @returns The pixel format.
  */
-FfFrameReader::PixelFormat getPixelFormat(AVPixelFormat format) noexcept;
+PixelFormat getPixelFormat(AVPixelFormat format) noexcept;
+
+/**
+ * Gets ffmpeg pixel format.
+ * @param format Describes the format to use.
+ * @returns The pixel format.
+ */
+AVPixelFormat getPixelFormat(PixelFormat format) noexcept;
 } // namespace Ffr

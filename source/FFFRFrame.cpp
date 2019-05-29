@@ -15,6 +15,8 @@
  */
 #include "FFFRFrame.h"
 
+#include "FFFRUtility.h"
+
 #include <algorithm>
 
 extern "C" {
@@ -112,9 +114,8 @@ double Frame::getAspectRatio() const noexcept
     return static_cast<double>(getWidth()) / static_cast<double>(getHeight());
 }
 
-int Frame::getPixelFormat() const noexcept
+PixelFormat Frame::getPixelFormat() const noexcept
 {
-    // TODO: Convert to internal PixelFormat
-    return m_frame->format;
+    return Ffr::getPixelFormat(static_cast<AVPixelFormat>(m_frame->format));
 }
 } // namespace Ffr

@@ -20,34 +20,40 @@
 
 using namespace Ffr;
 
-struct TestParamsDecode
+struct TestParamsFilter
 {
     uint32_t m_testDataIndex;
-    FfFrameReader::Resolution m_scale;
-    FfFrameReader::Crop m_crop;
-    FfFrameReader::PixelFormat m_format;
+    DecodeType m_type;
+    Resolution m_scale;
+    Crop m_crop;
+    PixelFormat m_format;
 };
 
-static std::vector<TestParamsDecode> g_testDataFilter = {
-    {0, {1280, 720}, {0, 0, 0, 0}, FfFrameReader::PixelFormat::Auto},
-    {0, {1280, 720}, {0, 360, 0, 640}, FfFrameReader::PixelFormat::Auto},
-    {0, {1280, 720}, {180, 180, 320, 320}, FfFrameReader::PixelFormat::Auto},
-    {0, {1920, 1080}, {0, 0, 0, 0}, FfFrameReader::PixelFormat::YUV444P},
+static std::vector<TestParamsFilter> g_testDataFilter = {
+    {0, DecodeType::Software, {1280, 720}, {0, 0, 0, 0}, PixelFormat::Auto},
+    {0, DecodeType::Software, {1280, 720}, {0, 360, 0, 640}, PixelFormat::Auto},
+    {0, DecodeType::Software, {1280, 720}, {180, 180, 320, 320}, PixelFormat::Auto},
+    {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::YUV422P},
+    {0, DecodeType::Cuda, {1280, 720}, {0, 0, 0, 0}, PixelFormat::Auto},
+    {0, DecodeType::Cuda, {1280, 720}, {0, 360, 0, 640}, PixelFormat::Auto},
+    {0, DecodeType::Cuda, {1280, 720}, {180, 180, 320, 320}, PixelFormat::Auto},
+    //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::YUV422P},
 };
 
-class FilterTest1 : public ::testing::TestWithParam<TestParamsDecode>
+class FilterTest1 : public ::testing::TestWithParam<TestParamsFilter>
 {
 protected:
     FilterTest1() = default;
 
     void SetUp() override
     {
-        FfFrameReader::DecoderOptions options;
+        setLogLevel(LogLevel::Warning);
+        DecoderOptions options;
+        options.m_type = GetParam().m_type;
         options.m_scale = GetParam().m_scale;
         options.m_crop = GetParam().m_crop;
         options.m_format = GetParam().m_format;
-        ASSERT_NO_THROW(m_frameReader = std::make_shared<FfFrameReader>());
-        auto ret = m_frameReader->getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
+        auto ret = Stream::getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
     }
@@ -55,10 +61,8 @@ protected:
     void TearDown() override
     {
         m_stream = nullptr;
-        m_frameReader = nullptr;
     }
 
-    std::shared_ptr<FfFrameReader> m_frameReader = nullptr;
     std::shared_ptr<Stream> m_stream = nullptr;
     bool m_allocatorCalled = false;
 };
@@ -98,12 +102,23 @@ TEST_P(FilterTest1, getFrameRate)
     ASSERT_DOUBLE_EQ(m_stream->getFrameRate(), g_testData[GetParam().m_testDataIndex].m_frameRate);
 }
 
+TEST_P(FilterTest1, getFormat)
+{
+    const auto ret1 = m_stream->getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    const auto frame = std::get<1>(ret1);
+    const auto format = GetParam().m_format == PixelFormat::Auto ?
+        GetParam().m_type == DecodeType::Cuda ? PixelFormat::NV12 : PixelFormat::YUV420P :
+        GetParam().m_format;
+    ASSERT_EQ(frame->getPixelFormat(), format);
+}
+
 TEST_P(FilterTest1, getLoop25)
 {
     // Ensure that all frames can be read
     int64_t timeStamp = 0;
     int64_t frameNum = 0;
-    for (int64_t i = 0; i < 25; i++) {
+    for (int64_t i = 0; i < std::min(m_stream->getTotalFrames(), 25LL); i++) {
         const auto ret1 = m_stream->getNextFrame();
         if (ret1.index() == 0) {
             ASSERT_EQ(timeStamp, m_stream->getDuration()); // Readout in case it failed

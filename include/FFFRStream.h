@@ -15,6 +15,7 @@
  */
 #pragma once
 #include "FFFRFrame.h"
+#include "FFFRTypes.h"
 
 #include <cstdint>
 #include <memory>
@@ -30,59 +31,10 @@ class DecoderContext;
 
 class Stream
 {
-    friend class FfFrameReader;
     friend class Filter;
-
-private:
-    class FormatContextPtr
-    {
-        friend class FfFrameReader;
-        friend class Stream;
-        friend class Filter;
-
-    private:
-        FormatContextPtr() = default;
-
-        explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
-
-        [[nodiscard]] AVFormatContext* get() const noexcept;
-
-        AVFormatContext* operator->() const noexcept;
-
-        std::shared_ptr<AVFormatContext> m_formatContext = nullptr;
-    };
-
-    class CodecContextPtr
-    {
-        friend class FfFrameReader;
-        friend class Stream;
-        friend class Filter;
-
-    private:
-        CodecContextPtr() = default;
-
-        explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
-
-        [[nodiscard]] AVCodecContext* get() const noexcept;
-
-        AVCodecContext* operator->() const noexcept;
-
-        std::shared_ptr<AVCodecContext> m_codecContext = nullptr;
-    };
 
 public:
     Stream() = delete;
-
-    /**
-     * Constructor.
-     * @param filename       Filename of the file to open.
-     * @param bufferLength   Number of frames in the the decode buffer.
-     * @param decoderContext Pointer to an existing context to be used for hardware decoding.
-     * @param outputHost     True to output each frame to host CPU memory (only affects hardware decoding).
-     * @returns The new stream or false on error.
-     */
-    Stream(const std::string& filename, uint32_t bufferLength, const std::shared_ptr<DecoderContext>& decoderContext,
-        bool outputHost) noexcept;
 
     ~Stream() = default;
 
@@ -93,6 +45,15 @@ public:
     Stream& operator=(const Stream& other) = delete;
 
     Stream& operator=(Stream&& other) noexcept = delete;
+
+    /**
+     * Gets a stream from a file.
+     * @param filename Filename of the file to open.
+     * @param options  (Optional) Options for controlling decoding.
+     * @returns The stream if succeeded, false otherwise.
+     */
+    [[nodiscard]] static std::variant<bool, std::shared_ptr<Stream>> getStream(
+        const std::string& filename, const DecoderOptions& options = DecoderOptions()) noexcept;
 
     /**
      * Gets the width of the video stream.
@@ -176,6 +137,38 @@ public:
     [[nodiscard]] bool seekFrame(int64_t frame) noexcept;
 
 private:
+    class FormatContextPtr
+    {
+        friend class Stream;
+        friend class Filter;
+
+        FormatContextPtr() = default;
+
+        explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
+
+        [[nodiscard]] AVFormatContext* get() const noexcept;
+
+        AVFormatContext* operator->() const noexcept;
+
+        std::shared_ptr<AVFormatContext> m_formatContext = nullptr;
+    };
+
+    class CodecContextPtr
+    {
+        friend class Stream;
+        friend class Filter;
+
+        CodecContextPtr() = default;
+
+        explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
+
+        [[nodiscard]] AVCodecContext* get() const noexcept;
+
+        AVCodecContext* operator->() const noexcept;
+
+        std::shared_ptr<AVCodecContext> m_codecContext = nullptr;
+    };
+
     std::recursive_mutex m_mutex;
 
     uint32_t m_bufferLength = 0;                      /**< Length of the ping and pong buffers */
@@ -196,10 +189,18 @@ private:
     int64_t m_totalDuration = 0;      /**< Stream video duration in microseconds (AV_TIME_BASE) */
 
     /**
-     * Adds a filter graph to the stream.
-     * @param filter Specifies the filter.
+     * Constructor.
+     * @param filename       Filename of the file to open.
+     * @param bufferLength   Number of frames in the the decode buffer.
+     * @param decoderContext Pointer to an existing context to be used for hardware decoding.
+     * @param outputHost     True to output each frame to host CPU memory (only affects hardware decoding).
+     * @param crop           The output cropping or (0) if no crop should be performed.
+     * @param scale          The output resolution or (0, 0) if no scaling should be performed. Scaling is performed
+     *  after cropping.
+     * @param format         The required output pixel format.
      */
-    void setFilter(const std::shared_ptr<Filter>& filter);
+    Stream(const std::string& filename, uint32_t bufferLength, const std::shared_ptr<DecoderContext>& decoderContext,
+        bool outputHost, Crop crop, Resolution scale, PixelFormat format) noexcept;
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to the stream timebase.
@@ -287,6 +288,13 @@ private:
      * @returns The codec delay.
      */
     [[nodiscard]] int32_t getCodecDelay() const noexcept;
+
+    /**
+     * Return the maximum number of input frames needed by a codec before it can produce output.
+     * @param codec The codec.
+     * @returns The codec delay.
+     */
+    [[nodiscard]] static int32_t getCodecDelay(const CodecContextPtr& codec) noexcept;
 
     /**
      * Gets stream start time in the stream timebase.

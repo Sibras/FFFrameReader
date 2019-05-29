@@ -27,8 +27,8 @@ protected:
 
     void SetUp() override
     {
-        ASSERT_NO_THROW(m_frameReader = std::make_shared<FfFrameReader>());
-        auto ret = m_frameReader->getStream(GetParam().m_fileName);
+        setLogLevel(LogLevel::Warning);
+        auto ret = Stream::getStream(GetParam().m_fileName);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
         const auto ret1 = m_stream->getNextFrame();
@@ -40,10 +40,8 @@ protected:
     {
         m_frame = nullptr;
         m_stream = nullptr;
-        m_frameReader = nullptr;
     }
 
-    std::shared_ptr<FfFrameReader> m_frameReader = nullptr;
     std::shared_ptr<Stream> m_stream = nullptr;
     std::shared_ptr<Frame> m_frame;
 };

@@ -33,9 +33,9 @@ static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const 
     for (int i = 0;; i++) {
         const AVCodecHWConfig* config = avcodec_get_hw_config(context->codec, i);
         if (!config) {
-            FfFrameReader::log((("Decoder does not support device type: "s += context->codec->name) += ", "s) +=
+            log((("Decoder does not support device type: "s += context->codec->name) += ", "s) +=
                 av_hwdevice_get_type_name(AV_HWDEVICE_TYPE_CUDA),
-                FfFrameReader::LogLevel::Error);
+                LogLevel::Error);
             return AV_PIX_FMT_NONE;
         }
         if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX && config->device_type == AV_HWDEVICE_TYPE_CUDA) {
@@ -48,7 +48,7 @@ static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const 
             return *p;
         }
     }
-    FfFrameReader::log("Failed to get hardware surface format"s, FfFrameReader::LogLevel::Error);
+    log("Failed to get hardware surface format"s, LogLevel::Error);
     return AV_PIX_FMT_NONE;
 }
 
@@ -116,15 +116,14 @@ DecoderContext::DecoderContext(const DecodeType type, const std::any& context, c
         if (context.has_value()) {
             DeviceContextPtr tempDevice(av_hwdevice_ctx_alloc(typeInternal));
             if (tempDevice.get() == nullptr) {
-                FfFrameReader::log("Failed to create custom hardware device"s, FfFrameReader::LogLevel::Error);
+                log("Failed to create custom hardware device"s, LogLevel::Error);
                 return;
             }
             auto* deviceContext = reinterpret_cast<AVHWDeviceContext*>(tempDevice->data);
             deviceContext->free = nullptr;
             if (typeInternal == AV_HWDEVICE_TYPE_CUDA) {
                 if (context.type() != typeid(CUcontext)) {
-                    FfFrameReader::log(
-                        "Specified device context does not match the required type"s, FfFrameReader::LogLevel::Error);
+                    log("Specified device context does not match the required type"s, LogLevel::Error);
                     return;
                 }
                 auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(deviceContext->hwctx);
@@ -135,7 +134,7 @@ DecoderContext::DecoderContext(const DecodeType type, const std::any& context, c
             }
             const auto ret = av_hwdevice_ctx_init(tempDevice.get());
             if (ret < 0) {
-                FfFrameReader::log("Failed to init custom hardware device"s, FfFrameReader::LogLevel::Error);
+                log("Failed to init custom hardware device"s, LogLevel::Error);
                 return;
             }
             // Move the temp device to the internal one
@@ -145,7 +144,7 @@ DecoderContext::DecoderContext(const DecodeType type, const std::any& context, c
             AVBufferRef* deviceContext;
             const int err = av_hwdevice_ctx_create(&deviceContext, typeInternal, deviceName.c_str(), nullptr, 0);
             if (err < 0) {
-                FfFrameReader::log("Failed to create specified hardware device"s, FfFrameReader::LogLevel::Error);
+                log("Failed to create specified hardware device"s, LogLevel::Error);
                 return;
             }
             m_deviceContext = DeviceContextPtr(deviceContext);
