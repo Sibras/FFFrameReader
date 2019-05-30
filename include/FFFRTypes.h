@@ -45,13 +45,12 @@ enum class PixelFormat : int32_t
     YUV420P = 0, /**< planar YUV 4:2:0, 12bpp, (1 Cr & Cb sample per 2x2 Y samples) */
     YUV422P = 4, /**< planar YUV 4:2:2, 16bpp, (1 Cr & Cb sample per 2x1 Y samples) */
     YUV444P = 5, /**< planar YUV 4:4:4, 24bpp, (1 Cr & Cb sample per 1x1 Y samples) */
-    NV12 = 23,   /*< planar YUV 4:2:0, 12bpp, 1 plane for Y and 1 plane for the UV components, which are interleaved
+    NV12 = 23,   /**< planar YUV 4:2:0, 12bpp, 1 plane for Y and 1 plane for the UV components, which are interleaved
                     (first byte U and the following byte V) */
 
     GBR8P = 73, /**< planar GBR 4:4:4 24bpp */
 
     RGB8 = 2, /**< packed RGB 8:8:8, 24bpp, RGBRGB... */
-    BGR8 = 3, /**< packed RGB 8:8:8, 24bpp, BGRBGR... */
 };
 
 class DecoderOptions

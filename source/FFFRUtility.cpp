@@ -43,8 +43,6 @@ PixelFormat getPixelFormat(const AVPixelFormat format) noexcept
             return PixelFormat::GBR8P;
         case AV_PIX_FMT_RGB24:
             return PixelFormat::RGB8;
-        case AV_PIX_FMT_BGR24:
-            return PixelFormat::BGR8;
         case AV_PIX_FMT_NV12:
             return PixelFormat::NV12;
         default:
@@ -64,7 +62,6 @@ AVPixelFormat getPixelFormat(PixelFormat format) noexcept
     static_assert(static_cast<int>(PixelFormat::NV12) == AV_PIX_FMT_NV12, "Pixel format mismatch detected");
     static_assert(static_cast<int>(PixelFormat::GBR8P) == AV_PIX_FMT_GBRP, "Pixel format mismatch detected");
     static_assert(static_cast<int>(PixelFormat::RGB8) == AV_PIX_FMT_RGB24, "Pixel format mismatch detected");
-    static_assert(static_cast<int>(PixelFormat::BGR8) == AV_PIX_FMT_BGR24, "Pixel format mismatch detected");
     // Can just do a direct cast
     return static_cast<AVPixelFormat>(format);
 }
