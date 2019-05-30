@@ -29,7 +29,7 @@ class DecoderContext
     friend class Stream;
 
 public:
-    using DecodeType = DecodeType;
+    using DecodeType = Ffr::DecodeType;
 
     /**
      * Constructor.
