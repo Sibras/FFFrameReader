@@ -28,6 +28,7 @@ struct AVCodecContext;
 
 namespace Ffr {
 class DecoderContext;
+class Filter;
 
 class Stream
 {
