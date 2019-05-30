@@ -21,6 +21,8 @@
 
 extern "C" {
 #include <libavutil/frame.h>
+#include <libavutil/hwcontext.h>
+#include <libavutil/pixdesc.h>
 }
 
 using namespace std;
@@ -93,9 +95,11 @@ int64_t Frame::getFrameNumber() const noexcept
     return m_frameNum;
 }
 
-uint8_t* const* Frame::getFrameData() const noexcept
+std::pair<uint8_t* const, int32_t> Frame::getFrameData(const uint32_t plane) const noexcept
 {
-    return m_frame->data;
+    int32_t lineSize = m_frame->linesize[plane];
+    uint8_t* const data = m_frame->data[plane];
+    return make_pair(data, lineSize);
 }
 
 uint32_t Frame::getWidth() const noexcept
@@ -117,5 +121,23 @@ double Frame::getAspectRatio() const noexcept
 PixelFormat Frame::getPixelFormat() const noexcept
 {
     return Ffr::getPixelFormat(static_cast<AVPixelFormat>(m_frame->format));
+}
+
+int32_t Frame::getNumberFrames()
+{
+    return av_pix_fmt_count_planes(static_cast<AVPixelFormat>(m_frame->format));
+}
+
+DecodeType Frame::getDataType() const noexcept
+{
+    if (m_frame->hw_frames_ctx == nullptr) {
+        return DecodeType::Software;
+    }
+    auto* framesContext = reinterpret_cast<AVHWFramesContext*>(m_frame->hw_frames_ctx->data);
+    if (framesContext->format == AV_PIX_FMT_CUDA) {
+        return DecodeType::Cuda;
+    }
+    log("Unhandled format in getDataType()", LogLevel::Error);
+    return DecodeType::Software;
 }
 } // namespace Ffr

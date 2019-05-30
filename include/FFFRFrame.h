@@ -92,12 +92,13 @@ public:
     [[nodiscard]] int64_t getFrameNumber() const noexcept;
 
     /**
-     * Gets frame data pointer. This is an array of pointers to each layer of the output frame. The number of layers is
-     * based on the frames internal format. The memory address of these frames will be in a memory space dependent on
-     * what settings where used when the parent stream was created. (e.g. cuda pointer if using nvdec etc.).
-     * @returns The internal frame data.
+     * Gets frame data pointer for a specified image plane. The memory address of these frames will be in a memory space
+     * dependent on what settings where used when the parent stream was created. (e.g. cuda pointer if using nvdec
+     * etc.).
+     * @param plane The image plane to get. Should be less than @getNumberFrames.
+     * @returns The internal frame data and line size, nullptr if specified frame does not exist.
      */
-    [[nodiscard]] uint8_t* const* getFrameData() const noexcept;
+    [[nodiscard]] std::pair<uint8_t* const, int32_t> getFrameData(uint32_t plane) const noexcept;
 
     /**
      * Gets the frame width.
@@ -124,6 +125,18 @@ public:
      * @returns The pixel format.
      */
     [[nodiscard]] PixelFormat getPixelFormat() const noexcept;
+
+    /**
+     * Gets number of planes for an image of the specified pixel format
+     * @returns The number of planes (YUV420P has 3, RGB8 has 1 etc.) or negative value if invalid format.
+     */
+    [[nodiscard]] int32_t getNumberFrames();
+
+    /**
+     * Gets the type of memeory used to store the image.
+     * @returns The data type.
+     */
+    [[nodiscard]] DecodeType getDataType() const noexcept;
 
 private:
     FramePtr m_frame;
