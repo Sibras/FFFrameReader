@@ -42,4 +42,30 @@ void setLogLevel(LogLevel level);
  * @param level (Optional) The logging level.
  */
 void log(const std::string& text, LogLevel level = LogLevel::Info);
+
+/**
+ * Gets number of planes for an image of the specified pixel format
+ * @param format Describes the pixel format.
+ * @returns The number of planes (YUV420P has 3, RGB8 has 1 etc.) or negative value if invalid format.
+ */
+int32_t getPixelFormatPlanes(PixelFormat format);
+
+/**
+ * Gets image size for frame with specified properties
+ * @param format Describes the pixel format.
+ * @param width  The width.
+ * @param height The height.
+ * @returns The image size or negative value if error.
+ */
+int32_t getImageSize(PixelFormat format, uint32_t width, uint32_t height);
+
+/**
+ * Convert pixel format using cuda.
+ * @param       frame     The input frame.
+ * @param [out] outMem    Memory location to store output (must be allocated with enough size for outpur frame see
+ *  @getImageSize).
+ * @param       outFormat The pixel format to convert to.
+ * @returns True if it succeeds, false if it fails.
+ */
+bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], PixelFormat outFormat) noexcept;
 } // namespace Ffr
