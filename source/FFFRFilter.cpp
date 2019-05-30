@@ -274,6 +274,6 @@ double Filter::getFrameRate() const noexcept
 uint32_t Filter::getFrameSize() const noexcept
 {
     return av_image_get_buffer_size(
-        static_cast<AVPixelFormat>(av_buffersink_get_format(m_sink)), getWidth(), getHeight(), 0);
+        static_cast<AVPixelFormat>(av_buffersink_get_format(m_sink)), getWidth(), getHeight(), 32);
 }
 } // namespace Ffr
