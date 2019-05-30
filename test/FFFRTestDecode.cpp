@@ -26,13 +26,12 @@ struct TestParamsDecode
     uint32_t m_testDataIndex;
     bool m_useNvdec;
     bool m_useContext;
-    // TODO: copy to host option (check pixfmp NV12???)
+    bool m_outputToHost;
 };
 
 static std::vector<TestParamsDecode> g_testDataDecode = {
-    {0, false, false},
-    {0, true, false},
-    {0, true, true},
+    {0, false, false, true}, {0, true, false, false}, {0, true, false, true},
+    //{0, true, true, false},
 };
 
 class DecodeTest1 : public ::testing::TestWithParam<TestParamsDecode>
@@ -63,6 +62,7 @@ protected:
                 ASSERT_EQ(err, CUDA_SUCCESS);
             }
         }
+        options.m_outputHost = GetParam().m_outputToHost;
         auto ret = Stream::getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
@@ -84,6 +84,18 @@ protected:
     CUcontext m_cudaContext = nullptr;
     bool m_allocatorCalled = false;
 };
+
+TEST_P(DecodeTest1, getDecodeType)
+{
+    const auto ret1 = m_stream->getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    const auto frame1 = std::get<1>(ret1);
+    if (GetParam().m_useNvdec && !GetParam().m_outputToHost) {
+        ASSERT_EQ(frame1->getDataType(), Ffr::DecodeType::Cuda);
+    } else {
+        ASSERT_EQ(frame1->getDataType(), Ffr::DecodeType::Software);
+    }
+}
 
 TEST_P(DecodeTest1, getLoop25)
 {
