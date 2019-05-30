@@ -223,7 +223,7 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
 
     // Make the new stream
     m_bufferLength = bufferLength;
-    m_outputHost = outputHost;
+    m_outputHost = outputHost && decoderContext.get() != nullptr;
     m_formatContext = move(tempFormat);
     m_index = index;
     m_codecContext = move(tempCodec);
