@@ -53,6 +53,7 @@ protected:
         options.m_scale = GetParam().m_scale;
         options.m_crop = GetParam().m_crop;
         options.m_format = GetParam().m_format;
+        options.m_outputHost = false;
         auto ret = Stream::getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
