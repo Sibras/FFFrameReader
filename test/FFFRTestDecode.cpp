@@ -30,8 +30,11 @@ struct TestParamsDecode
 };
 
 static std::vector<TestParamsDecode> g_testDataDecode = {
-    {0, false, false, true}, {0, true, false, false}, {0, true, false, true},
-    //{0, true, true, false},
+    {0, false, false, true},
+    {0, true, false, false},
+    {0, true, false, true},
+    {0, true, true, false},
+    {0, true, true, true},
 };
 
 class DecodeTest1 : public ::testing::TestWithParam<TestParamsDecode>

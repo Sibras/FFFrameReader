@@ -120,24 +120,27 @@ double Frame::getAspectRatio() const noexcept
 
 PixelFormat Frame::getPixelFormat() const noexcept
 {
-    return Ffr::getPixelFormat(static_cast<AVPixelFormat>(m_frame->format));
+    if (m_frame->hw_frames_ctx == nullptr) {
+        return Ffr::getPixelFormat(static_cast<AVPixelFormat>(m_frame->format));
+    }
+    auto* framesContext = reinterpret_cast<AVHWFramesContext*>(m_frame->hw_frames_ctx->data);
+    return Ffr::getPixelFormat(framesContext->sw_format);
 }
 
 int32_t Frame::getNumberFrames()
 {
-    return av_pix_fmt_count_planes(static_cast<AVPixelFormat>(m_frame->format));
+    if (m_frame->hw_frames_ctx == nullptr) {
+        return av_pix_fmt_count_planes(static_cast<AVPixelFormat>(m_frame->format));
+    }
+    auto* framesContext = reinterpret_cast<AVHWFramesContext*>(m_frame->hw_frames_ctx->data);
+    return av_pix_fmt_count_planes(framesContext->sw_format);
 }
 
 DecodeType Frame::getDataType() const noexcept
 {
-    if (m_frame->hw_frames_ctx == nullptr) {
-        return DecodeType::Software;
-    }
-    auto* framesContext = reinterpret_cast<AVHWFramesContext*>(m_frame->hw_frames_ctx->data);
-    if (framesContext->format == AV_PIX_FMT_CUDA) {
+    if (m_frame->format == AV_PIX_FMT_CUDA) {
         return DecodeType::Cuda;
     }
-    log("Unhandled format in getDataType()", LogLevel::Error);
     return DecodeType::Software;
 }
 } // namespace Ffr
