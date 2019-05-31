@@ -238,10 +238,12 @@ bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], cons
                 case PixelFormat::YUV422P: {
                     av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::YUV422P), roi.width);
                     ret = nppiRGBToYUV422_8u_P3R(inMem, data1.second, outMem, outStep, roi);
+                    break;
                 }
                 case PixelFormat::YUV420P: {
                     av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::YUV420P), roi.width);
                     ret = nppiRGBToYUV420_8u_P3R(inMem, data1.second, outMem, outStep, roi);
+                    break;
                 }
                 default:
                     break;
