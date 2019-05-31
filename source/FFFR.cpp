@@ -198,6 +198,7 @@ bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], cons
                 case PixelFormat::YUV420P: {
                     av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::YUV420P), roi.width);
                     ret = nppiNV12ToYUV420_8u_P2P3R(inMem, data1.second, outMem, outStep, roi);
+                    break;
                 }
                 default:
                     break;
@@ -219,6 +220,7 @@ bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], cons
                 case PixelFormat::YUV420P: {
                     av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::YUV420P), roi.width);
                     ret = nppiRGBToYUV420_8u_C3P3R(data1.first, data1.second, outMem, outStep, roi);
+                    break;
                 }
                 default:
                     break;
