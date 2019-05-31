@@ -202,7 +202,6 @@ if(BUILD_TESTING)
         PRIVATE FfFrameReader
         PRIVATE GTest::GTest
         PRIVATE GTest::Main
-        PRIVATE ${CUDA_LIBRARY}
         PRIVATE ${CUDA_DRIVER_LIBRARY}
     )
 
