@@ -99,6 +99,15 @@ TEST_P(StreamTest1, seekSmall)
 TEST_P(StreamTest1, seekFail)
 {
     ASSERT_FALSE(m_stream->seek(m_stream->getDuration()));
+    ASSERT_FALSE(m_stream->seek(m_stream->getDuration() + 300000));
+    //Check we can do a valid seek after a failed one
+    const double timeStamp1 = (static_cast<double>(2) * (1000000.0 / GetParam().m_frameRate));
+    const auto time1 = llround(timeStamp1);
+    ASSERT_TRUE(m_stream->seek(time1));
+    const auto ret1 = m_stream->getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    const auto frame1 = std::get<1>(ret1);
+    ASSERT_EQ(frame1->getTimeStamp(), time1);
 }
 
 TEST_P(StreamTest1, seekEnd)
