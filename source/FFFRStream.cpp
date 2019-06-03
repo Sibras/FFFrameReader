@@ -218,7 +218,7 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
             // filter creation failed
             return;
         }
-        m_filterGraph = filter;
+        m_filterGraph = move(filter);
     }
 
     // Make the new stream
@@ -629,11 +629,11 @@ bool Stream::decodeNextFrames() noexcept
                 log("Failed to copy frame to host: "s += getFfmpegErrorString(ret), LogLevel::Error);
                 return false;
             }
-            frame = frame2;
+            frame = move(frame2);
         }
 
         // Add the new frame to the pong buffer
-        m_bufferPong.emplace_back(make_shared<Frame>(frame, timeStamp, frameNum));
+        m_bufferPong.emplace_back(make_shared<Frame>(move(frame), timeStamp, frameNum));
     }
 }
 
