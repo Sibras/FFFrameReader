@@ -354,6 +354,7 @@ variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
 
 variant<bool, shared_ptr<Frame>> Stream::getNextFrame() noexcept
 {
+    lock_guard<recursive_mutex> lock(m_mutex);
     auto ret = peekNextFrame();
     if (ret.index() == 0) {
         return false;
