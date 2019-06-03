@@ -649,7 +649,7 @@ void Stream::popFrame() noexcept
 bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
 {
     if (timeStamp >= getDuration()) {
-        //Early out if seek is not possible
+        // Early out if seek is not possible
         return false;
     }
     lock_guard<recursive_mutex> lock(m_mutex);
@@ -743,6 +743,10 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
 
 bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcept
 {
+    if (frame >= getTotalFrames()) {
+        // Early out if seek is not possible
+        return false;
+    }
     lock_guard<recursive_mutex> lock(m_mutex);
     // Check if we actually have any frames in the current buffer
     if (m_bufferPing.size() > 0) {
