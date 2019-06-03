@@ -108,7 +108,7 @@ public:
 
     /**
      * Gets the next frame in the stream and removes it from the buffer.
-     * @returns The next frame in current stream, or false if an error occured.
+     * @returns The next frame in current stream, or false if an error occured, or true if end of file reached.
      */
     [[nodiscard]] std::variant<bool, std::shared_ptr<Frame>> getNextFrame() noexcept;
 

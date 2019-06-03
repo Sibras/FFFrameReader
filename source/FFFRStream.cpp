@@ -344,8 +344,8 @@ variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
         m_bufferPong.resize(0);
         // Check if there are any new frames or we reached EOF
         if (m_bufferPing.size() == 0) {
-            log("Cannot get a new frame, End of file has been reached"s, LogLevel::Error);
-            return false;
+            log("Cannot get a new frame, End of file has been reached"s, LogLevel::Warning);
+            return true;
         }
     }
     // Get frame from ping buffer
@@ -357,7 +357,7 @@ variant<bool, shared_ptr<Frame>> Stream::getNextFrame() noexcept
     lock_guard<recursive_mutex> lock(m_mutex);
     auto ret = peekNextFrame();
     if (ret.index() == 0) {
-        return false;
+        return ret;
     }
     // Remove the frame from list
     popFrame();
