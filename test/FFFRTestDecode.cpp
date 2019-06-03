@@ -37,16 +37,23 @@ static std::vector<TestParamsDecode> g_testDataDecode = {
     {0, true, true, true},
 };
 
-class DecodeTest1 : public ::testing::TestWithParam<TestParamsDecode>
+class Decoder
 {
-protected:
-    DecodeTest1() = default;
+public:
+    Decoder() = default;
 
-    void SetUp() override
+    ~Decoder()
     {
-        setLogLevel(LogLevel::Warning);
+        m_stream = nullptr;
+        if (m_cudaContext != nullptr) {
+            cuCtxDestroy(m_cudaContext);
+        }
+    }
+
+    void SetUp(const TestParamsDecode& params)
+    {
         DecoderOptions options;
-        if (GetParam().m_useNvdec) {
+        if (params.m_useNvdec) {
             options.m_type = DecodeType::Cuda;
             // Setup a cuda context
             auto err = cuInit(0);
@@ -54,7 +61,7 @@ protected:
             CUdevice device;
             err = cuDeviceGet(&device, 0);
             ASSERT_EQ(err, CUDA_SUCCESS);
-            if (GetParam().m_useContext) {
+            if (params.m_useContext) {
                 err = cuCtxCreate(&m_cudaContext, CU_CTX_SCHED_BLOCKING_SYNC, device);
                 ASSERT_EQ(err, CUDA_SUCCESS);
 
@@ -65,32 +72,43 @@ protected:
                 ASSERT_EQ(err, CUDA_SUCCESS);
             }
         }
-        options.m_outputHost = GetParam().m_outputToHost;
-        auto ret = Stream::getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
+        options.m_outputHost = params.m_outputToHost;
+        auto ret = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
         ASSERT_NE(ret.index(), 0);
         m_stream = std::get<1>(ret);
     }
 
-    void TearDown() override
+    void TearDown()
     {
         m_stream = nullptr;
     }
 
-    ~DecodeTest1() override
-    {
-        if (m_cudaContext != nullptr) {
-            cuCtxDestroy(m_cudaContext);
-        }
-    }
-
     std::shared_ptr<Stream> m_stream = nullptr;
     CUcontext m_cudaContext = nullptr;
-    bool m_allocatorCalled = false;
+};
+
+class DecodeTest1 : public ::testing::TestWithParam<TestParamsDecode>
+{
+protected:
+    DecodeTest1() = default;
+
+    void SetUp() override
+    {
+        setLogLevel(LogLevel::Warning);
+        m_decoder.SetUp(GetParam());
+    }
+
+    void TearDown() override
+    {
+        m_decoder.TearDown();
+    }
+
+    Decoder m_decoder;
 };
 
 TEST_P(DecodeTest1, getDecodeType)
 {
-    const auto ret1 = m_stream->getNextFrame();
+    const auto ret1 = m_decoder.m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);
     const auto frame1 = std::get<1>(ret1);
     if (GetParam().m_useNvdec && !GetParam().m_outputToHost) {
@@ -105,11 +123,11 @@ TEST_P(DecodeTest1, getLoop25)
     // Ensure that frames can be read
     int64_t timeStamp = 0;
     int64_t frameNum = 0;
-    for (int64_t i = 0; i < std::min(m_stream->getTotalFrames(), 25LL); i++) {
-        const auto ret1 = m_stream->getNextFrame();
+    for (int64_t i = 0; i < std::min(m_decoder.m_stream->getTotalFrames(), 25LL); i++) {
+        const auto ret1 = m_decoder.m_stream->getNextFrame();
         if (ret1.index() == 0) {
-            ASSERT_EQ(timeStamp, m_stream->getDuration()); // Readout in case it failed
-            ASSERT_EQ(i, m_stream->getTotalFrames());
+            ASSERT_EQ(timeStamp, m_decoder.m_stream->getDuration()); // Readout in case it failed
+            ASSERT_EQ(i, m_decoder.m_stream->getTotalFrames());
         }
         ASSERT_NE(ret1.index(), 0);
         const auto frame1 = std::get<1>(ret1);
@@ -121,4 +139,26 @@ TEST_P(DecodeTest1, getLoop25)
         ++frameNum;
     }
 }
+
+TEST_P(DecodeTest1, getMultiple)
+{
+    // Create additional streams
+    Decoder test2;
+    test2.SetUp(GetParam());
+    Decoder test3;
+    test3.SetUp(GetParam());
+    const auto ret1 = m_decoder.m_stream->getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    const auto frame1 = std::get<1>(ret1);
+    const auto ret2 = test2.m_stream->getNextFrame();
+    ASSERT_NE(ret2.index(), 0);
+    const auto frame2 = std::get<1>(ret2);
+    const auto ret3 = test3.m_stream->getNextFrame();
+    ASSERT_NE(ret3.index(), 0);
+    const auto frame3 = std::get<1>(ret3);
+    ASSERT_EQ(frame1->getTimeStamp(), 0);
+    ASSERT_EQ(frame2->getTimeStamp(), 0);
+    ASSERT_EQ(frame3->getTimeStamp(), 0);
+}
+
 INSTANTIATE_TEST_SUITE_P(DecodeTestData, DecodeTest1, ::testing::ValuesIn(g_testDataDecode));
