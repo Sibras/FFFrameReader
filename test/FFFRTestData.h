@@ -34,7 +34,9 @@ struct TestParams
 // To run tests you must first download the files from the corresponding web location
 static std::vector<TestParams> g_testData = {
     {"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333},
-#if 0
+    {"data/board_game-h264.mkv", 1280, 720, 16.0 / 9.0, 50, 2000000, 25.0, 40000},
+    {"data/tvl_missing_pts.avi", 2048, 2048, 1.0, 375, 15000000, 25.0, 40000},
+#if 1
     // These are internal testing files and are not redistributed
     {"data/CLIP0000818_000_77aabf.mkv", 3840, 2160, 16.0 / 9.0, 1116, 44640000, 25.0, 40000},
     {"data/MenMC_50BR_Finals_Canon - Cut.mp4", 3840, 2160, 16.0 / 9.0, 249, 9960000, 25.0, 40000},
