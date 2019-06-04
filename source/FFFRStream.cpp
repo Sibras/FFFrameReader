@@ -212,7 +212,7 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
     // Add any required filter stages
     if (scaleRequired || cropRequired || formatRequired) {
         // Create a new filter object
-        const shared_ptr<Filter> filter = make_shared<Filter>(postScale, crop, format, tempFormat, index, tempCodec);
+        shared_ptr<Filter> filter = make_shared<Filter>(postScale, crop, format, tempFormat, index, tempCodec);
 
         if (filter->m_filterGraph.get() == nullptr) {
             // filter creation failed
@@ -240,13 +240,6 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
     m_startTimeStamp = getStreamStartTime();
     m_totalFrames = getStreamFrames();
     m_totalDuration = getStreamDuration();
-
-    // Decode the first sequence of frames (must be done to ensure codec parameters are properly filed)
-    if (peekNextFrame().index() == 0) {
-        // Clear internal data as failure occured
-        m_formatContext = FormatContextPtr(nullptr);
-        m_codecContext = CodecContextPtr(nullptr);
-    }
 }
 
 variant<bool, shared_ptr<Stream>> Stream::getStream(const string& filename, const DecoderOptions& options) noexcept
@@ -265,6 +258,11 @@ variant<bool, shared_ptr<Stream>> Stream::getStream(const string& filename, cons
         outputHost, options.m_crop, options.m_scale, options.m_format));
     if (stream->m_codecContext.get() == nullptr) {
         // stream creation failed
+        return false;
+    }
+
+    // Decode the first sequence of frames (must be done to ensure codec parameters are properly filled)
+    if (stream->peekNextFrame().index() == 0) {
         return false;
     }
     return stream;
@@ -530,14 +528,18 @@ bool Stream::decodeNextBlock() noexcept
 bool Stream::decodeNextFrames() noexcept
 {
     // Loop through and retrieve all decoded frames
-    Frame::FramePtr frame;
+    Frame::FramePtr frame(av_frame_alloc());
+    shared_ptr<Stream> thisPtr;
+    try {
+        thisPtr = shared_from_this();
+    } catch (...) {
+        log("Stream created without using a shared pointer"s, LogLevel::Error);
+        return false;
+    }
     while (true) {
         if (*frame == nullptr) {
-            *frame = av_frame_alloc();
-            if (*frame == nullptr) {
-                log("Failed to allocate new frame"s, LogLevel::Error);
-                return false;
-            }
+            log("Failed to allocate new frame"s, LogLevel::Error);
+            return false;
         }
         const auto ret = avcodec_receive_frame(m_codecContext.get(), *frame);
         if (ret < 0) {
@@ -592,7 +594,7 @@ bool Stream::decodeNextFrames() noexcept
                     ++fillFrameNum;
                     fillTimeStamp = frameToTime(fillFrameNum);
                     Frame::FramePtr frameClone(av_frame_clone(*frame));
-                    m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum));
+                    m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum, thisPtr));
                 }
             }
         }
@@ -633,7 +635,8 @@ bool Stream::decodeNextFrames() noexcept
         }
 
         // Add the new frame to the pong buffer
-        m_bufferPong.emplace_back(make_shared<Frame>(move(frame), timeStamp, frameNum));
+        m_bufferPong.emplace_back(make_shared<Frame>(move(frame), timeStamp, frameNum, thisPtr));
+        frame = Frame::FramePtr(av_frame_alloc());
     }
 }
 

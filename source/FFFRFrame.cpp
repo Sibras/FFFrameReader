@@ -18,6 +18,7 @@
 #include "FFFRUtility.h"
 
 #include <algorithm>
+#include <utility>
 
 extern "C" {
 #include <libavutil/frame.h>
@@ -79,10 +80,11 @@ const AVFrame* Frame::FramePtr::operator->() const noexcept
     return m_frame;
 }
 
-Frame::Frame(FramePtr& frame, const int64_t timeStamp, const int64_t frameNum) noexcept
+Frame::Frame(FramePtr& frame, const int64_t timeStamp, const int64_t frameNum, shared_ptr<Stream> stream) noexcept
     : m_frame(move(frame))
     , m_timeStamp(timeStamp)
     , m_frameNum(frameNum)
+    , m_stream(move(stream))
 {}
 
 int64_t Frame::getTimeStamp() const noexcept

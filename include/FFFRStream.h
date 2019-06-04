@@ -30,7 +30,7 @@ namespace Ffr {
 class DecoderContext;
 class Filter;
 
-class Stream
+class Stream : public std::enable_shared_from_this<Stream>
 {
     friend class Filter;
 
