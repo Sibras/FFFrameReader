@@ -34,10 +34,13 @@ PixelFormat getPixelFormat(const AVPixelFormat format) noexcept
 {
     switch (format) {
         case AV_PIX_FMT_YUV420P:
+        case AV_PIX_FMT_YUVJ420P:
             return PixelFormat::YUV420P;
         case AV_PIX_FMT_YUV422P:
+        case AV_PIX_FMT_YUVJ422P:
             return PixelFormat::YUV422P;
         case AV_PIX_FMT_YUV444P:
+        case AV_PIX_FMT_YUVJ444P:
             return PixelFormat::YUV444P;
         case AV_PIX_FMT_GBRP:
             return PixelFormat::GBR8P;
