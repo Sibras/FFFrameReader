@@ -335,11 +335,6 @@ variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
         if (!decodeNextBlock()) {
             return false;
         }
-        // Swap ping and pong buffer
-        swap(m_bufferPing, m_bufferPong);
-        m_bufferPingHead = 0;
-        // Reset the pong buffer
-        m_bufferPong.resize(0);
         // Check if there are any new frames or we reached EOF
         if (m_bufferPing.size() == 0) {
             log("Cannot get a new frame, End of file has been reached"s, LogLevel::Warning);
@@ -517,6 +512,12 @@ bool Stream::decodeNextBlock() noexcept
         }
         // Check if we have reached the buffer limit
         if ((m_bufferPong.size() >= m_bufferLength) || eof) {
+            // Swap ping and pong buffer
+            swap(m_bufferPing, m_bufferPong);
+            m_bufferPingHead = 0;
+            // Reset the pong buffer
+            m_bufferPong.resize(0);
+
             return true;
         }
 
@@ -706,12 +707,12 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
                 m_bufferPingHead = 0;
 
                 // Decode the next block of frames
-                if (peekNextFrame().index() == 0) {
+                if (!decodeNextBlock()) {
                     return false;
                 }
 
                 // Search through buffer until time stamp is found
-                return seekInternal(timeStamp, true);
+                return seekInternal(timeStamp, recursed);
             }
         }
     }
@@ -737,7 +738,7 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
     m_bufferPingHead = 0;
 
     // Decode the next block of frames
-    if (peekNextFrame().index() == 0) {
+    if (!decodeNextBlock()) {
         return false;
     }
 
@@ -781,19 +782,19 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
             // compensate for potentially huge gaps between seek frames.
             const int64_t frameRange = (!recursed) ? m_bufferLength * 3 : 1000;
             if (frame <= m_bufferPing.back()->getFrameNumber() + frameRange) {
-                while (true) {
-                    auto ret = peekNextFrame();
-                    if (ret.index() == 0) {
-                        return false;
-                    }
-                    // Check if we have found our requested time stamp
-                    if (frame <= get<1>(ret)->getFrameNumber()) {
-                        break;
-                    }
-                    // Remove frames from ping buffer
-                    popFrame();
+                // Loop through until the requested frame is found. Discard all frames occuring before requested one
+
+                // Clean out current buffer
+                m_bufferPing.resize(0);
+                m_bufferPingHead = 0;
+
+                // Decode the next block of frames
+                if (!decodeNextBlock()) {
+                    return false;
                 }
-                return true;
+
+                // Search through buffer until time stamp is found
+                return seekFrameInternal(frame, recursed);
             }
         }
     }
@@ -832,7 +833,7 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
     m_bufferPingHead = 0;
 
     // Decode the next block of frames
-    if (peekNextFrame().index() == 0) {
+    if (!decodeNextBlock()) {
         return false;
     }
 

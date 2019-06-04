@@ -102,7 +102,7 @@ public:
 
     /**
      * Get the next frame in the stream without removing it from stream buffer.
-     * @returns The next frame in current stream, or false if an error occured.
+     * @returns The next frame in current stream, or false if an error occured, or true if end of file reached.
      */
     [[nodiscard]] std::variant<bool, std::shared_ptr<Frame>> peekNextFrame() noexcept;
 
