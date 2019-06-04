@@ -242,6 +242,29 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
     m_totalDuration = getStreamDuration();
 }
 
+bool Stream::initialise() noexcept
+{
+    // Decode the first couple of frames (must be done to ensure codec parameters are properly filled)
+    const auto backup = m_bufferLength;
+    m_bufferLength = 2;
+    if (peekNextFrame().index() == 0) {
+        return false;
+    }
+    m_bufferLength = backup;
+    // Check if the first element in the buffer does not match our start time
+    const auto startTime = m_bufferPing.front()->getTimeStamp();
+    if (startTime != 0) {
+        m_startTimeStamp = 0;
+        m_startTimeStamp = timeToTimeStamp(m_bufferPing.front()->getTimeStamp());
+        // Loop through all current frames and fix the time stamps
+        for (auto& i : m_bufferPing) {
+            i->m_timeStamp -= startTime;
+            i->m_frameNum = timeToFrame(i->m_timeStamp);
+        }
+    }
+    return true;
+}
+
 variant<bool, shared_ptr<Stream>> Stream::getStream(const string& filename, const DecoderOptions& options) noexcept
 {
     // Create the device context
@@ -253,6 +276,8 @@ variant<bool, shared_ptr<Stream>> Stream::getStream(const string& filename, cons
             return false;
         }
     }
+
+    // Create the new stream
     const bool outputHost = options.m_outputHost && (options.m_type != DecodeType::Software);
     shared_ptr<Stream> stream = shared_ptr<Stream>(new Stream(filename, options.m_bufferLength, deviceContext,
         outputHost, options.m_crop, options.m_scale, options.m_format));
@@ -261,10 +286,11 @@ variant<bool, shared_ptr<Stream>> Stream::getStream(const string& filename, cons
         return false;
     }
 
-    // Decode the first sequence of frames (must be done to ensure codec parameters are properly filled)
-    if (stream->peekNextFrame().index() == 0) {
+    // Initialise stream data
+    if (!stream->initialise()) {
         return false;
     }
+
     return stream;
 }
 
@@ -504,7 +530,8 @@ bool Stream::decodeNextBlock() noexcept
             // Check if we got more frames than we should have. This occurs when there are missing frames that are
             // padded in resulting in more output frames than expected.
             while (!m_bufferPong.empty()) {
-                if (m_bufferPong.back()->getTimeStamp() < this->getDuration()) {
+                if (m_bufferPong.back()->getTimeStamp() < this->getDuration() &&
+                    m_bufferPong.back()->getTimeStamp() != AV_NOPTS_VALUE) {
                     break;
                 }
                 m_bufferPong.pop_back();
@@ -578,6 +605,18 @@ bool Stream::decodeNextFrames() noexcept
             } else {
                 frame->best_effort_timestamp = frame->pkt_dts;
             }
+
+            if (frame->best_effort_timestamp == AV_NOPTS_VALUE) {
+                // Try and just rebuild it from the previous frame
+                if (!m_bufferPong.empty()) {
+                    const auto previous = m_bufferPong.back()->getFrameNumber();
+                    frame->best_effort_timestamp = frameToTimeStamp(previous + 1);
+                } else {
+                    // TODO: Handle case where pong is empty
+                    log("Failed to determine valid timestamp for frame", LogLevel::Error);
+                    return false;
+                }
+            }
         }
         const auto timeStamp = timeStampToTime(frame->best_effort_timestamp);
         const auto frameNum = timeStampToFrame(frame->best_effort_timestamp);
@@ -587,7 +626,7 @@ bool Stream::decodeNextFrames() noexcept
             // TODO: Handle case where pong is empty but a frame was still skipped between now and last entry in ping
             // (which has already been popped by the time this function is called)
             const auto previous = m_bufferPong.back();
-            if (frameNum != previous->getFrameNumber() + 1) {
+            if (frameNum != previous->getFrameNumber() + 1 && frameNum != AV_NOPTS_VALUE) {
                 // Fill in missing frames by duplicating the old one
                 auto fillFrameNum = previous->getFrameNumber();
                 int64_t fillTimeStamp;

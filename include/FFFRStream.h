@@ -204,6 +204,12 @@ private:
         bool outputHost, Crop crop, Resolution scale, PixelFormat format) noexcept;
 
     /**
+     * Initialises codec parameters needed for future operations.
+     * @returns True if it succeeds, false if it fails.
+     */
+    [[nodiscard]] bool initialise() noexcept;
+
+    /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to the stream timebase.
      * @param time The time in microseconds (AV_TIME_BASE).
      * @return The converted time stamp.

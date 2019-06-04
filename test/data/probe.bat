@@ -1,0 +1,1 @@
+.\ffprobe.exe tvl_missing_pts.avi -hide_banner -loglevel fatal -pretty -show_streams -count_frames -select_streams v:0 -show_entries "stream=codec_type,r_frame_rate,width,height,sample_aspect_ratio,nb_frames"
