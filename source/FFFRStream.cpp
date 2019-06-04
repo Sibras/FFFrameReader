@@ -608,36 +608,28 @@ bool Stream::decodeNextFrames() noexcept
 
             if (frame->best_effort_timestamp == AV_NOPTS_VALUE) {
                 // Try and just rebuild it from the previous frame
-                if (!m_bufferPong.empty()) {
-                    const auto previous = m_bufferPong.back()->getFrameNumber();
-                    frame->best_effort_timestamp = frameToTimeStamp(previous + 1);
-                } else {
-                    // TODO: Handle case where pong is empty
-                    log("Failed to determine valid timestamp for frame", LogLevel::Error);
-                    return false;
-                }
+                frame->best_effort_timestamp = frameToTimeStamp(timeStampToFrame(m_lastDecodedTimeStamp) + 1);
             }
         }
-        const auto timeStamp = timeStampToTime(frame->best_effort_timestamp);
-        const auto frameNum = timeStampToFrame(frame->best_effort_timestamp);
+        auto timeStamp = timeStampToTime(frame->best_effort_timestamp);
+        auto frameNum = timeStampToFrame(frame->best_effort_timestamp);
 
         // Check if we have skipped a frame
-        if (!m_bufferPong.empty()) {
-            // TODO: Handle case where pong is empty but a frame was still skipped between now and last entry in ping
-            // (which has already been popped by the time this function is called)
-            const auto previous = m_bufferPong.back();
-            if (frameNum != previous->getFrameNumber() + 1 && frameNum != AV_NOPTS_VALUE) {
-                // Fill in missing frames by duplicating the old one
-                auto fillFrameNum = previous->getFrameNumber();
-                int64_t fillTimeStamp;
-                for (auto i = previous->getFrameNumber() + 1; i < frameNum; i++) {
-                    ++fillFrameNum;
-                    fillTimeStamp = frameToTime(fillFrameNum);
-                    Frame::FramePtr frameClone(av_frame_clone(*frame));
-                    m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum, thisPtr));
-                }
+        const auto previous = timeStampToFrame(m_lastDecodedTimeStamp);
+        if (frameNum != previous + 1 && m_lastDecodedTimeStamp != -1) {
+            // Fill in missing frames by duplicating the old one
+            auto fillFrameNum = previous;
+            int64_t fillTimeStamp;
+            for (auto i = previous + 1; i < frameNum; i++) {
+                ++fillFrameNum;
+                fillTimeStamp = frameToTime(fillFrameNum);
+                Frame::FramePtr frameClone(av_frame_clone(*frame));
+                m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum, thisPtr));
             }
         }
+
+        // Store last decoded pts
+        m_lastDecodedTimeStamp = frame->best_effort_timestamp;
 
         // Perform any required filtering
         if (m_filterGraph != nullptr) {
@@ -764,6 +756,7 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
 
     // Seek to desired timestamp
     avcodec_flush_buffers(m_codecContext.get());
+    m_lastDecodedTimeStamp = -1;
     const auto localTimeStamp = timeToTimeStamp(timeStamp) + m_startTimeStamp;
     const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
@@ -854,6 +847,7 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
 
     // Seek to desired timestamp
     avcodec_flush_buffers(m_codecContext.get());
+    m_lastDecodedTimeStamp = -1;
     const auto frameInternal = frame + timeStampToFrame(m_startTimeStamp);
     const auto err =
         avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
