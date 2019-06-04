@@ -508,7 +508,8 @@ bool Stream::decodeNextBlock() noexcept
                 }
                 // Increase the number of maxPackets if we are really close to just finishing the stream anyway
                 if (i == (maxPackets - 1)) {
-                    if (timeStampToFrame(packet.pts) >= (m_totalFrames - 2)) {
+                    const auto timeStamp = packet.pts != AV_NOPTS_VALUE ? packet.pts : packet.dts;
+                    if (timeStampToFrame(timeStamp) >= (m_totalFrames - 2)) {
                         maxPackets += 2;
                     }
                 }
