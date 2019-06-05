@@ -21,6 +21,8 @@
 struct AVFrame;
 
 namespace Ffr {
+class Stream;
+
 class Frame
 {
     friend class Stream;
