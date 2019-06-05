@@ -668,7 +668,7 @@ bool Stream::decodeNextFrames() noexcept
         }
 
         // Add the new frame to the pong buffer
-        m_bufferPong.emplace_back(make_shared<Frame>(move(frame), timeStamp, frameNum, thisPtr));
+        m_bufferPong.emplace_back(make_shared<Frame>(frame, timeStamp, frameNum, thisPtr));
         frame = Frame::FramePtr(av_frame_alloc());
     }
 }
