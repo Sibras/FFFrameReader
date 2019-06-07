@@ -6,7 +6,7 @@ cmake_minimum_required (VERSION 3.10.2)
 project(FfFrameReader
     VERSION 0.1
     DESCRIPTION "FFmpeg based library for reading frames from a video source"
-    LANGUAGES CXX
+    LANGUAGES CXX CUDA
 )
 
 # Use vcpkg if available
@@ -37,7 +37,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}"
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}")
 
-# Differentiate between release/debug builds 
+# Differentiate between release/debug builds
 if(MSVC)
     set(CMAKE_DEBUG_POSTFIX "d")
 endif()
@@ -94,15 +94,16 @@ endif()
 set_target_properties(FfFrameReader PROPERTIES
     FRAMEWORK ON
     SOVERSION 0
-    VERSION ${PROJECT_VERSION} 
+    VERSION ${PROJECT_VERSION}
     PUBLIC_HEADER "${FFFR_HEADERS}"
+    CUDA_SEPERABLE_COMPILATION ON
 )
 
 # Enable all compile warnings
 if(MSVC)
-  target_compile_options(FfFrameReader PRIVATE /W4 /WX /experimental:external /external:anglebrackets /external:W3)
+  target_compile_options(FfFrameReader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /WX /experimental:external /external:anglebrackets /external:W3>)
 else()
-  target_compile_options(FfFrameReader PRIVATE -Wall -Wextra -pedantic -Werror)
+  target_compile_options(FfFrameReader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -pedantic -Werror>)
 endif()
 
 # Find the required FFmpeg libraries
@@ -122,8 +123,9 @@ find_library(SWSCALE_LIBRARY NAMES swscale)
 find_library(POSTPROC_LIBRARY NAMES postproc)
 find_library(SWRESAMPLE_LIBRARY NAMES swresample)
 
-# Find additional dependencies
-find_package(CUDA QUIET REQUIRED)
+# Find required cuda npicc library
+find_library(CUDA_nppicc_LIBRARY NAMES nppicc
+        PATHS ${CMAKE_CUDA_HOST_IMPLICIT_LINK_DIRECTORIES})
 
 target_include_directories(FfFrameReader PRIVATE
     ${PROJECT_SOURCE_DIR}/include
@@ -131,7 +133,7 @@ target_include_directories(FfFrameReader PRIVATE
     ${AVFORMAT_INCLUDE_DIR}
     ${AVFILTER_INCLUDE_DIR}
     ${AVUTIL_INCLUDE_DIR}
-    ${CUDA_INCLUDE_DIRS}
+    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 )
 target_link_libraries(FfFrameReader
     PRIVATE ${AVCODEC_LIBRARY}
@@ -175,26 +177,7 @@ if(BUILD_TESTING)
 
     target_include_directories(FFFRTest PRIVATE
         ${PROJECT_SOURCE_DIR}/include
-        ${CUDA_INCLUDE_DIRS}
-    )
-
-    #Find the cuda driver library
-    if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-        if(CMAKE_CL_64 OR ${CMAKE_SIZEOF_VOID_P} EQUAL "8")
-            set(FFFR_CUDA_DRIVER_PATHS
-                ${CUDA_SDK_ROOT_DIR}/lib/x64 ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64
-            )
-        else()
-            set(FFFR_CUDA_DRIVER_PATHS
-                ${CUDA_SDK_ROOT_DIR}/lib/Win32 ${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32
-            )
-        endif()
-    else()
-        set(FFFR_CUDA_DRIVER_PATHS 
-        )
-    endif()
-    find_library(CUDA_DRIVER_LIBRARY NAMES cuda
-        PATHS ${CUDA_SDK_ROOT_DIR} ${CUDA_TOOLKIT_ROOT_DIR} ${FFFR_CUDA_DRIVER_PATHS}
+        ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
     )
 
     target_link_libraries(
@@ -202,7 +185,7 @@ if(BUILD_TESTING)
         PRIVATE FfFrameReader
         PRIVATE GTest::GTest
         PRIVATE GTest::Main
-        PRIVATE ${CUDA_DRIVER_LIBRARY}
+        PRIVATE ${CUDA_CUDA_LIBRARY}
     )
 
     set_target_properties(
