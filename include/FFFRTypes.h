@@ -50,6 +50,8 @@ enum class PixelFormat : int32_t
 
     GBR8P = 73, /**< planar GBR 4:4:4 24bpp */
 
+    GBR32FP = 178, /**< IEEE-754 single precision planar GBR 4:4:4, 96bpp */
+
     RGB8 = 2, /**< packed RGB 8:8:8, 24bpp, RGBRGB... */
 };
 
