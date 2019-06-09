@@ -20,6 +20,7 @@
 #include <string>
 
 extern "C" {
+#include <libavutil/frame.h>
 #include <libavutil/hwcontext_cuda.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/log.h>
@@ -106,6 +107,12 @@ int32_t getImageSize(const PixelFormat format, const uint32_t width, const uint3
 {
     return av_image_get_buffer_size(getPixelFormat(format), width, height, 32);
 }
+
+extern bool convertNV12ToRGB8P(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
+    uint8_t* dest[3], uint32_t destStep);
+
+extern bool convertNV12ToRGB32FP(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
+    uint8_t* dest[3], uint32_t destStep);
 
 bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], const PixelFormat outFormat) noexcept
 {
@@ -198,6 +205,18 @@ bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], cons
                 case PixelFormat::YUV420P: {
                     av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::YUV420P), roi.width);
                     ret = nppiNV12ToYUV420_8u_P2P3R(inMem, data1.second, outMem, outStep, roi);
+                    break;
+                }
+                case PixelFormat::GBR8P: {
+                    av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::GBR8P), roi.width);
+                    ret = static_cast<NppStatus>(
+                        convertNV12ToRGB8P(inMem, data1.second, roi.width, roi.height, outMem, outStep[0]));
+                    break;
+                }
+                case PixelFormat::GBR32FP: {
+                    av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::GBR32FP), roi.width);
+                    ret = static_cast<NppStatus>(
+                        convertNV12ToRGB32FP(inMem, data1.second, roi.width, roi.height, outMem, outStep[0]));
                     break;
                 }
                 default:
