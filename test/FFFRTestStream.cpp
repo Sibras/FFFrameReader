@@ -73,8 +73,8 @@ TEST_P(StreamTest1, getFrameRate)
 
 TEST_P(StreamTest1, seek)
 {
-    constexpr uint32_t seekFrames = 80;
-    const uint32_t actualSeek = seekFrames >= GetParam().m_totalFrames ? GetParam().m_totalFrames - 5 : seekFrames;
+    constexpr int64_t seekFrames = 80;
+    const int64_t actualSeek = seekFrames >= GetParam().m_totalFrames ? GetParam().m_totalFrames - 5 : seekFrames;
     const double timeStamp1 = (static_cast<double>(actualSeek) * (1000000.0 / GetParam().m_frameRate));
     const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
@@ -156,8 +156,8 @@ TEST_P(StreamTest1, seekLoop)
 TEST_P(StreamTest1, seekBack)
 {
     // Seek forward
-    constexpr uint32_t seekFrames = 80;
-    const uint32_t actualSeek = seekFrames >= GetParam().m_totalFrames ? GetParam().m_totalFrames - 5 : seekFrames;
+    constexpr int64_t seekFrames = 80;
+    const int64_t actualSeek = seekFrames >= GetParam().m_totalFrames ? GetParam().m_totalFrames - 5 : seekFrames;
     const double timeStamp1 = (static_cast<double>(actualSeek) * (1000000.0 / GetParam().m_frameRate));
     const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
@@ -204,8 +204,8 @@ TEST_P(StreamTest1, seekFrameLoop)
 TEST_P(StreamTest1, getNextFrameSequenceSeek)
 {
     // First seek to a frame
-    constexpr uint32_t seekFrames = 80;
-    const uint32_t actualSeek = seekFrames >= GetParam().m_totalFrames ? GetParam().m_totalFrames - 9 : seekFrames;
+    constexpr int64_t seekFrames = 80;
+    const int64_t actualSeek = seekFrames >= GetParam().m_totalFrames ? GetParam().m_totalFrames - 9 : seekFrames;
     ASSERT_TRUE(m_stream->seekFrame(actualSeek));
     // Now get frame sequence offset from current
     const std::vector<int64_t> framesList1 = {0, 1, 5, 7, 8};
