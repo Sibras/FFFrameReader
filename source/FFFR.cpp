@@ -16,7 +16,6 @@
 #include "FFFRUtility.h"
 #include "FFFrameReader.h"
 
-#include <cuda.h>
 #include <nppi_color_conversion.h>
 #include <string>
 
@@ -109,13 +108,14 @@ int32_t getImageSize(const PixelFormat format, const uint32_t width, const uint3
     return av_image_get_buffer_size(getPixelFormat(format), width, height, 32);
 }
 
-extern cudaError_t convertNV12ToRGB8P(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
-    uint8_t* dest[3], uint32_t destStep);
+extern cudaError_t convertNV12ToRGB8P(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width,
+    uint32_t height, uint8_t* dest[3], uint32_t destStep);
 
-extern cudaError_t convertNV12ToRGB32FP(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
-    uint8_t* dest[3], uint32_t destStep);
+extern cudaError_t convertNV12ToRGB32FP(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width,
+    uint32_t height, uint8_t* dest[3], uint32_t destStep);
 
-static NppStatus cudaErrorToNppStatus(cudaError_t err) {
+static NppStatus cudaErrorToNppStatus(const cudaError_t err)
+{
     if (err == cudaSuccess) {
         return NPP_SUCCESS;
     }
@@ -286,8 +286,7 @@ bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], cons
         if (ret == NPP_ERROR_RESERVED) {
             log("Format conversion not currently supported", LogLevel::Error);
         } else if (ret == NPP_CUDA_KERNEL_EXECUTION_ERROR) {
-            log("CUDA kernel for format conversion failed: "s +=
-                cudaGetErrorName(cudaGetLastError()), LogLevel::Error);
+            log("CUDA kernel for format conversion failed: "s += cudaGetErrorName(cudaGetLastError()), LogLevel::Error);
         } else {
             log("Format conversion failed: "s += to_string(ret), LogLevel::Error);
         }
