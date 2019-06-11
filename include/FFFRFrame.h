@@ -27,12 +27,14 @@ class Frame
 {
     friend class Stream;
     friend class Filter;
+    friend class Encoder;
 
     class FramePtr
     {
         friend class Frame;
         friend class Filter;
         friend class Stream;
+        friend class Encoder;
 
     public:
         ~FramePtr() noexcept;

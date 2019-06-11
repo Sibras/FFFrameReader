@@ -25,6 +25,12 @@ enum class DecodeType
     Cuda,
 };
 
+enum class EncodeType
+{
+    h264,
+    h265,
+};
+
 struct Resolution
 {
     uint32_t m_width;
@@ -90,5 +96,47 @@ public:
                                                decoding. This must match the hardware type specified in @m_type. */
     uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */
     bool m_outputHost = true; /**< True to output each frame to host CPU memory (only affects hardware decoding). */
+};
+
+class EncoderOptions
+{
+public:
+    enum class Preset
+    {
+        Ultrafast,
+        Superfast,
+        Veryfast,
+        Faster,
+        Fast,
+        Medium,
+        Slow,
+        Slower,
+        Veryslow,
+        Placebo,
+    };
+    EncoderOptions() = default;
+
+    explicit EncoderOptions(DecodeType type) noexcept;
+
+    ~EncoderOptions() = default;
+
+    EncoderOptions(const EncoderOptions& other) = default;
+
+    EncoderOptions(EncoderOptions&& other) = default;
+
+    EncoderOptions& operator=(const EncoderOptions& other) = default;
+
+    EncoderOptions& operator=(EncoderOptions&& other) = default;
+
+    bool operator==(const EncoderOptions& other) const noexcept;
+
+    bool operator!=(const EncoderOptions& other) const noexcept;
+
+    bool operator<(const EncoderOptions& other) const noexcept;
+
+    EncodeType m_type = EncodeType::h264; /**< The type of encoder to use. */
+    uint8_t m_quality = 125;              /**< The quality of the output video. 0 is worst, 255 is best. */
+    Preset m_preset = Preset::Medium; /**< The preset compression level to use. Higher values result in smaller files
+                             but increased encoding time. */
 };
 } // namespace Ffr

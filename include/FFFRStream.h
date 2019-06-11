@@ -33,6 +33,7 @@ class Filter;
 class Stream : public std::enable_shared_from_this<Stream>
 {
     friend class Filter;
+    friend class Encoder;
 
 public:
     Stream() = delete;
@@ -49,12 +50,12 @@ public:
 
     /**
      * Gets a stream from a file.
-     * @param filename Filename of the file to open.
+     * @param fileName Filename of the file to open.
      * @param options  (Optional) Options for controlling decoding.
      * @returns The stream if succeeded, false otherwise.
      */
     [[nodiscard]] static std::variant<bool, std::shared_ptr<Stream>> getStream(
-        const std::string& filename, const DecoderOptions& options = DecoderOptions()) noexcept;
+        const std::string& fileName, const DecoderOptions& options = DecoderOptions()) noexcept;
 
     /**
      * Gets the width of the video stream.
@@ -74,6 +75,12 @@ public:
      * @returns The aspect ratio.
      */
     [[nodiscard]] double getAspectRatio() const noexcept;
+
+    /**
+     * Gets the pixel format of the video stream.
+     * @returns The pixel format.
+     */
+    [[nodiscard]] PixelFormat getPixelFormat() const noexcept;
 
     /**
      * Gets total frames in the video stream.
@@ -142,6 +149,7 @@ private:
     {
         friend class Stream;
         friend class Filter;
+        friend class Encoder;
 
         FormatContextPtr() = default;
 
@@ -158,6 +166,7 @@ private:
     {
         friend class Stream;
         friend class Filter;
+        friend class Encoder;
 
         CodecContextPtr() = default;
 
@@ -192,7 +201,7 @@ private:
 
     /**
      * Constructor.
-     * @param filename       Filename of the file to open.
+     * @param fileName       Filename of the file to open.
      * @param bufferLength   Number of frames in the the decode buffer.
      * @param decoderContext Pointer to an existing context to be used for hardware decoding.
      * @param outputHost     True to output each frame to host CPU memory (only affects hardware decoding).
@@ -201,7 +210,7 @@ private:
      *  after cropping.
      * @param format         The required output pixel format.
      */
-    Stream(const std::string& filename, uint32_t bufferLength, const std::shared_ptr<DecoderContext>& decoderContext,
+    Stream(const std::string& fileName, uint32_t bufferLength, const std::shared_ptr<DecoderContext>& decoderContext,
         bool outputHost, Crop crop, Resolution scale, PixelFormat format) noexcept;
 
     /**

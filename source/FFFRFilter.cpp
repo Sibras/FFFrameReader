@@ -102,7 +102,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format,
     const bool cropRequired = (crop.m_top != 0 || crop.m_bottom != 0 || crop.m_left != 0 || crop.m_right != 0);
     const bool scaleRequired = (scale.m_height != 0 || scale.m_width != 0);
     const bool formatRequired =
-        (format != PixelFormat::Auto && format != getPixelFormat(static_cast<AVPixelFormat>(inFormat)));
+        (format != PixelFormat::Auto && format != Ffr::getPixelFormat(static_cast<AVPixelFormat>(inFormat)));
 
     // Set the output buffer parameters
     if (formatRequired) {
@@ -264,6 +264,11 @@ double Filter::getAspectRatio() const noexcept
         return static_cast<double>(getWidth()) / static_cast<double>(getHeight()) * av_q2d(ar);
     }
     return static_cast<double>(getWidth()) / static_cast<double>(getHeight());
+}
+
+PixelFormat Filter::getPixelFormat() const noexcept
+{
+    return Ffr::getPixelFormat(static_cast<AVPixelFormat>(av_buffersink_get_format(m_sink)));
 }
 
 double Filter::getFrameRate() const noexcept

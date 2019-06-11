@@ -61,20 +61,21 @@ AVCodecContext* Stream::CodecContextPtr::get() const noexcept
     return m_codecContext.get();
 }
 
-Stream::Stream(const std::string& filename, const uint32_t bufferLength,
+Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
     const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost, Crop crop, Resolution scale,
     PixelFormat format) noexcept
 {
     AVFormatContext* formatPtr = nullptr;
-    auto ret = avformat_open_input(&formatPtr, filename.c_str(), nullptr, nullptr);
+    auto ret = avformat_open_input(&formatPtr, fileName.c_str(), nullptr, nullptr);
     FormatContextPtr tempFormat(formatPtr);
     if (ret < 0) {
-        log(("Failed to open input stream "s += filename) += ", "s += getFfmpegErrorString(ret), LogLevel::Error);
+        log(("Failed to open input stream: "s += fileName) += ", "s += getFfmpegErrorString(ret), LogLevel::Error);
         return;
     }
     ret = avformat_find_stream_info(tempFormat.get(), nullptr);
     if (ret < 0) {
-        log(("Failed finding stream information "s += filename) += ", "s += getFfmpegErrorString(ret), LogLevel::Error);
+        log(("Failed finding stream information: "s += fileName) += ", "s += getFfmpegErrorString(ret),
+            LogLevel::Error);
         return;
     }
 
@@ -82,7 +83,7 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
     AVCodec* decoder = nullptr;
     ret = av_find_best_stream(tempFormat.get(), AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
     if (ret < 0) {
-        log(("Failed to find video stream in file "s += filename) += ", "s += getFfmpegErrorString(ret),
+        log(("Failed to find video stream in file: "s += fileName) += ", "s += getFfmpegErrorString(ret),
             LogLevel::Error);
         return;
     }
@@ -96,7 +97,7 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
             cuvidName += "_cuvid";
             decoder = avcodec_find_decoder_by_name(cuvidName.c_str());
             if (decoder == nullptr) {
-                log("Requested hardware decoding not supported for file: "s += filename, LogLevel::Error);
+                log("Requested hardware decoding not supported for file: "s += fileName, LogLevel::Error);
                 return;
             }
         } else {
@@ -120,13 +121,13 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
     // Create a decoder context
     CodecContextPtr tempCodec(avcodec_alloc_context3(decoder));
     if (tempCodec.get() == nullptr) {
-        log("Failed allocating decoder context "s += filename, LogLevel::Error);
+        log("Failed allocating decoder context: "s += fileName, LogLevel::Error);
         return;
     }
 
     ret = avcodec_parameters_to_context(tempCodec.get(), stream->codecpar);
     if (ret < 0) {
-        log(("Failed copying parameters to decoder context "s += filename) += ", "s += getFfmpegErrorString(ret),
+        log(("Failed copying parameters to decoder context: "s += fileName) += ", "s += getFfmpegErrorString(ret),
             LogLevel::Error);
         return;
     }
@@ -192,7 +193,7 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
     }
     ret = avcodec_open2(tempCodec.get(), decoder, &opts);
     if (ret < 0) {
-        log(("Failed opening decoder for "s += filename) += ": "s += getFfmpegErrorString(ret), LogLevel::Error);
+        log(("Failed opening decoder: "s += fileName) += ": "s += getFfmpegErrorString(ret), LogLevel::Error);
         return;
     }
 
@@ -201,11 +202,11 @@ Stream::Stream(const std::string& filename, const uint32_t bufferLength,
         static_cast<AVPixelFormat>(tempFormat->streams[index]->codecpar->format) :
         tempCodec->sw_pix_fmt;
     const bool formatRequired =
-        (format != PixelFormat::Auto && format != getPixelFormat(static_cast<AVPixelFormat>(inFormat)));
+        (format != PixelFormat::Auto && format != Ffr::getPixelFormat(static_cast<AVPixelFormat>(inFormat)));
 
     // Check if the pixel format is a known format
-    if (getPixelFormat(static_cast<AVPixelFormat>(inFormat)) == PixelFormat::Auto) {
-        log("Unknown output pixel format, Manual format conversion must be used: "s += filename, LogLevel::Error);
+    if (Ffr::getPixelFormat(static_cast<AVPixelFormat>(inFormat)) == PixelFormat::Auto) {
+        log("Unknown output pixel format, Manual format conversion must be used: "s += fileName, LogLevel::Error);
         return;
     }
 
@@ -265,7 +266,7 @@ bool Stream::initialise() noexcept
     return true;
 }
 
-variant<bool, shared_ptr<Stream>> Stream::getStream(const string& filename, const DecoderOptions& options) noexcept
+variant<bool, shared_ptr<Stream>> Stream::getStream(const string& fileName, const DecoderOptions& options) noexcept
 {
     // Create the device context
     shared_ptr<DecoderContext> deviceContext = nullptr;
@@ -279,7 +280,7 @@ variant<bool, shared_ptr<Stream>> Stream::getStream(const string& filename, cons
 
     // Create the new stream
     const bool outputHost = options.m_outputHost && (options.m_type != DecodeType::Software);
-    shared_ptr<Stream> stream = shared_ptr<Stream>(new Stream(filename, options.m_bufferLength, deviceContext,
+    shared_ptr<Stream> stream = shared_ptr<Stream>(new Stream(fileName, options.m_bufferLength, deviceContext,
         outputHost, options.m_crop, options.m_scale, options.m_format));
     if (stream->m_codecContext.get() == nullptr) {
         // stream creation failed
@@ -319,6 +320,14 @@ double Stream::getAspectRatio() const noexcept
         return av_q2d(av_mul_q(av_make_q(getWidth(), getHeight()), m_codecContext->sample_aspect_ratio));
     }
     return static_cast<double>(getWidth()) / static_cast<double>(getHeight());
+}
+
+PixelFormat Stream::getPixelFormat() const noexcept
+{
+    if (m_filterGraph.get() != nullptr) {
+        return m_filterGraph->getPixelFormat();
+    }
+    return Ffr::getPixelFormat(m_codecContext->sw_pix_fmt);
 }
 
 int64_t Stream::getTotalFrames() const noexcept

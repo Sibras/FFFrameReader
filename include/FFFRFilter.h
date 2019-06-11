@@ -102,6 +102,12 @@ public:
     [[nodiscard]] double getAspectRatio() const noexcept;
 
     /**
+     * Gets pixel format of output frames.
+     * @returns The pixel format.
+     */
+    [[nodiscard]] PixelFormat getPixelFormat() const noexcept;
+
+    /**
      * Gets the frame rate (fps) of the output frames.
      * @note This will not be fully accurate when dealing with VFR video streams.
      * @returns The frame rate in frames per second.

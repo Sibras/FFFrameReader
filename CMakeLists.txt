@@ -63,6 +63,7 @@ set(FFFR_SOURCES
     source/FFFRDecoderContext.cpp
     source/FFFRFilter.cpp
     source/FFFRFrame.cpp
+    source/FFFREncoder.cpp
     source/FFFRUtility.cpp
     source/FFFRFormatConvert.cu
     include/FFFRDecoderContext.h
@@ -75,6 +76,7 @@ set(FFFR_HEADERS
     include/FFFrameReader.h
     include/FFFRStream.h
     include/FFFRFrame.h
+    include/FFFREncoder.h
 )
 
 # Add source to this project's executable.
@@ -172,6 +174,7 @@ if(BUILD_TESTING)
         test/FFFRTestDecode.cpp
         test/FFFRTestFrame.cpp
         test/FFFRTestFilter.cpp
+        test/FFFRTestEncode.cpp
     )
 
     add_executable(FFFRTest ${FFFR_TEST_SOURCES})
