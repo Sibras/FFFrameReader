@@ -16,6 +16,7 @@
 #include "FFFRUtility.h"
 #include "FFFrameReader.h"
 
+#include <cuda.h>
 #include <nppi_color_conversion.h>
 #include <string>
 
@@ -108,11 +109,18 @@ int32_t getImageSize(const PixelFormat format, const uint32_t width, const uint3
     return av_image_get_buffer_size(getPixelFormat(format), width, height, 32);
 }
 
-extern bool convertNV12ToRGB8P(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
+extern cudaError_t convertNV12ToRGB8P(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
     uint8_t* dest[3], uint32_t destStep);
 
-extern bool convertNV12ToRGB32FP(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
+extern cudaError_t convertNV12ToRGB32FP(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
     uint8_t* dest[3], uint32_t destStep);
+
+static NppStatus cudaErrorToNppStatus(cudaError_t err) {
+    if (err == cudaSuccess) {
+        return NPP_SUCCESS;
+    }
+    return NPP_CUDA_KERNEL_EXECUTION_ERROR;
+}
 
 bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], const PixelFormat outFormat) noexcept
 {
@@ -209,13 +217,13 @@ bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], cons
                 }
                 case PixelFormat::GBR8P: {
                     av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::GBR8P), roi.width);
-                    ret = static_cast<NppStatus>(
+                    ret = cudaErrorToNppStatus(
                         convertNV12ToRGB8P(inMem, data1.second, roi.width, roi.height, outMem, outStep[0]));
                     break;
                 }
                 case PixelFormat::GBR32FP: {
                     av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::GBR32FP), roi.width);
-                    ret = static_cast<NppStatus>(
+                    ret = cudaErrorToNppStatus(
                         convertNV12ToRGB32FP(inMem, data1.second, roi.width, roi.height, outMem, outStep[0]));
                     break;
                 }
@@ -277,6 +285,9 @@ bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], cons
     if (ret != NPP_SUCCESS) {
         if (ret == NPP_ERROR_RESERVED) {
             log("Format conversion not currently supported", LogLevel::Error);
+        } else if (ret == NPP_CUDA_KERNEL_EXECUTION_ERROR) {
+            log("CUDA kernel for format conversion failed: "s +=
+                cudaGetErrorName(cudaGetLastError()), LogLevel::Error);
         } else {
             log("Format conversion failed: "s += to_string(ret), LogLevel::Error);
         }

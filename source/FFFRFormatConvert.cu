@@ -112,7 +112,7 @@ __forceinline__ int divUp(const uint32_t total, const uint32_t grain)
     return (total + grain - 1) / grain;
 }
 
-bool convertNV12ToRGB8P(const uint8_t* const source[2], const uint32_t sourceStep, const uint32_t width,
+cudaError_t convertNV12ToRGB8P(const uint8_t* const source[2], const uint32_t sourceStep, const uint32_t width,
     const uint32_t height, uint8_t* dest[3], const uint32_t destStep)
 {
     const dim3 blockDim(8, 8, 1);
@@ -120,10 +120,10 @@ bool convertNV12ToRGB8P(const uint8_t* const source[2], const uint32_t sourceSte
 
     convertNV12ToRGBP<char3><<<gridDim, blockDim>>>(source, sourceStep, width, height, dest, destStep);
 
-    return cudaGetLastError() == cudaSuccess;
+    return cudaPeekAtLastError();
 }
 
-bool convertNV12ToRGB32FP(const uint8_t* const source[2], const uint32_t sourceStep, const uint32_t width,
+cudaError_t convertNV12ToRGB32FP(const uint8_t* const source[2], const uint32_t sourceStep, const uint32_t width,
     const uint32_t height, uint8_t* dest[3], const uint32_t destStep)
 {
     const dim3 blockDim(8, 8, 1);
@@ -131,6 +131,6 @@ bool convertNV12ToRGB32FP(const uint8_t* const source[2], const uint32_t sourceS
 
     convertNV12ToRGBP<char3><<<gridDim, blockDim>>>(source, sourceStep, width, height, dest, destStep);
 
-    return cudaGetLastError() == cudaSuccess;
+    return cudaPeekAtLastError();
 }
 } // namespace Ffr
