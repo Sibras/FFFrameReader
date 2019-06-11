@@ -227,11 +227,25 @@ private:
     [[nodiscard]] int64_t timeToTimeStamp(int64_t time) const noexcept;
 
     /**
+     * Convert a time value represented in microseconds (AV_TIME_BASE) to the codec timebase.
+     * @param time The time in microseconds (AV_TIME_BASE).
+     * @return The converted time stamp.
+     */
+    [[nodiscard]] int64_t timeToTimeStamp2(int64_t time) const noexcept;
+
+    /**
      * Convert a stream timebase to a time value represented in microseconds (AV_TIME_BASE).
      * @param timeStamp The time stamp represented in the streams internal time base.
      * @return The converted time.
      */
     [[nodiscard]] int64_t timeStampToTime(int64_t timeStamp) const noexcept;
+
+    /**
+     * Convert a codec timebase to a time value represented in microseconds (AV_TIME_BASE).
+     * @param timeStamp The time stamp represented in the codec internal time base.
+     * @return The converted time.
+     */
+    [[nodiscard]] int64_t timeStampToTime2(int64_t timeStamp) const noexcept;
 
     /**
      * Convert a zero-based frame number to the stream timebase.
@@ -242,12 +256,28 @@ private:
     [[nodiscard]] int64_t frameToTimeStamp(int64_t frame) const noexcept;
 
     /**
+     * Convert a zero-based frame number to the codec timebase.
+     * @note This will not be fully accurate when dealing with VFR video streams.
+     * @param frame The zero-based frame number
+     * @return The converted time stamp.
+     */
+    [[nodiscard]] int64_t frameToTimeStamp2(int64_t frame) const noexcept;
+
+    /**
      * Convert stream based time stamp to an equivalent zero-based frame number.
      * @note This will not be fully accurate when dealing with VFR video streams.
      * @param timeStamp The time stamp represented in the streams internal time base.
      * @return The converted frame index.
      */
     [[nodiscard]] int64_t timeStampToFrame(int64_t timeStamp) const noexcept;
+
+    /**
+     * Convert codec based time stamp to an equivalent zero-based frame number.
+     * @note This will not be fully accurate when dealing with VFR video streams.
+     * @param timeStamp The time stamp represented in the codecs internal time base.
+     * @return The converted frame index.
+     */
+    [[nodiscard]] int64_t timeStampToFrame2(int64_t timeStamp) const noexcept;
 
     /**
      * Convert a zero-based frame number to time value represented in microseconds (AV_TIME_BASE).
@@ -258,12 +288,28 @@ private:
     [[nodiscard]] int64_t frameToTime(int64_t frame) const noexcept;
 
     /**
+     * Convert a zero-based codec frame number to time value represented in microseconds (AV_TIME_BASE).
+     * @note This will not be fully accurate when dealing with VFR video streams.
+     * @param frame The zero-based frame number
+     * @return The converted time.
+     */
+    [[nodiscard]] int64_t frameToTime2(int64_t frame) const noexcept;
+
+    /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to a zero-based frame number.
      * @note This will not be fully accurate when dealing with VFR video streams.
      * @param time The time in microseconds (AV_TIME_BASE).
      * @return The converted frame index.
      */
     [[nodiscard]] int64_t timeToFrame(int64_t time) const noexcept;
+
+    /**
+     * Convert a time value represented in microseconds (AV_TIME_BASE) to a zero-based codec frame number.
+     * @note This will not be fully accurate when dealing with VFR video streams.
+     * @param time The time in microseconds (AV_TIME_BASE).
+     * @return The converted frame index.
+     */
+    [[nodiscard]] int64_t timeToFrame2(int64_t time) const noexcept;
 
     /**
      * Decodes the next block of frames into the pong buffer. Once complete swaps the ping/pong buffers.

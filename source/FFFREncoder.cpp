@@ -142,7 +142,7 @@ Encoder::Encoder(const std::string& fileName, const std::shared_ptr<Stream>& str
     tempCodec->width = stream->getWidth();
     tempCodec->sample_aspect_ratio = stream->m_codecContext->sample_aspect_ratio;
     tempCodec->pix_fmt = getPixelFormat(stream->getPixelFormat());
-    tempCodec->time_base = stream->m_formatContext->streams[stream->m_index]->time_base;
+    tempCodec->time_base = stream->m_codecContext->time_base;
     av_opt_set_int(tempCodec.get(), "refcounted_frames", 1, 0);
 
     if (tempFormat->oformat->flags & AVFMT_GLOBALHEADER) {

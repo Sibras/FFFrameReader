@@ -132,6 +132,8 @@ Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
         return;
     }
 
+    tempCodec->framerate = av_guess_frame_rate(tempFormat.get(), stream, nullptr);
+
     tempCodec->pkt_timebase = stream->time_base;
     av_opt_set_int(tempCodec.get(), "refcounted_frames", 1, 0);
 
@@ -256,11 +258,11 @@ bool Stream::initialise() noexcept
     const auto startTime = m_bufferPing.front()->getTimeStamp();
     if (startTime != 0) {
         m_startTimeStamp = 0;
-        m_startTimeStamp = timeToTimeStamp(m_bufferPing.front()->getTimeStamp());
+        m_startTimeStamp = timeToTimeStamp(startTime);
         // Loop through all current frames and fix the time stamps
         for (auto& i : m_bufferPing) {
             i->m_timeStamp -= startTime;
-            i->m_frameNum = timeToFrame(i->m_timeStamp);
+            i->m_frameNum = timeToFrame2(i->m_timeStamp);
         }
     }
     return true;
@@ -438,11 +440,22 @@ int64_t Stream::timeToTimeStamp(const int64_t time) const noexcept
         av_rescale_q(time, av_make_q(1, AV_TIME_BASE), m_formatContext->streams[m_index]->time_base);
 }
 
+int64_t Stream::timeToTimeStamp2(const int64_t time) const noexcept
+{
+    return av_rescale_q(time, av_make_q(1, AV_TIME_BASE), m_codecContext->time_base);
+}
+
 int64_t Stream::timeStampToTime(const int64_t timeStamp) const noexcept
 {
     // Perform opposite operation to timeToTimeStamp
     return av_rescale_q(
         timeStamp - m_startTimeStamp, m_formatContext->streams[m_index]->time_base, av_make_q(1, AV_TIME_BASE));
+}
+
+int64_t Stream::timeStampToTime2(const int64_t timeStamp) const noexcept
+{
+    // Perform opposite operation to timeToTimeStamp
+    return av_rescale_q(timeStamp, m_codecContext->time_base, av_make_q(1, AV_TIME_BASE));
 }
 
 int64_t Stream::frameToTimeStamp(const int64_t frame) const noexcept
@@ -452,10 +465,20 @@ int64_t Stream::frameToTimeStamp(const int64_t frame) const noexcept
             m_formatContext->streams[m_index]->time_base);
 }
 
+int64_t Stream::frameToTimeStamp2(const int64_t frame) const noexcept
+{
+    return av_rescale_q(frame, av_inv_q(m_codecContext->framerate), m_codecContext->time_base);
+}
+
 int64_t Stream::timeStampToFrame(const int64_t timeStamp) const noexcept
 {
-    return av_rescale_q(timeStamp - m_startTimeStamp, m_formatContext->streams[m_index]->r_frame_rate,
-        av_inv_q(m_formatContext->streams[m_index]->time_base));
+    return av_rescale_q(timeStamp - m_startTimeStamp, m_formatContext->streams[m_index]->time_base,
+        av_inv_q(m_formatContext->streams[m_index]->r_frame_rate));
+}
+
+int64_t Stream::timeStampToFrame2(const int64_t timeStamp) const noexcept
+{
+    return av_rescale_q(timeStamp, m_codecContext->time_base, av_inv_q(m_codecContext->framerate));
 }
 
 int64_t Stream::frameToTime(const int64_t frame) const noexcept
@@ -463,9 +486,19 @@ int64_t Stream::frameToTime(const int64_t frame) const noexcept
     return av_rescale_q(frame, av_make_q(AV_TIME_BASE, 1), m_formatContext->streams[m_index]->r_frame_rate);
 }
 
+int64_t Stream::frameToTime2(const int64_t frame) const noexcept
+{
+    return av_rescale_q(frame, av_make_q(AV_TIME_BASE, 1), m_codecContext->framerate);
+}
+
 int64_t Stream::timeToFrame(const int64_t time) const noexcept
 {
     return av_rescale_q(time, av_make_q(1, AV_TIME_BASE), av_inv_q(m_formatContext->streams[m_index]->r_frame_rate));
+}
+
+int64_t Stream::timeToFrame2(const int64_t time) const noexcept
+{
+    return av_rescale_q(time, av_make_q(1, AV_TIME_BASE), av_inv_q(m_codecContext->framerate));
 }
 
 bool Stream::decodeNextBlock() noexcept
@@ -498,6 +531,8 @@ bool Stream::decodeNextBlock() noexcept
 
             if (m_index == packet.stream_index) {
                 ++i;
+                // Convert timebase
+                av_packet_rescale_ts(&packet, m_formatContext->streams[0]->time_base, m_codecContext->time_base);
                 ret = avcodec_send_packet(m_codecContext.get(), &packet);
                 if (ret == AVERROR(EAGAIN)) {
                     // Cannot add any more packets as must decode what we have first
@@ -514,7 +549,7 @@ bool Stream::decodeNextBlock() noexcept
                 // Increase the number of maxPackets if we are really close to just finishing the stream anyway
                 if (i == (maxPackets - 1)) {
                     const auto timeStamp = packet.pts != AV_NOPTS_VALUE ? packet.pts : packet.dts;
-                    if (timeStampToFrame(timeStamp) >= (m_totalFrames - 2)) {
+                    if (timeStampToFrame2(timeStamp) >= (m_totalFrames - 2)) {
                         maxPackets += 2;
                     }
                 }
@@ -611,31 +646,35 @@ bool Stream::decodeNextFrames() noexcept
             } else {
                 frame->best_effort_timestamp = frame->pkt_dts;
             }
-
-            if (frame->best_effort_timestamp == AV_NOPTS_VALUE) {
-                // Try and just rebuild it from the previous frame
-                frame->best_effort_timestamp = frameToTimeStamp(timeStampToFrame(m_lastDecodedTimeStamp) + 1);
-            }
         }
-        auto timeStamp = timeStampToTime(frame->best_effort_timestamp);
-        auto frameNum = timeStampToFrame(frame->best_effort_timestamp);
+        int64_t offsetTimeStamp = frame->best_effort_timestamp;
+        if (offsetTimeStamp == AV_NOPTS_VALUE) {
+            // Try and just rebuild it from the previous frame
+            offsetTimeStamp = frameToTimeStamp2(timeStampToFrame2(m_lastDecodedTimeStamp) + 1);
+        } else if (m_startTimeStamp != 0) {
+            // Remove the start time from calculations
+            offsetTimeStamp -=
+                av_rescale_q(m_startTimeStamp, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
+        }
+        auto timeStamp = timeStampToTime2(offsetTimeStamp);
+        auto frameNum = timeStampToFrame2(offsetTimeStamp);
 
         // Check if we have skipped a frame
-        const auto previous = timeStampToFrame(m_lastDecodedTimeStamp);
+        const auto previous = timeStampToFrame2(m_lastDecodedTimeStamp);
         if (frameNum != previous + 1 && m_lastDecodedTimeStamp != -1) {
             // Fill in missing frames by duplicating the old one
             auto fillFrameNum = previous;
             int64_t fillTimeStamp;
             for (auto i = previous + 1; i < frameNum; i++) {
                 ++fillFrameNum;
-                fillTimeStamp = frameToTime(fillFrameNum);
+                fillTimeStamp = frameToTime2(fillFrameNum);
                 Frame::FramePtr frameClone(av_frame_clone(*frame));
                 m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum, thisPtr));
             }
         }
 
         // Store last decoded pts
-        m_lastDecodedTimeStamp = frame->best_effort_timestamp;
+        m_lastDecodedTimeStamp = offsetTimeStamp;
 
         // Perform any required filtering
         if (m_filterGraph != nullptr) {
@@ -763,7 +802,7 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
     // Seek to desired timestamp
     avcodec_flush_buffers(m_codecContext.get());
     m_lastDecodedTimeStamp = -1;
-    const auto localTimeStamp = timeToTimeStamp(timeStamp) + m_startTimeStamp;
+    const auto localTimeStamp = timeToTimeStamp(timeStamp);
     const auto err = avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
         log("Failed seeking to specified time stamp "s += to_string(timeStamp) += getFfmpegErrorString(err),
