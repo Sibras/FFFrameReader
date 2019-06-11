@@ -89,22 +89,22 @@ bool DecoderOptions::operator<(const DecoderOptions& other) const noexcept
     return this->m_device < other.m_device;
 }
 
-void setLogLevel(const LogLevel level)
+void setLogLevel(const LogLevel level) noexcept
 {
     av_log_set_level(static_cast<int>(level));
 }
 
-void log(const std::string& text, const LogLevel level)
+void log(const std::string& text, const LogLevel level) noexcept
 {
     av_log(nullptr, static_cast<int>(level), "%s\n", text.c_str());
 }
 
-int32_t getPixelFormatPlanes(const PixelFormat format)
+int32_t getPixelFormatPlanes(const PixelFormat format) noexcept
 {
     return av_pix_fmt_count_planes(getPixelFormat(format));
 }
 
-int32_t getImageSize(const PixelFormat format, const uint32_t width, const uint32_t height)
+int32_t getImageSize(const PixelFormat format, const uint32_t width, const uint32_t height) noexcept
 {
     return av_image_get_buffer_size(getPixelFormat(format), width, height, 32);
 }
@@ -131,13 +131,13 @@ public:
     {
         // This only supports cuda frames
         if (frame->getDataType() != DecodeType::Cuda) {
-            log("Only CUDA frames are currently supported by convertFormat", LogLevel::Error);
+            log("Only CUDA frames are currently supported by convertFormat"s, LogLevel::Error);
             return false;
         }
         auto* framesContext = reinterpret_cast<AVHWFramesContext*>(frame->m_frame->hw_frames_ctx->data);
         auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(framesContext->device_ctx->hwctx);
         if (cuCtxPushCurrent(cudaDevice->cuda_ctx) != CUDA_SUCCESS) {
-            log("Failed to set CUDA context", LogLevel::Error);
+            log("Failed to set CUDA context"s, LogLevel::Error);
             return false;
         }
 
@@ -151,7 +151,7 @@ public:
             case PixelFormat::YUV420P: {
                 const auto data2 = frame->getFrameData(2);
                 const auto data3 = frame->getFrameData(3);
-                uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
+                const uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
                 int32_t inStep[3] = {data1.second, data2.second, data3.second};
                 switch (outFormat) {
                     case PixelFormat::GBR8P: {
@@ -173,7 +173,7 @@ public:
             case PixelFormat::YUV422P: {
                 const auto data2 = frame->getFrameData(2);
                 const auto data3 = frame->getFrameData(3);
-                uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
+                const uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
                 int32_t inStep[3] = {data1.second, data2.second, data3.second};
                 switch (outFormat) {
                     case PixelFormat::GBR8P: {
@@ -195,7 +195,7 @@ public:
             case PixelFormat::YUV444P: {
                 const auto data2 = frame->getFrameData(2);
                 const auto data3 = frame->getFrameData(3);
-                uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
+                const uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
                 switch (outFormat) {
                     case PixelFormat::GBR8P: {
                         av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::GBR8P), roi.width);
@@ -215,7 +215,7 @@ public:
             }
             case PixelFormat::NV12: {
                 const auto data2 = frame->getFrameData(2);
-                uint8_t* inMem[2] = {data1.first, data2.first};
+                const uint8_t* inMem[2] = {data1.first, data2.first};
                 switch (outFormat) {
                     case PixelFormat::RGB8: {
                         av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::RGB8), roi.width);
@@ -269,7 +269,7 @@ public:
             case PixelFormat::GBR8P: {
                 const auto data2 = frame->getFrameData(2);
                 const auto data3 = frame->getFrameData(3);
-                uint8_t* inMem[3] = {data3.first, data1.first, data2.first};
+                const uint8_t* inMem[3] = {data3.first, data1.first, data2.first};
                 switch (outFormat) {
                     case PixelFormat::YUV444P: {
                         av_image_fill_linesizes(outStep, getPixelFormat(PixelFormat::YUV444P), roi.width);

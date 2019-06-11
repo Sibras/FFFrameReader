@@ -223,7 +223,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format,
     m_sink = bufferOutContext;
 }
 
-bool Filter::sendFrame(Frame::FramePtr& frame) const
+bool Filter::sendFrame(Frame::FramePtr& frame) const noexcept
 {
     const auto err = av_buffersrc_add_frame(m_source, *frame);
     if (err < 0) {
@@ -233,7 +233,7 @@ bool Filter::sendFrame(Frame::FramePtr& frame) const
     return true;
 }
 
-bool Filter::receiveFrame(Frame::FramePtr& frame) const
+bool Filter::receiveFrame(Frame::FramePtr& frame) const noexcept
 {
     // Get the next available frame
     const auto err = av_buffersink_get_frame(m_sink, *frame);

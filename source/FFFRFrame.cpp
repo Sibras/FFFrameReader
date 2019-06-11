@@ -129,7 +129,7 @@ PixelFormat Frame::getPixelFormat() const noexcept
     return Ffr::getPixelFormat(framesContext->sw_format);
 }
 
-int32_t Frame::getNumberFrames()
+int32_t Frame::getNumberFrames() const noexcept
 {
     if (m_frame->hw_frames_ctx == nullptr) {
         return av_pix_fmt_count_planes(static_cast<AVPixelFormat>(m_frame->format));

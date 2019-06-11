@@ -73,14 +73,14 @@ public:
      * @param [in,out] frame The input frame.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool sendFrame(Frame::FramePtr& frame) const;
+    [[nodiscard]] bool sendFrame(Frame::FramePtr& frame) const noexcept;
 
     /**
      * Receive frame from filter graph
      * @param [in,out] frame The frame.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool receiveFrame(Frame::FramePtr& frame) const;
+    [[nodiscard]] bool receiveFrame(Frame::FramePtr& frame) const noexcept;
 
     /**
      * Gets the width of output frames.

@@ -34,21 +34,21 @@ enum class LogLevel : int32_t
  * Sets log level for all functions within FfFrameReader.
  * @param level The level.
  */
-void setLogLevel(LogLevel level);
+void setLogLevel(LogLevel level) noexcept;
 
 /**
  * Logs text to default output.
  * @param text  The text.
  * @param level (Optional) The logging level.
  */
-void log(const std::string& text, LogLevel level = LogLevel::Info);
+void log(const std::string& text, LogLevel level = LogLevel::Info) noexcept;
 
 /**
  * Gets number of planes for an image of the specified pixel format
  * @param format Describes the pixel format.
  * @returns The number of planes (YUV420P has 3, RGB8 has 1 etc.) or negative value if invalid format.
  */
-int32_t getPixelFormatPlanes(PixelFormat format);
+int32_t getPixelFormatPlanes(PixelFormat format) noexcept;
 
 /**
  * Gets image size for frame with specified properties
@@ -57,7 +57,7 @@ int32_t getPixelFormatPlanes(PixelFormat format);
  * @param height The height.
  * @returns The image size or negative value if error.
  */
-int32_t getImageSize(PixelFormat format, uint32_t width, uint32_t height);
+int32_t getImageSize(PixelFormat format, uint32_t width, uint32_t height) noexcept;
 
 /**
  * Convert pixel format using cuda.

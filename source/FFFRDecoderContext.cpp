@@ -126,7 +126,7 @@ DecoderContext::DecoderContext(const DecodeType type, const std::any& context, c
                     log("Specified device context does not match the required type"s, LogLevel::Error);
                     return;
                 }
-                auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(deviceContext->hwctx);
+                auto* cudaDevice = static_cast<AVCUDADeviceContext*>(deviceContext->hwctx);
                 try {
                     cudaDevice->cuda_ctx = any_cast<CUcontext>(context);
                 } catch (...) {

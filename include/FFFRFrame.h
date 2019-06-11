@@ -138,7 +138,7 @@ public:
      * Gets number of planes for an image of the specified pixel format
      * @returns The number of planes (YUV420P has 3, RGB8 has 1 etc.) or negative value if invalid format.
      */
-    [[nodiscard]] int32_t getNumberFrames();
+    [[nodiscard]] int32_t getNumberFrames() const noexcept;
 
     /**
      * Gets the type of memory used to store the image.

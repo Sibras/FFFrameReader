@@ -236,8 +236,8 @@ Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
     minFrames = (m_bufferLength >= minFrames) ? m_bufferLength : minFrames;
 
     // Allocate ping and pong buffers
-    m_bufferPing.reserve(minFrames * 2);
-    m_bufferPong.reserve(minFrames * 2);
+    m_bufferPing.reserve(static_cast<size_t>(minFrames) * 2);
+    m_bufferPong.reserve(static_cast<size_t>(minFrames) * 2);
 
     // Set stream start time and numbers of frames
     m_startTimeStamp = getStreamStartTime();
@@ -522,6 +522,7 @@ bool Stream::decodeNextBlock() noexcept
             auto ret = av_read_frame(m_formatContext.get(), &packet);
             if (ret < 0) {
                 if (ret != AVERROR_EOF) {
+                    av_packet_unref(&packet);
                     log("Failed to retrieve new frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
                     return false;
                 }
@@ -537,6 +538,7 @@ bool Stream::decodeNextBlock() noexcept
                 if (ret == AVERROR(EAGAIN)) {
                     // Cannot add any more packets as must decode what we have first
                     if (!decodeNextFrames()) {
+                        av_packet_unref(&packet);
                         return false;
                     }
                     ret = avcodec_send_packet(m_codecContext.get(), &packet);
