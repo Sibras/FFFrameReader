@@ -353,11 +353,7 @@ double Stream::getFrameRate() const noexcept
 
 uint32_t Stream::getFrameSize() const noexcept
 {
-    if (m_filterGraph.get() != nullptr) {
-        return m_filterGraph->getFrameSize();
-    }
-    return av_image_get_buffer_size(
-        static_cast<AVPixelFormat>(m_codecContext->pix_fmt), m_codecContext->width, m_codecContext->height, 32);
+    return av_image_get_buffer_size(Ffr::getPixelFormat(getPixelFormat()), getWidth(), getHeight(), 32);
 }
 
 variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
