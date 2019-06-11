@@ -28,6 +28,7 @@ class Frame
     friend class Stream;
     friend class Filter;
     friend class Encoder;
+    friend class FFR;
 
     class FramePtr
     {
@@ -35,6 +36,7 @@ class Frame
         friend class Filter;
         friend class Stream;
         friend class Encoder;
+        friend class FFR;
 
     public:
         ~FramePtr() noexcept;
@@ -139,7 +141,7 @@ public:
     [[nodiscard]] int32_t getNumberFrames();
 
     /**
-     * Gets the type of memeory used to store the image.
+     * Gets the type of memory used to store the image.
      * @returns The data type.
      */
     [[nodiscard]] DecodeType getDataType() const noexcept;

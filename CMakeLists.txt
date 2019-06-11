@@ -99,7 +99,7 @@ set_target_properties(FfFrameReader PROPERTIES
     SOVERSION 0
     VERSION ${PROJECT_VERSION}
     PUBLIC_HEADER "${FFFR_HEADERS}"
-    CUDA_SEPERABLE_COMPILATION ON
+    CUDA_SEPARABLE_COMPILATION ON
 )
 
 # Enable all compile warnings
@@ -129,6 +129,8 @@ find_library(SWRESAMPLE_LIBRARY NAMES swresample)
 # Find required cuda npicc library
 find_library(CUDA_nppicc_LIBRARY NAMES nppicc
         PATHS ${CMAKE_CUDA_HOST_IMPLICIT_LINK_DIRECTORIES})
+find_library(CUDA_LIBRARY NAMES cuda
+        PATHS ${CMAKE_CUDA_HOST_IMPLICIT_LINK_DIRECTORIES})
 
 target_include_directories(FfFrameReader PRIVATE
     ${PROJECT_SOURCE_DIR}/include
@@ -146,6 +148,7 @@ target_link_libraries(FfFrameReader
     PRIVATE ${SWSCALE_LIBRARY}
     PRIVATE ${POSTPROC_LIBRARY}
     PRIVATE ${SWRESAMPLE_LIBRARY}
+    PRIVATE ${CUDA_LIBRARY}
     PRIVATE ${CUDA_nppicc_LIBRARY}
 )
 
