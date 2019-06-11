@@ -126,11 +126,7 @@ find_library(SWSCALE_LIBRARY NAMES swscale)
 find_library(POSTPROC_LIBRARY NAMES postproc)
 find_library(SWRESAMPLE_LIBRARY NAMES swresample)
 
-# Find required cuda npicc library
-find_library(CUDA_nppicc_LIBRARY NAMES nppicc
-        PATHS ${CMAKE_CUDA_HOST_IMPLICIT_LINK_DIRECTORIES})
-find_library(CUDA_LIBRARY NAMES cuda
-        PATHS ${CMAKE_CUDA_HOST_IMPLICIT_LINK_DIRECTORIES})
+find_package(CUDA QUIET REQUIRED)
 
 target_include_directories(FfFrameReader PRIVATE
     ${PROJECT_SOURCE_DIR}/include
@@ -148,7 +144,7 @@ target_link_libraries(FfFrameReader
     PRIVATE ${SWSCALE_LIBRARY}
     PRIVATE ${POSTPROC_LIBRARY}
     PRIVATE ${SWRESAMPLE_LIBRARY}
-    PRIVATE ${CUDA_LIBRARY}
+    PRIVATE ${CUDA_CUDA_LIBRARY}
     PRIVATE ${CUDA_nppicc_LIBRARY}
 )
 
@@ -192,7 +188,6 @@ if(BUILD_TESTING)
         PRIVATE FfFrameReader
         PRIVATE GTest::GTest
         PRIVATE GTest::Main
-        PRIVATE ${CUDA_LIBRARY}
     )
 
     set_target_properties(
