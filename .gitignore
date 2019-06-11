@@ -35,3 +35,13 @@
 .vs/
 build/
 install/
+
+# Video files
+*.mp4
+*.m4v
+*.mkv
+*.avi
+*.mxf
+*.MP4
+*.AVI
+*.MXF
