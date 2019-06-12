@@ -71,6 +71,11 @@ TEST_P(StreamTest1, getFrameRate)
     ASSERT_DOUBLE_EQ(m_stream->getFrameRate(), GetParam().m_frameRate);
 }
 
+TEST_P(StreamTest1, getPixelFormat)
+{
+    ASSERT_EQ(m_stream->getPixelFormat(), GetParam().m_format);
+}
+
 TEST_P(StreamTest1, seek)
 {
     constexpr int64_t seekFrames = 80;

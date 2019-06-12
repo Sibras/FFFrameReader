@@ -37,12 +37,12 @@ static std::vector<TestParamsDecode> g_testDataDecode = {
     {0, true, true, true},
 };
 
-class Decoder
+class TestDecoder
 {
 public:
-    Decoder() = default;
+    TestDecoder() = default;
 
-    ~Decoder()
+    ~TestDecoder()
     {
         m_stream = nullptr;
         if (m_cudaContext != nullptr) {
@@ -103,7 +103,7 @@ protected:
         m_decoder.TearDown();
     }
 
-    Decoder m_decoder;
+    TestDecoder m_decoder;
 };
 
 TEST_P(DecodeTest1, getDecodeType)
@@ -116,6 +116,14 @@ TEST_P(DecodeTest1, getDecodeType)
     } else {
         ASSERT_EQ(frame1->getDataType(), Ffr::DecodeType::Software);
     }
+}
+
+TEST_P(DecodeTest1, getPixelFormat)
+{
+    const auto ret1 = m_decoder.m_stream->getNextFrame();
+    ASSERT_NE(ret1.index(), 0);
+    const auto frame1 = std::get<1>(ret1);
+    ASSERT_EQ(frame1->getPixelFormat(), g_testData[GetParam().m_testDataIndex].m_format);
 }
 
 TEST_P(DecodeTest1, getLoop25)
@@ -143,9 +151,9 @@ TEST_P(DecodeTest1, getLoop25)
 TEST_P(DecodeTest1, getMultiple)
 {
     // Create additional streams
-    Decoder test2;
+    TestDecoder test2;
     test2.SetUp(GetParam());
-    Decoder test3;
+    TestDecoder test3;
     test3.SetUp(GetParam());
     const auto ret1 = m_decoder.m_stream->getNextFrame();
     ASSERT_NE(ret1.index(), 0);

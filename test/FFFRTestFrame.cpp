@@ -71,4 +71,9 @@ TEST_P(FrameTest1, getAspectRatio)
     ASSERT_DOUBLE_EQ(m_frame->getAspectRatio(), GetParam().m_aspectRatio);
 }
 
+TEST_P(FrameTest1, getPixelFormat)
+{
+    ASSERT_EQ(m_frame->getPixelFormat(), GetParam().m_format);
+}
+
 INSTANTIATE_TEST_SUITE_P(FrameTestData, FrameTest1, ::testing::ValuesIn(g_testData));

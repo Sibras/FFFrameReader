@@ -249,7 +249,7 @@ bool Stream::initialise() noexcept
 {
     // Decode the first couple of frames (must be done to ensure codec parameters are properly filled)
     const auto backup = m_bufferLength;
-    m_bufferLength = 2;
+    m_bufferLength = 1;
     if (peekNextFrame().index() == 0) {
         return false;
     }
