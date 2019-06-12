@@ -28,18 +28,17 @@ protected:
     void SetUp() override
     {
         setLogLevel(LogLevel::Warning);
-        auto ret = Stream::getStream(GetParam().m_fileName);
-        ASSERT_NE(ret.index(), 0);
-        m_stream = std::get<1>(ret);
-        const auto ret1 = m_stream->getNextFrame();
-        ASSERT_NE(ret1.index(), 0);
-        m_frame = std::get<1>(ret1);
+        m_stream = Stream::getStream(GetParam().m_fileName);
+        ASSERT_NE(m_stream, nullptr);
+        m_frame = m_stream->getNextFrame();
+        ASSERT_NE(m_frame, nullptr);
     }
 
     void TearDown() override
     {
-        m_frame = nullptr;
-        m_stream = nullptr;
+        m_stream.reset();
+        // Check what happens if stream destroyed before frame
+        m_frame.reset();
     }
 
     std::shared_ptr<Stream> m_stream = nullptr;

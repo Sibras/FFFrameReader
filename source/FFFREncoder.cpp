@@ -101,7 +101,7 @@ bool Encoder::encodeStream(
 {
     // Create the new encoder
     const shared_ptr<Encoder> encoder =
-        shared_ptr<Encoder>(new Encoder(fileName, stream, options.m_type, options.m_quality, options.m_preset));
+        make_shared<Encoder>(fileName, stream, options.m_type, options.m_quality, options.m_preset, ConstructorLock());
     if (stream->m_codecContext.get() == nullptr) {
         // Stream creation failed
         return false;
@@ -110,7 +110,7 @@ bool Encoder::encodeStream(
 }
 
 Encoder::Encoder(const std::string& fileName, const std::shared_ptr<Stream>& stream, const EncodeType codecType,
-    const uint8_t quality, const EncoderOptions::Preset preset) noexcept
+    const uint8_t quality, const EncoderOptions::Preset preset, ConstructorLock) noexcept
 {
     AVFormatContext* formatPtr = nullptr;
     auto ret = avformat_alloc_output_context2(&formatPtr, nullptr, nullptr, fileName.c_str());
@@ -200,14 +200,9 @@ bool Encoder::encodeStream() const noexcept
 {
     while (true) {
         // Get next frame
-        auto err = m_stream->getNextFrame();
-        if (err.index() == 0) {
-            try {
-                if (get<0>(err) == false) {
-                    return false;
-                }
-            } catch (...) {
-                // Should never get here
+        auto frame = m_stream->getNextFrame();
+        if (frame == nullptr) {
+            if (!m_stream->isEndOfFile()) {
                 return false;
             }
             // Send a flush frame
@@ -226,18 +221,12 @@ bool Encoder::encodeStream() const noexcept
             }
             return true;
         }
-        try {
-            auto frame = get<1>(err);
-            const auto ret = avcodec_send_frame(m_codecContext.get(), *frame->m_frame);
-            if (ret < 0) {
-                log("Failed to send packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
-                return false;
-            }
-            if (!encodeFrames()) {
-                return false;
-            }
-        } catch (...) {
-            // Should never get here
+        const auto ret = avcodec_send_frame(m_codecContext.get(), *frame->m_frame);
+        if (ret < 0) {
+            log("Failed to send packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+            return false;
+        }
+        if (!encodeFrames()) {
             return false;
         }
     }

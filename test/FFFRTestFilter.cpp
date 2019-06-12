@@ -54,14 +54,13 @@ protected:
         options.m_crop = GetParam().m_crop;
         options.m_format = GetParam().m_format;
         options.m_outputHost = false;
-        auto ret = Stream::getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
-        ASSERT_NE(ret.index(), 0);
-        m_stream = std::get<1>(ret);
+        m_stream = Stream::getStream(g_testData[GetParam().m_testDataIndex].m_fileName, options);
+        ASSERT_NE(m_stream, nullptr);
     }
 
     void TearDown() override
     {
-        m_stream = nullptr;
+        m_stream.reset();
     }
 
     std::shared_ptr<Stream> m_stream = nullptr;
@@ -72,9 +71,8 @@ TEST_P(FilterTest1, getWidth)
 {
     ASSERT_EQ(m_stream->getWidth(), GetParam().m_scale.m_width);
     // Test the output frame matches
-    const auto ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame = std::get<1>(ret1);
+    const auto frame = m_stream->getNextFrame();
+    ASSERT_NE(frame, nullptr);
     ASSERT_DOUBLE_EQ(frame->getWidth(), GetParam().m_scale.m_width);
 }
 
@@ -82,9 +80,8 @@ TEST_P(FilterTest1, getHeight)
 {
     ASSERT_EQ(m_stream->getHeight(), GetParam().m_scale.m_height);
     // Test the output frame matches
-    const auto ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame = std::get<1>(ret1);
+    const auto frame = m_stream->getNextFrame();
+    ASSERT_NE(frame, nullptr);
     ASSERT_DOUBLE_EQ(frame->getHeight(), GetParam().m_scale.m_height);
 }
 
@@ -92,9 +89,8 @@ TEST_P(FilterTest1, getAspectRatio)
 {
     ASSERT_DOUBLE_EQ(m_stream->getAspectRatio(), g_testData[GetParam().m_testDataIndex].m_aspectRatio);
     // Test the output frame matches
-    const auto ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame = std::get<1>(ret1);
+    const auto frame = m_stream->getNextFrame();
+    ASSERT_NE(frame, nullptr);
     ASSERT_DOUBLE_EQ(frame->getAspectRatio(), g_testData[GetParam().m_testDataIndex].m_aspectRatio);
 }
 
@@ -105,9 +101,8 @@ TEST_P(FilterTest1, getFrameRate)
 
 TEST_P(FilterTest1, getFormat)
 {
-    const auto ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame = std::get<1>(ret1);
+    const auto frame = m_stream->getNextFrame();
+    ASSERT_NE(frame, nullptr);
     const auto format = GetParam().m_format == PixelFormat::Auto ?
         GetParam().m_type == DecodeType::Cuda ? PixelFormat::NV12 : PixelFormat::YUV420P :
         GetParam().m_format;
@@ -120,13 +115,12 @@ TEST_P(FilterTest1, getLoop25)
     int64_t timeStamp = 0;
     int64_t frameNum = 0;
     for (int64_t i = 0; i < std::min(m_stream->getTotalFrames(), 25LL); i++) {
-        const auto ret1 = m_stream->getNextFrame();
-        if (ret1.index() == 0) {
+        const auto frame1 = m_stream->getNextFrame();
+        if (frame1 == nullptr) {
             ASSERT_EQ(timeStamp, m_stream->getDuration()); // Readout in case it failed
             ASSERT_EQ(i, m_stream->getTotalFrames());
         }
-        ASSERT_NE(ret1.index(), 0);
-        const auto frame1 = std::get<1>(ret1);
+        ASSERT_NE(frame1, nullptr);
         ASSERT_EQ(frame1->getTimeStamp(), timeStamp);
         const double timeStamp1 =
             (static_cast<double>(i + 1) * (1000000.0 / g_testData[GetParam().m_testDataIndex].m_frameRate));

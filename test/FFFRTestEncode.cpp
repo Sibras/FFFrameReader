@@ -35,6 +35,10 @@ static std::vector<TestParamsEncode> g_testDataEncode = {
     {1, "test2.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast},
     {1, "test3.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast},
     {1, "test4.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast},
+    {2, "test5.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast},
+    {2, "test6.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast},
+    {2, "test7.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast},
+    {2, "test8.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast},
 };
 
 class TestDecoder
@@ -49,15 +53,14 @@ public:
 
     void SetUp(const TestParamsEncode& params)
     {
-        const DecoderOptions options;
-        auto ret = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
-        ASSERT_NE(ret.index(), 0);
-        m_stream = std::get<1>(ret);
+        DecoderOptions options;
+        m_stream = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
+        ASSERT_NE(m_stream, nullptr);
     }
 
     void TearDown()
     {
-        m_stream = nullptr;
+        m_stream.reset();
     }
 
     std::shared_ptr<Stream> m_stream = nullptr;
@@ -70,7 +73,7 @@ protected:
 
     void SetUp() override
     {
-        setLogLevel(LogLevel::Error);
+        setLogLevel(LogLevel::Warning);
         m_decoder.SetUp(GetParam());
     }
 
@@ -88,14 +91,13 @@ TEST_P(EncodeTest1, encodeStream)
     options2.m_type = GetParam().m_encodeType;
     options2.m_quality = GetParam().m_quality;
     options2.m_preset = GetParam().m_preset;
-    ;
+
     // Just run an encode and see if output is correct manually
     ASSERT_TRUE(Encoder::encodeStream(GetParam().m_fileName, m_decoder.m_stream, options2));
 
     // Check that we can open encoded file and its parameters are correct
-    auto ret = Stream::getStream(GetParam().m_fileName);
-    ASSERT_NE(ret.index(), 0);
-    auto stream = std::get<1>(ret);
+    auto stream = Stream::getStream(GetParam().m_fileName);
+    ASSERT_NE(stream, nullptr);
 
     ASSERT_EQ(stream->getWidth(), g_testData[GetParam().m_testDataIndex].m_width);
     ASSERT_EQ(stream->getHeight(), g_testData[GetParam().m_testDataIndex].m_height);

@@ -73,9 +73,8 @@ public:
      * @param [in,out] frame     The frame pointer to frame data. This is reset to nullptr on function exit.
      * @param          timeStamp The time stamp for the current frame.
      * @param          frameNum  The zero-indexed frame number in the stream.
-     * @param          stream    The parent stream that produced this frame.
      */
-    Frame(FramePtr& frame, int64_t timeStamp, int64_t frameNum, std::shared_ptr<Stream> stream) noexcept;
+    Frame(FramePtr& frame, int64_t timeStamp, int64_t frameNum) noexcept;
 
     ~Frame() noexcept = default;
 
@@ -150,7 +149,5 @@ private:
     FramePtr m_frame;
     int64_t m_timeStamp = 0;
     int64_t m_frameNum = 0;
-    std::shared_ptr<Stream> m_stream = nullptr; /**< The parent stream, this keeps the stream alive so that frames are
-                                                   ensured to be freed before the stream is */
 };
 } // namespace Ffr

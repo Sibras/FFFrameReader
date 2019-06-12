@@ -100,6 +100,7 @@ set_target_properties(FfFrameReader PROPERTIES
     VERSION ${PROJECT_VERSION}
     PUBLIC_HEADER "${FFFR_HEADERS}"
     CUDA_SEPARABLE_COMPILATION ON
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
 
 # Enable all compile warnings
@@ -174,6 +175,7 @@ if(BUILD_TESTING)
         test/FFFRTestFrame.cpp
         test/FFFRTestFilter.cpp
         test/FFFRTestEncode.cpp
+        test/FFFRTestData.h
     )
 
     add_executable(FFFRTest ${FFFR_TEST_SOURCES})

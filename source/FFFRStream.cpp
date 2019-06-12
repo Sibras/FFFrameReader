@@ -63,7 +63,7 @@ AVCodecContext* Stream::CodecContextPtr::get() const noexcept
 
 Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
     const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost, Crop crop, Resolution scale,
-    PixelFormat format) noexcept
+    PixelFormat format, ConstructorLock) noexcept
 {
     AVFormatContext* formatPtr = nullptr;
     auto ret = avformat_open_input(&formatPtr, fileName.c_str(), nullptr, nullptr);
@@ -250,7 +250,7 @@ bool Stream::initialise() noexcept
     // Decode the first couple of frames (must be done to ensure codec parameters are properly filled)
     const auto backup = m_bufferLength;
     m_bufferLength = 1;
-    if (peekNextFrame().index() == 0) {
+    if (peekNextFrame() == nullptr) {
         return false;
     }
     m_bufferLength = backup;
@@ -268,7 +268,7 @@ bool Stream::initialise() noexcept
     return true;
 }
 
-variant<bool, shared_ptr<Stream>> Stream::getStream(const string& fileName, const DecoderOptions& options) noexcept
+shared_ptr<Stream> Stream::getStream(const string& fileName, const DecoderOptions& options) noexcept
 {
     // Create the device context
     shared_ptr<DecoderContext> deviceContext = nullptr;
@@ -276,22 +276,22 @@ variant<bool, shared_ptr<Stream>> Stream::getStream(const string& fileName, cons
         deviceContext = make_shared<DecoderContext>(options.m_type, options.m_context, options.m_device);
         if (deviceContext->m_deviceContext.get() == nullptr) {
             // Device creation failed
-            return false;
+            return nullptr;
         }
     }
 
     // Create the new stream
     const bool outputHost = options.m_outputHost && (options.m_type != DecodeType::Software);
-    shared_ptr<Stream> stream = shared_ptr<Stream>(new Stream(fileName, options.m_bufferLength, deviceContext,
-        outputHost, options.m_crop, options.m_scale, options.m_format));
+    shared_ptr<Stream> stream = make_shared<Stream>(fileName, options.m_bufferLength, deviceContext, outputHost,
+        options.m_crop, options.m_scale, options.m_format, ConstructorLock());
     if (stream->m_codecContext.get() == nullptr) {
-        // stream creation failed
-        return false;
+        // Stream creation failed
+        return nullptr;
     }
 
     // Initialise stream data
     if (!stream->initialise()) {
-        return false;
+        return nullptr;
     }
 
     return stream;
@@ -358,7 +358,7 @@ uint32_t Stream::getFrameSize() const noexcept
     return av_image_get_buffer_size(Ffr::getPixelFormat(getPixelFormat()), getWidth(), getHeight(), 32);
 }
 
-variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
+shared_ptr<Frame> Stream::peekNextFrame() noexcept
 {
     lock_guard<recursive_mutex> lock(m_mutex);
     // Check if we actually have any frames in the current buffer
@@ -366,31 +366,30 @@ variant<bool, shared_ptr<Frame>> Stream::peekNextFrame() noexcept
         // TODO: Async decode of next block, should start once reached the last couple of frames in a buffer
         // The swap buffer only should occur when ping buffer is exhausted and pong decode has completed
         if (!decodeNextBlock()) {
-            return false;
+            return nullptr;
         }
         // Check if there are any new frames or we reached EOF
         if (m_bufferPing.size() == 0) {
             log("Cannot get a new frame, End of file has been reached"s, LogLevel::Warning);
-            return true;
+            return nullptr;
         }
     }
     // Get frame from ping buffer
     return m_bufferPing[m_bufferPingHead];
 }
 
-variant<bool, shared_ptr<Frame>> Stream::getNextFrame() noexcept
+shared_ptr<Frame> Stream::getNextFrame() noexcept
 {
     lock_guard<recursive_mutex> lock(m_mutex);
     auto ret = peekNextFrame();
-    if (ret.index() == 0) {
-        return ret;
+    if (ret != nullptr) {
+        // Remove the frame from list
+        popFrame();
     }
-    // Remove the frame from list
-    popFrame();
     return ret;
 }
 
-variant<bool, vector<shared_ptr<Frame>>> Stream::getNextFrameSequence(const vector<int64_t>& frameSequence) noexcept
+vector<shared_ptr<Frame>> Stream::getNextFrameSequence(const vector<int64_t>& frameSequence) noexcept
 {
     // Note: for best performance when using this the buffer size should be small enough to not waste to much memory
     lock_guard<recursive_mutex> lock(m_mutex);
@@ -401,25 +400,30 @@ variant<bool, vector<shared_ptr<Frame>>> Stream::getNextFrameSequence(const vect
             // Invalid sequence list
             log("Invalid sequence list passed to getNextFrameSequence(). Sequences in the list must be in ascending order"s,
                 LogLevel::Error);
-            return false;
+            break;
         }
         // Remove all frames until first in sequence
         for (int64_t j = start; j < i; j++) {
             // Must peek to check there is actually a new frame
-            auto err = peekNextFrame();
-            if (err.index() == 0) {
-                return false;
+            auto frame = peekNextFrame();
+            if (frame == nullptr) {
+                break;
             }
             popFrame();
         }
         auto frame = getNextFrame();
-        if (frame.index() == 0) {
-            return false;
+        if (frame == nullptr) {
+            break;
         }
-        ret.push_back(get<1>(frame));
+        ret.emplace_back(move(frame));
         start = i + 1;
     }
     return ret;
+}
+
+bool Stream::isEndOfFile() const noexcept
+{
+    return timeStampToFrame2(m_lastDecodedTimeStamp) + 1 == getTotalFrames();
 }
 
 bool Stream::seek(const int64_t timeStamp) noexcept
@@ -600,13 +604,6 @@ bool Stream::decodeNextFrames() noexcept
 {
     // Loop through and retrieve all decoded frames
     Frame::FramePtr frame(av_frame_alloc());
-    shared_ptr<Stream> thisPtr;
-    try {
-        thisPtr = shared_from_this();
-    } catch (...) {
-        log("Stream created without using a shared pointer"s, LogLevel::Error);
-        return false;
-    }
     while (true) {
         if (*frame == nullptr) {
             log("Failed to allocate new frame"s, LogLevel::Error);
@@ -671,7 +668,7 @@ bool Stream::decodeNextFrames() noexcept
                 ++fillFrameNum;
                 fillTimeStamp = frameToTime2(fillFrameNum);
                 Frame::FramePtr frameClone(av_frame_clone(*frame));
-                m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum, thisPtr));
+                m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum));
             }
         }
 
@@ -714,7 +711,7 @@ bool Stream::decodeNextFrames() noexcept
         }
 
         // Add the new frame to the pong buffer
-        m_bufferPong.emplace_back(make_shared<Frame>(frame, timeStamp, frameNum, thisPtr));
+        m_bufferPong.emplace_back(make_shared<Frame>(frame, timeStamp, frameNum));
         frame = Frame::FramePtr(av_frame_alloc());
     }
 }
@@ -744,18 +741,11 @@ bool Stream::seekInternal(const int64_t timeStamp, const bool recursed) noexcept
             // Dump all frames before requested one
             while (true) {
                 // Get next frame
-                auto ret = peekNextFrame();
-                if (ret.index() == 0) {
+                auto frame = peekNextFrame();
+                if (frame == nullptr) {
                     return false;
                 }
                 // Check if we have found our requested time stamp
-                shared_ptr<Frame> frame;
-                try {
-                    frame = get<1>(ret);
-                } catch (...) {
-                    // Should never get here
-                    return false;
-                }
                 if (timeStamp <= frame->getTimeStamp()) {
                     break;
                 }
@@ -841,11 +831,11 @@ bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcep
             while (true) {
                 // Get next frame
                 auto ret = peekNextFrame();
-                if (ret.index() == 0) {
+                if (ret == nullptr) {
                     return false;
                 }
                 // Check if we have found our requested frame
-                if (frame <= get<1>(ret)->getFrameNumber()) {
+                if (frame <= ret->getFrameNumber()) {
                     break;
                 }
                 // Remove frames from ping buffer

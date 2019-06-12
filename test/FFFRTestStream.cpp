@@ -28,14 +28,13 @@ protected:
     void SetUp() override
     {
         setLogLevel(LogLevel::Warning);
-        auto ret = Stream::getStream(GetParam().m_fileName);
-        ASSERT_NE(ret.index(), 0);
-        m_stream = std::get<1>(ret);
+        m_stream = Stream::getStream(GetParam().m_fileName);
+        ASSERT_NE(m_stream, nullptr);
     }
 
     void TearDown() override
     {
-        m_stream = nullptr;
+        m_stream.reset();
     }
 
     std::shared_ptr<Stream> m_stream = nullptr;
@@ -83,23 +82,21 @@ TEST_P(StreamTest1, seek)
     const double timeStamp1 = (static_cast<double>(actualSeek) * (1000000.0 / GetParam().m_frameRate));
     const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
-    const auto ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame1 = std::get<1>(ret1);
+    const auto frame1 = m_stream->getNextFrame();
+    ASSERT_NE(frame1, nullptr);
     ASSERT_EQ(frame1->getTimeStamp(), time1);
 }
 
 TEST_P(StreamTest1, seekSmall)
 {
     // First fill the buffer
-    ASSERT_NE(m_stream->getNextFrame().index(), 0);
+    ASSERT_NE(m_stream->getNextFrame(), nullptr);
     // Seek forward 2 frames only. This should just increment the existing buffer
     const double timeStamp1 = (static_cast<double>(2) * (1000000.0 / GetParam().m_frameRate));
     const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
-    const auto ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame1 = std::get<1>(ret1);
+    const auto frame1 = m_stream->getNextFrame();
+    ASSERT_NE(frame1, nullptr);
     ASSERT_EQ(frame1->getTimeStamp(), time1);
 }
 
@@ -111,9 +108,8 @@ TEST_P(StreamTest1, seekFail)
     const double timeStamp1 = (static_cast<double>(2) * (1000000.0 / GetParam().m_frameRate));
     const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
-    const auto ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame1 = std::get<1>(ret1);
+    const auto frame1 = m_stream->getNextFrame();
+    ASSERT_NE(frame1, nullptr);
     ASSERT_EQ(frame1->getTimeStamp(), time1);
 }
 
@@ -121,8 +117,8 @@ TEST_P(StreamTest1, seekEnd)
 {
     ASSERT_TRUE(m_stream->seek(
         m_stream->getDuration() - GetParam().m_frameTime - ((((GetParam().m_frameTime / 3) & 0x3) == 2) ? 1 : 0)));
-    const auto ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
+    const auto frame1 = m_stream->getNextFrame();
+    ASSERT_NE(frame1, nullptr);
 }
 
 TEST_P(StreamTest1, seekLoop)
@@ -139,13 +135,12 @@ TEST_P(StreamTest1, seekLoop)
             // Check that multiple sequential frames can be read
             int64_t time2 = time1;
             for (uint32_t j = 0; j < numFrames; j++) {
-                const auto ret1 = m_stream->getNextFrame();
+                const auto frame1 = m_stream->getNextFrame();
                 // Allow EOF
-                if (ret1.index() == 0 && std::get<0>(ret1) == true) {
+                if (frame1 == nullptr && m_stream->isEndOfFile()) {
                     return;
                 }
-                ASSERT_NE(ret1.index(), 0);
-                const auto frame1 = std::get<1>(ret1);
+                ASSERT_NE(frame1, nullptr);
                 ASSERT_EQ(frame1->getTimeStamp(), time2);
                 const double timeStamp2 =
                     timeStamp1 + (static_cast<double>(j + 1) * (1000000.0 / GetParam().m_frameRate));
@@ -166,15 +161,13 @@ TEST_P(StreamTest1, seekBack)
     const double timeStamp1 = (static_cast<double>(actualSeek) * (1000000.0 / GetParam().m_frameRate));
     const auto time1 = llround(timeStamp1);
     ASSERT_TRUE(m_stream->seek(time1));
-    auto ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    auto frame1 = std::get<1>(ret1);
+    auto frame1 = m_stream->getNextFrame();
+    ASSERT_NE(frame1, nullptr);
     ASSERT_EQ(frame1->getTimeStamp(), time1);
     // Seek back
     ASSERT_TRUE(m_stream->seek(0));
-    ret1 = m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    frame1 = std::get<1>(ret1);
+    frame1 = m_stream->getNextFrame();
+    ASSERT_NE(frame1, nullptr);
     ASSERT_EQ(frame1->getTimeStamp(), 0);
 }
 
@@ -191,13 +184,12 @@ TEST_P(StreamTest1, seekFrameLoop)
             // Check that multiple sequential frames can be read
             int64_t frame2 = frame;
             for (uint32_t j = 0; j < numFrames; j++) {
-                const auto ret1 = m_stream->getNextFrame();
+                const auto frame1 = m_stream->getNextFrame();
                 // Allow EOF
-                if (ret1.index() == 0 && std::get<0>(ret1) == true) {
+                if (frame1 == nullptr && m_stream->isEndOfFile()) {
                     return;
                 }
-                ASSERT_NE(ret1.index(), 0);
-                const auto frame1 = std::get<1>(ret1);
+                ASSERT_NE(frame1, nullptr);
                 ASSERT_EQ(frame1->getFrameNumber(), frame2);
                 ++frame2;
             }
@@ -214,10 +206,9 @@ TEST_P(StreamTest1, getNextFrameSequenceSeek)
     ASSERT_TRUE(m_stream->seekFrame(actualSeek));
     // Now get frame sequence offset from current
     const std::vector<int64_t> framesList1 = {0, 1, 5, 7, 8};
-    const auto ret1 = m_stream->getNextFrameSequence(framesList1);
-    ASSERT_NE(ret1.index(), 0);
+    const auto frames1 = m_stream->getNextFrameSequence(framesList1);
+    ASSERT_EQ(frames1.size(), framesList1.size());
     // Check that the returned frames are correct
-    const auto frames1 = std::get<1>(ret1);
     auto j = 0;
     for (auto& i : frames1) {
         ASSERT_EQ(i->getFrameNumber(), framesList1[j] + actualSeek);
@@ -229,10 +220,9 @@ TEST_P(StreamTest1, getNextFrameSequence2)
 {
     // Ensure that value in list is greater than buffer size
     const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
-    const auto ret1 = m_stream->getNextFrameSequence(framesList1);
-    ASSERT_NE(ret1.index(), 0);
+    const auto frames1 = m_stream->getNextFrameSequence(framesList1);
+    ASSERT_EQ(frames1.size(), framesList1.size());
     // Check that the returned frames are correct
-    const auto frames1 = std::get<1>(ret1);
     auto j = 0;
     for (auto& i : frames1) {
         ASSERT_EQ(i->getFrameNumber(), framesList1[j]);

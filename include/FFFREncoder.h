@@ -43,6 +43,23 @@ public:
     [[nodiscard]] static bool encodeStream(const std::string& fileName, const std::shared_ptr<Stream>& stream,
         const EncoderOptions& options = EncoderOptions()) noexcept;
 
+    class ConstructorLock
+    {
+        friend bool encodeStream(
+            const std::string& fileName, const std::shared_ptr<Stream>& stream, const EncoderOptions& options) noexcept;
+    };
+
+    /**
+     * Constructor.
+     * @param fileName  File name of the file to write to.
+     * @param stream    The stream to use as input.
+     * @param codecType Type of the codec to encode with.
+     * @param quality   The encode quality.
+     * @param preset    The encode preset.
+     */
+    Encoder(const std::string& fileName, const std::shared_ptr<Stream>& stream, EncodeType codecType, uint8_t quality,
+        EncoderOptions::Preset preset, ConstructorLock) noexcept;
+
 private:
     class OutputFormatContextPtr
     {
@@ -64,17 +81,6 @@ private:
     OutputFormatContextPtr m_formatContext;
     CodecContextPtr m_codecContext;
     std::shared_ptr<Stream> m_stream;
-
-    /**
-     * Constructor.
-     * @param fileName  File name of the file to write to.
-     * @param stream    The stream to use as input.
-     * @param codecType Type of the codec to encode with.
-     * @param quality   The encode quality.
-     * @param preset    The encode preset.
-     */
-    Encoder(const std::string& fileName, const std::shared_ptr<Stream>& stream, EncodeType codecType, uint8_t quality,
-        EncoderOptions::Preset preset) noexcept;
 
     /**
      * Encodes all frames found in input stream from its current position.

@@ -73,14 +73,13 @@ public:
             }
         }
         options.m_outputHost = params.m_outputToHost;
-        auto ret = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
-        ASSERT_NE(ret.index(), 0);
-        m_stream = std::get<1>(ret);
+        m_stream = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
+        ASSERT_NE(m_stream, nullptr);
     }
 
     void TearDown()
     {
-        m_stream = nullptr;
+        m_stream.reset();
     }
 
     std::shared_ptr<Stream> m_stream = nullptr;
@@ -108,9 +107,8 @@ protected:
 
 TEST_P(DecodeTest1, getDecodeType)
 {
-    const auto ret1 = m_decoder.m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame1 = std::get<1>(ret1);
+    const auto frame1 = m_decoder.m_stream->getNextFrame();
+    ASSERT_NE(frame1, nullptr);
     if (GetParam().m_useNvdec && !GetParam().m_outputToHost) {
         ASSERT_EQ(frame1->getDataType(), Ffr::DecodeType::Cuda);
     } else {
@@ -120,10 +118,13 @@ TEST_P(DecodeTest1, getDecodeType)
 
 TEST_P(DecodeTest1, getPixelFormat)
 {
-    const auto ret1 = m_decoder.m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame1 = std::get<1>(ret1);
-    ASSERT_EQ(frame1->getPixelFormat(), g_testData[GetParam().m_testDataIndex].m_format);
+    const auto frame1 = m_decoder.m_stream->getNextFrame();
+    ASSERT_NE(frame1, nullptr);
+    if (GetParam().m_useNvdec) {
+        ASSERT_EQ(frame1->getPixelFormat(), Ffr::PixelFormat::NV12);
+    } else {
+        ASSERT_EQ(frame1->getPixelFormat(), g_testData[GetParam().m_testDataIndex].m_format);
+    }
 }
 
 TEST_P(DecodeTest1, getLoop25)
@@ -132,13 +133,12 @@ TEST_P(DecodeTest1, getLoop25)
     int64_t timeStamp = 0;
     int64_t frameNum = 0;
     for (int64_t i = 0; i < std::min(m_decoder.m_stream->getTotalFrames(), 25LL); i++) {
-        const auto ret1 = m_decoder.m_stream->getNextFrame();
-        if (ret1.index() == 0) {
+        const auto frame1 = m_decoder.m_stream->getNextFrame();
+        if (frame1 == nullptr) {
             ASSERT_EQ(timeStamp, m_decoder.m_stream->getDuration()); // Readout in case it failed
             ASSERT_EQ(i, m_decoder.m_stream->getTotalFrames());
         }
-        ASSERT_NE(ret1.index(), 0);
-        const auto frame1 = std::get<1>(ret1);
+        ASSERT_NE(frame1, nullptr);
         ASSERT_EQ(frame1->getTimeStamp(), timeStamp);
         const double timeStamp1 =
             (static_cast<double>(i + 1) * (1000000.0 / g_testData[GetParam().m_testDataIndex].m_frameRate));
@@ -155,15 +155,12 @@ TEST_P(DecodeTest1, getMultiple)
     test2.SetUp(GetParam());
     TestDecoder test3;
     test3.SetUp(GetParam());
-    const auto ret1 = m_decoder.m_stream->getNextFrame();
-    ASSERT_NE(ret1.index(), 0);
-    const auto frame1 = std::get<1>(ret1);
-    const auto ret2 = test2.m_stream->getNextFrame();
-    ASSERT_NE(ret2.index(), 0);
-    const auto frame2 = std::get<1>(ret2);
-    const auto ret3 = test3.m_stream->getNextFrame();
-    ASSERT_NE(ret3.index(), 0);
-    const auto frame3 = std::get<1>(ret3);
+    const auto frame1 = m_decoder.m_stream->getNextFrame();
+    ASSERT_NE(frame1, nullptr);
+    const auto frame2 = test2.m_stream->getNextFrame();
+    ASSERT_NE(frame2, nullptr);
+    const auto frame3 = test3.m_stream->getNextFrame();
+    ASSERT_NE(frame3, nullptr);
     ASSERT_EQ(frame1->getTimeStamp(), 0);
     ASSERT_EQ(frame2->getTimeStamp(), 0);
     ASSERT_EQ(frame3->getTimeStamp(), 0);

@@ -20,9 +20,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
-#include <variant>
 #include <vector>
-
 struct AVFormatContext;
 struct AVCodecContext;
 
@@ -30,7 +28,7 @@ namespace Ffr {
 class DecoderContext;
 class Filter;
 
-class Stream : public std::enable_shared_from_this<Stream>
+class Stream
 {
     friend class Filter;
     friend class Encoder;
@@ -54,8 +52,27 @@ public:
      * @param options  (Optional) Options for controlling decoding.
      * @returns The stream if succeeded, false otherwise.
      */
-    [[nodiscard]] static std::variant<bool, std::shared_ptr<Stream>> getStream(
+    [[nodiscard]] static std::shared_ptr<Stream> getStream(
         const std::string& fileName, const DecoderOptions& options = DecoderOptions()) noexcept;
+
+    class ConstructorLock
+    {
+        friend std::shared_ptr<Stream> getStream(const std::string& fileName, const DecoderOptions& options) noexcept;
+    };
+
+    /**
+     * Constructor.
+     * @param fileName       Filename of the file to open.
+     * @param bufferLength   Number of frames in the the decode buffer.
+     * @param decoderContext Pointer to an existing context to be used for hardware decoding.
+     * @param outputHost     True to output each frame to host CPU memory (only affects hardware decoding).
+     * @param crop           The output cropping or (0) if no crop should be performed.
+     * @param scale          The output resolution or (0, 0) if no scaling should be performed. Scaling is performed
+     *  after cropping.
+     * @param format         The required output pixel format.
+     */
+    Stream(const std::string& fileName, uint32_t bufferLength, const std::shared_ptr<DecoderContext>& decoderContext,
+        bool outputHost, Crop crop, Resolution scale, PixelFormat format, ConstructorLock) noexcept;
 
     /**
      * Gets the width of the video stream.
@@ -109,25 +126,32 @@ public:
 
     /**
      * Get the next frame in the stream without removing it from stream buffer.
-     * @returns The next frame in current stream, or false if an error occured, or true if end of file reached.
+     * @returns The next frame in current stream, or nullptr if an error occured or end of file reached.
      */
-    [[nodiscard]] std::variant<bool, std::shared_ptr<Frame>> peekNextFrame() noexcept;
+    [[nodiscard]] std::shared_ptr<Frame> peekNextFrame() noexcept;
 
     /**
      * Gets the next frame in the stream and removes it from the buffer.
-     * @returns The next frame in current stream, or false if an error occured, or true if end of file reached.
+     * @returns The next frame in current stream, or nullptr if an error occured or end of file reached.
      */
-    [[nodiscard]] std::variant<bool, std::shared_ptr<Frame>> getNextFrame() noexcept;
+    [[nodiscard]] std::shared_ptr<Frame> getNextFrame() noexcept;
 
     /**
      * Gets a sequence of frames offset from the current stream position.
      * @param frameSequence The frame sequence. This is a monotonically increasing list of offset indices used to
      * specify which frames to retrieve. e.g. A sequence value of {0, 3, 6} will get the current next frame  as well as
      * the 3rd frame after this and then the third frame after that.
-     * @returns A list of frames corresponding to the input sequence, or false if an error occured.
+     * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
+     * retrieved before the error are returned.
      */
-    [[nodiscard]] std::variant<bool, std::vector<std::shared_ptr<Frame>>> getNextFrameSequence(
+    [[nodiscard]] std::vector<std::shared_ptr<Frame>> getNextFrameSequence(
         const std::vector<int64_t>& frameSequence) noexcept;
+
+    /**
+     * Query if the stream has reached end of input file.
+     * @returns True if end of file, false if not.
+     */
+    [[nodiscard]] bool isEndOfFile() const noexcept;
 
     /**
      * Seeks the stream to the given time stamp. If timestamp does not exactly match a frame then the timestamp rounded
@@ -198,20 +222,6 @@ private:
     bool m_frameSeekSupported = true;    /**< True if frame seek supported */
     int64_t m_totalFrames = 0;           /**< Stream video duration in frames */
     int64_t m_totalDuration = 0;         /**< Stream video duration in microseconds (AV_TIME_BASE) */
-
-    /**
-     * Constructor.
-     * @param fileName       Filename of the file to open.
-     * @param bufferLength   Number of frames in the the decode buffer.
-     * @param decoderContext Pointer to an existing context to be used for hardware decoding.
-     * @param outputHost     True to output each frame to host CPU memory (only affects hardware decoding).
-     * @param crop           The output cropping or (0) if no crop should be performed.
-     * @param scale          The output resolution or (0, 0) if no scaling should be performed. Scaling is performed
-     *  after cropping.
-     * @param format         The required output pixel format.
-     */
-    Stream(const std::string& fileName, uint32_t bufferLength, const std::shared_ptr<DecoderContext>& decoderContext,
-        bool outputHost, Crop crop, Resolution scale, PixelFormat format) noexcept;
 
     /**
      * Initialises codec parameters needed for future operations.
