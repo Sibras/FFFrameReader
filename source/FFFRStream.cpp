@@ -646,11 +646,13 @@ bool Stream::decodeNextFrames() noexcept
                 frame->best_effort_timestamp = frame->pkt_dts;
             }
         }
-        int64_t offsetTimeStamp = frame->best_effort_timestamp;
-        if (offsetTimeStamp == AV_NOPTS_VALUE) {
+        if (frame->best_effort_timestamp == AV_NOPTS_VALUE) {
             // Try and just rebuild it from the previous frame
-            offsetTimeStamp = frameToTimeStamp2(timeStampToFrame2(m_lastDecodedTimeStamp) + 1);
-        } else if (m_startTimeStamp != 0) {
+            frame->best_effort_timestamp = frameToTimeStamp2(timeStampToFrame2(m_lastDecodedTimeStamp) + 1) +
+                av_rescale_q(m_startTimeStamp, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
+        }
+        int64_t offsetTimeStamp = frame->best_effort_timestamp;
+        if (m_startTimeStamp != 0) {
             // Remove the start time from calculations
             offsetTimeStamp -=
                 av_rescale_q(m_startTimeStamp, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
@@ -674,6 +676,11 @@ bool Stream::decodeNextFrames() noexcept
 
         // Store last decoded pts
         m_lastDecodedTimeStamp = offsetTimeStamp;
+
+        // Update internal timestamps that may be needed by later processing
+        if (frame->pts == AV_NOPTS_VALUE) {
+            frame->pts = frame->best_effort_timestamp;
+        }
 
         // Perform any required filtering
         if (m_filterGraph != nullptr) {
