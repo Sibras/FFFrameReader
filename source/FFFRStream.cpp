@@ -26,6 +26,7 @@ using namespace std;
 
 extern "C" {
 #include <libavcodec/avcodec.h>
+#include <libavfilter/buffersink.h>
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/log.h>
@@ -660,6 +661,8 @@ bool Stream::decodeNextFrames() noexcept
 
         // Perform any required filtering
         if (m_filterGraph != nullptr) {
+            m_tempFrame->pts = av_rescale_q(
+                m_tempFrame->pts, m_codecContext->time_base, av_buffersink_get_time_base(m_filterGraph->m_sink));
             if (!m_filterGraph->sendFrame(m_tempFrame)) {
                 av_frame_unref(*m_tempFrame);
                 return false;
