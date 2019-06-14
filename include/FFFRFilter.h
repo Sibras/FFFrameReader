@@ -25,11 +25,13 @@ namespace Ffr {
 class Filter
 {
     friend class Stream;
+    friend class Encoder;
 
     class FilterGraphPtr
     {
         friend class Stream;
         friend class Filter;
+        friend class Encoder;
 
         FilterGraphPtr() = default;
 

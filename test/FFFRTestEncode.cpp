@@ -28,17 +28,20 @@ struct TestParamsEncode
     EncodeType m_encodeType;
     uint8_t m_quality;
     EncoderOptions::Preset m_preset;
+    bool m_useFiltering;
 };
 
 static std::vector<TestParamsEncode> g_testDataEncode = {
-    {1, "test1.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast},
-    {1, "test2.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast},
-    {1, "test3.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast},
-    {1, "test4.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast},
-    {2, "test5.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast},
-    {2, "test6.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast},
-    {2, "test7.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast},
-    {2, "test8.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast},
+    {1, "test01.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast, false},
+    {1, "test02.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast, false},
+    {1, "test03.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false},
+    {1, "test04.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false},
+    {1, "test05.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true},
+    {2, "test06.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast, false},
+    {2, "test07.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast, false},
+    {2, "test08.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false},
+    {2, "test09.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false},
+    {2, "test10.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true},
 };
 
 class TestDecoder
@@ -54,6 +57,9 @@ public:
     void SetUp(const TestParamsEncode& params)
     {
         DecoderOptions options;
+        if (params.m_useFiltering) {
+            options.m_scale = {640, 360};
+        }
         m_stream = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
         ASSERT_NE(m_stream, nullptr);
     }
@@ -73,7 +79,7 @@ protected:
 
     void SetUp() override
     {
-        setLogLevel(LogLevel::Warning);
+        setLogLevel(LogLevel::Error);
         m_decoder.SetUp(GetParam());
     }
 
@@ -99,12 +105,12 @@ TEST_P(EncodeTest1, encodeStream)
     auto stream = Stream::getStream(GetParam().m_fileName);
     ASSERT_NE(stream, nullptr);
 
-    ASSERT_EQ(stream->getWidth(), g_testData[GetParam().m_testDataIndex].m_width);
-    ASSERT_EQ(stream->getHeight(), g_testData[GetParam().m_testDataIndex].m_height);
+    ASSERT_EQ(stream->getWidth(), GetParam().m_useFiltering ? 640 : g_testData[GetParam().m_testDataIndex].m_width);
+    ASSERT_EQ(stream->getHeight(), GetParam().m_useFiltering ? 360 : g_testData[GetParam().m_testDataIndex].m_height);
     ASSERT_DOUBLE_EQ(stream->getAspectRatio(), g_testData[GetParam().m_testDataIndex].m_aspectRatio);
     ASSERT_EQ(stream->getTotalFrames(), g_testData[GetParam().m_testDataIndex].m_totalFrames);
-    ASSERT_EQ(stream->getDuration(), g_testData[GetParam().m_testDataIndex].m_duration);
     ASSERT_DOUBLE_EQ(stream->getFrameRate(), g_testData[GetParam().m_testDataIndex].m_frameRate);
+    ASSERT_EQ(stream->getDuration(), g_testData[GetParam().m_testDataIndex].m_duration);
 }
 
 INSTANTIATE_TEST_SUITE_P(EncodeTestData, EncodeTest1, ::testing::ValuesIn(g_testDataEncode));

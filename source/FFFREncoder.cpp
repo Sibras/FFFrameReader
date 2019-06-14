@@ -15,12 +15,15 @@
  */
 #include "FFFREncoder.h"
 
+#include "FFFRFilter.h"
 #include "FFFRUtility.h"
 #include "FFFrameReader.h"
 
 #include <algorithm>
 
 extern "C" {
+#include <libavfilter/avfilter.h>
+#include <libavfilter/buffersink.h>
 #include <libavformat/avformat.h>
 #include <libavutil/opt.h>
 }
@@ -140,7 +143,9 @@ Encoder::Encoder(const std::string& fileName, const std::shared_ptr<Stream>& str
     // Setup encoding parameters
     tempCodec->height = stream->getHeight();
     tempCodec->width = stream->getWidth();
-    tempCodec->sample_aspect_ratio = stream->m_codecContext->sample_aspect_ratio;
+    tempCodec->sample_aspect_ratio = stream->m_filterGraph == nullptr ?
+        stream->m_codecContext->sample_aspect_ratio :
+        av_buffersink_get_sample_aspect_ratio(stream->m_filterGraph->m_sink);
     tempCodec->pix_fmt = getPixelFormat(stream->getPixelFormat());
     tempCodec->framerate = av_d2q(stream->getFrameRate(), INT_MAX);
     tempCodec->time_base = av_inv_q(tempCodec->framerate);
@@ -233,8 +238,10 @@ bool Encoder::encodeStream() const noexcept
             return true;
         }
         // Send frame to encoder
-        frame->m_frame->pts =
-            av_rescale_q(frame->m_frame->pts, m_stream->m_codecContext->time_base, m_codecContext->time_base);
+        frame->m_frame->pts = av_rescale_q(frame->m_frame->pts,
+            m_stream->m_filterGraph == nullptr ? m_stream->m_codecContext->time_base :
+                                                 av_buffersink_get_time_base(m_stream->m_filterGraph->m_sink),
+            m_codecContext->time_base);
         const auto ret = avcodec_send_frame(m_codecContext.get(), *frame->m_frame);
         if (ret < 0) {
             log("Failed to send packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
