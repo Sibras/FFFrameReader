@@ -102,8 +102,8 @@ bool Encoder::encodeStream(
     // Create the new encoder
     const shared_ptr<Encoder> encoder =
         make_shared<Encoder>(fileName, stream, options.m_type, options.m_quality, options.m_preset, ConstructorLock());
-    if (stream->m_codecContext.get() == nullptr) {
-        // Stream creation failed
+    if (encoder->m_codecContext.get() == nullptr) {
+        // Encoder creation failed
         return false;
     }
     return encoder->encodeStream();
@@ -142,7 +142,8 @@ Encoder::Encoder(const std::string& fileName, const std::shared_ptr<Stream>& str
     tempCodec->width = stream->getWidth();
     tempCodec->sample_aspect_ratio = stream->m_codecContext->sample_aspect_ratio;
     tempCodec->pix_fmt = getPixelFormat(stream->getPixelFormat());
-    tempCodec->time_base = stream->m_codecContext->time_base;
+    tempCodec->framerate = av_d2q(stream->getFrameRate(), INT_MAX);
+    tempCodec->time_base = av_inv_q(tempCodec->framerate);
     av_opt_set_int(tempCodec.get(), "refcounted_frames", 1, 0);
 
     if (tempFormat->oformat->flags & AVFMT_GLOBALHEADER) {
@@ -168,10 +169,13 @@ Encoder::Encoder(const std::string& fileName, const std::shared_ptr<Stream>& str
     ret = avcodec_parameters_from_context(outStream->codecpar, tempCodec.get());
     if (ret < 0) {
         log("Failed copying parameters to encoder context: "s += getFfmpegErrorString(ret), LogLevel::Error);
+        return;
     }
 
     // Set the output stream timebase
-    outStream->time_base = tempCodec.get()->time_base;
+    outStream->time_base = tempCodec->time_base;
+    outStream->r_frame_rate = tempCodec->framerate;
+    outStream->avg_frame_rate = tempCodec->framerate;
 
     // Open output file if required
     if (!(tempFormat->oformat->flags & AVFMT_NOFILE)) {
@@ -189,6 +193,12 @@ Encoder::Encoder(const std::string& fileName, const std::shared_ptr<Stream>& str
             LogLevel::Error);
         return;
     }
+
+    // Give muxer hint about duration
+    outStream->duration =
+        av_rescale_q(stream->getDuration() - (stream->m_lastDecodedTimeStamp >= 0 ? stream->m_lastDecodedTimeStamp : 0),
+            av_make_q(1, AV_TIME_BASE), outStream->time_base);
+    tempFormat->duration = outStream->duration;
 
     // Make the new encoder
     m_formatContext = move(tempFormat);
@@ -214,6 +224,7 @@ bool Encoder::encodeStream() const noexcept
             if (!encodeFrames()) {
                 return false;
             }
+            av_interleaved_write_frame(m_formatContext.get(), nullptr);
             ret = av_write_trailer(m_formatContext.get());
             if (ret < 0) {
                 log("Failed to write file trailer: "s += getFfmpegErrorString(ret), LogLevel::Error);
@@ -221,6 +232,9 @@ bool Encoder::encodeStream() const noexcept
             }
             return true;
         }
+        // Send frame to encoder
+        frame->m_frame->pts =
+            av_rescale_q(frame->m_frame->pts, m_stream->m_codecContext->time_base, m_codecContext->time_base);
         const auto ret = avcodec_send_frame(m_codecContext.get(), *frame->m_frame);
         if (ret < 0) {
             log("Failed to send packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
@@ -252,6 +266,7 @@ bool Encoder::encodeFrames() const noexcept
 
         // Setup packet for muxing
         packet.stream_index = 0;
+        packet.duration = av_rescale_q(1, av_inv_q(m_codecContext->framerate), m_codecContext->time_base);
         av_packet_rescale_ts(&packet, m_codecContext->time_base, m_formatContext->streams[0]->time_base);
 
         // Mux encoded frame
