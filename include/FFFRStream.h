@@ -211,7 +211,8 @@ private:
         0; /**< The position in the ping buffer of the next available frame in the decoded stream. */
     std::vector<std::shared_ptr<Frame>> m_bufferPong; /**< The secondary buffer used to store decoded frames */
     std::shared_ptr<Filter> m_filterGraph = nullptr;  /**< The filter graph for optional transformations. */
-    bool m_outputHost = true; /**< True to output each frame to host CPU memory (only affects hardware decoding) */
+    bool m_outputHost = true;    /**< True to output each frame to host CPU memory (only affects hardware decoding) */
+    Frame::FramePtr m_tempFrame; /**< The temporary frame used for decoding */
 
     FormatContextPtr m_formatContext;
     int32_t m_index = -1; /**< Zero-based index of the video stream  */

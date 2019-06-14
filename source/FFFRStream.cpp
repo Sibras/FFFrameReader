@@ -516,102 +516,80 @@ bool Stream::decodeNextBlock() noexcept
     AVPacket packet;
     av_init_packet(&packet);
     bool eof = false;
-    while (true) {
+    auto maxPackets = m_bufferLength;
+    do {
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
-        // We do m_bufferLength packets at a time for performance even though this may result in more than
-        // m_bufferLength frames being actually decoded
-        auto maxPackets = m_bufferLength;
-        uint32_t i = 0;
-        do {
-            auto ret = av_read_frame(m_formatContext.get(), &packet);
-            if (ret < 0) {
-                if (ret != AVERROR_EOF) {
-                    av_packet_unref(&packet);
-                    log("Failed to retrieve new frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
-                    return false;
-                }
-                eof = true;
-                break;
-            }
 
-            if (m_index == packet.stream_index) {
-                ++i;
-                // Convert timebase
-                av_packet_rescale_ts(&packet, m_formatContext->streams[0]->time_base, m_codecContext->time_base);
-                ret = avcodec_send_packet(m_codecContext.get(), &packet);
-                if (ret == AVERROR(EAGAIN)) {
-                    // Cannot add any more packets as must decode what we have first
-                    if (!decodeNextFrames()) {
-                        av_packet_unref(&packet);
-                        return false;
-                    }
-                    ret = avcodec_send_packet(m_codecContext.get(), &packet);
-                }
-                if (ret < 0) {
-                    av_packet_unref(&packet);
-                    log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
-                    return false;
-                }
-                // Increase the number of maxPackets if we are really close to just finishing the stream anyway
-                if (i == (maxPackets - 1)) {
-                    const auto timeStamp = packet.pts != AV_NOPTS_VALUE ? packet.pts : packet.dts;
-                    if (timeStampToFrame2(timeStamp) >= (m_totalFrames - 2)) {
-                        maxPackets += 2;
-                    }
+        auto ret = av_read_frame(m_formatContext.get(), &packet);
+        if (ret < 0) {
+            if (ret != AVERROR_EOF) {
+                av_packet_unref(&packet);
+                log("Failed to retrieve new frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                return false;
+            }
+            eof = true;
+            // Send flush packet to decoder
+            avcodec_send_packet(m_codecContext.get(), nullptr);
+        } else if (m_index == packet.stream_index) {
+            // Convert timebase
+            av_packet_rescale_ts(&packet, m_formatContext->streams[0]->time_base, m_codecContext->time_base);
+            ret = avcodec_send_packet(m_codecContext.get(), &packet);
+            if (ret < 0) {
+                log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                return false;
+            }
+            // Increase the number of maxPackets if we are really close to just finishing the stream anyway
+            if (m_bufferPong.size() == (maxPackets - 1)) {
+                const auto timeStamp = packet.pts != AV_NOPTS_VALUE ? packet.pts : packet.dts;
+                if (timeStampToFrame2(timeStamp) >= (m_totalFrames - 2)) {
+                    maxPackets += 2;
                 }
             }
-            av_packet_unref(&packet);
-        } while (i < maxPackets);
+        }
+        av_packet_unref(&packet);
 
         // Decode any pending frames
         if (!decodeNextFrames()) {
             return false;
         }
-        // Check if we need to flush any remaining frames
-        if (eof) {
-            // Send flush packet to decoder
-            avcodec_send_packet(m_codecContext.get(), &packet);
-            if (!decodeNextFrames()) {
-                return false;
-            }
-            // Check if we got more frames than we should have. This occurs when there are missing frames that are
-            // padded in resulting in more output frames than expected.
-            while (!m_bufferPong.empty()) {
-                if (m_bufferPong.back()->getTimeStamp() < this->getDuration() &&
-                    m_bufferPong.back()->getTimeStamp() != AV_NOPTS_VALUE) {
-                    break;
-                }
-                m_bufferPong.pop_back();
-            }
-        }
-        // Check if we have reached the buffer limit
-        if ((m_bufferPong.size() >= m_bufferLength) || eof) {
-            // Swap ping and pong buffer
-            swap(m_bufferPing, m_bufferPong);
-            m_bufferPingHead = 0;
-            // Reset the pong buffer
-            m_bufferPong.resize(0);
-
-            return true;
-        }
 
         // TODO: The maximum number of frames that are needed to get a valid frame is calculated using getCodecDelay().
         // If more than that are passed without a returned frame then an error has occured.
+    } while (m_bufferPong.size() < maxPackets && !eof);
+
+    if (eof) {
+        // Check if we got more frames than we should have. This occurs when there are missing frames that are
+        // padded in resulting in more output frames than expected.
+        while (!m_bufferPong.empty()) {
+            if (m_bufferPong.back()->getTimeStamp() < this->getDuration() &&
+                m_bufferPong.back()->getTimeStamp() != AV_NOPTS_VALUE) {
+                break;
+            }
+            m_bufferPong.pop_back();
+        }
     }
+    // Swap ping and pong buffer
+    swap(m_bufferPing, m_bufferPong);
+    m_bufferPingHead = 0;
+    // Reset the pong buffer
+    m_bufferPong.resize(0);
+
+    return true;
 }
 
 bool Stream::decodeNextFrames() noexcept
 {
     // Loop through and retrieve all decoded frames
-    Frame::FramePtr frame(av_frame_alloc());
     while (true) {
-        if (*frame == nullptr) {
-            log("Failed to allocate new frame"s, LogLevel::Error);
-            return false;
+        if (*m_tempFrame == nullptr) {
+            m_tempFrame = Frame::FramePtr(av_frame_alloc());
+            if (*m_tempFrame == nullptr) {
+                log("Failed to allocate new frame"s, LogLevel::Error);
+                return false;
+            }
         }
-        const auto ret = avcodec_receive_frame(m_codecContext.get(), *frame);
+        const auto ret = avcodec_receive_frame(m_codecContext.get(), *m_tempFrame);
         if (ret < 0) {
-            av_frame_unref(*frame);
             if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF)) {
                 return true;
             }
@@ -620,38 +598,39 @@ bool Stream::decodeNextFrames() noexcept
         }
 
         // Calculate time stamp for frame
-        if (frame->best_effort_timestamp == AV_NOPTS_VALUE) {
+        if (m_tempFrame->best_effort_timestamp == AV_NOPTS_VALUE) {
             // Some decoders (looking at you cuvid) don't return a best_effort_timestamp.
             // Based on ffmpegs decode.c guess_correct_pts
-            if (frame->pkt_dts != AV_NOPTS_VALUE) {
+            if (m_tempFrame->pkt_dts != AV_NOPTS_VALUE) {
                 m_codecContext->pts_correction_num_faulty_dts +=
-                    frame->pkt_dts <= m_codecContext->pts_correction_last_dts;
-                m_codecContext->pts_correction_last_dts = frame->pkt_dts;
-            } else if (frame->pts != AV_NOPTS_VALUE) {
-                m_codecContext->pts_correction_last_dts = frame->pts;
+                    m_tempFrame->pkt_dts <= m_codecContext->pts_correction_last_dts;
+                m_codecContext->pts_correction_last_dts = m_tempFrame->pkt_dts;
+            } else if (m_tempFrame->pts != AV_NOPTS_VALUE) {
+                m_codecContext->pts_correction_last_dts = m_tempFrame->pts;
             }
 
-            if (frame->pts != AV_NOPTS_VALUE) {
-                m_codecContext->pts_correction_num_faulty_pts += frame->pts <= m_codecContext->pts_correction_last_pts;
-                m_codecContext->pts_correction_last_pts = frame->pts;
-            } else if (frame->pkt_dts != AV_NOPTS_VALUE) {
-                m_codecContext->pts_correction_last_pts = frame->pkt_dts;
+            if (m_tempFrame->pts != AV_NOPTS_VALUE) {
+                m_codecContext->pts_correction_num_faulty_pts +=
+                    m_tempFrame->pts <= m_codecContext->pts_correction_last_pts;
+                m_codecContext->pts_correction_last_pts = m_tempFrame->pts;
+            } else if (m_tempFrame->pkt_dts != AV_NOPTS_VALUE) {
+                m_codecContext->pts_correction_last_pts = m_tempFrame->pkt_dts;
             }
 
             if ((m_codecContext->pts_correction_num_faulty_pts <= m_codecContext->pts_correction_num_faulty_dts ||
-                    frame->pkt_dts == AV_NOPTS_VALUE) &&
-                frame->pts != AV_NOPTS_VALUE) {
-                frame->best_effort_timestamp = frame->pts;
+                    m_tempFrame->pkt_dts == AV_NOPTS_VALUE) &&
+                m_tempFrame->pts != AV_NOPTS_VALUE) {
+                m_tempFrame->best_effort_timestamp = m_tempFrame->pts;
             } else {
-                frame->best_effort_timestamp = frame->pkt_dts;
+                m_tempFrame->best_effort_timestamp = m_tempFrame->pkt_dts;
             }
         }
-        if (frame->best_effort_timestamp == AV_NOPTS_VALUE) {
+        if (m_tempFrame->best_effort_timestamp == AV_NOPTS_VALUE) {
             // Try and just rebuild it from the previous frame
-            frame->best_effort_timestamp = frameToTimeStamp2(timeStampToFrame2(m_lastDecodedTimeStamp) + 1) +
+            m_tempFrame->best_effort_timestamp = frameToTimeStamp2(timeStampToFrame2(m_lastDecodedTimeStamp) + 1) +
                 av_rescale_q(m_startTimeStamp, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
         }
-        int64_t offsetTimeStamp = frame->best_effort_timestamp;
+        int64_t offsetTimeStamp = m_tempFrame->best_effort_timestamp;
         if (m_startTimeStamp != 0) {
             // Remove the start time from calculations
             offsetTimeStamp -=
@@ -669,7 +648,7 @@ bool Stream::decodeNextFrames() noexcept
             for (auto i = previous + 1; i < frameNum; i++) {
                 ++fillFrameNum;
                 fillTimeStamp = frameToTime2(fillFrameNum);
-                Frame::FramePtr frameClone(av_frame_clone(*frame));
+                Frame::FramePtr frameClone(av_frame_clone(*m_tempFrame));
                 m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum));
             }
         }
@@ -678,22 +657,22 @@ bool Stream::decodeNextFrames() noexcept
         m_lastDecodedTimeStamp = offsetTimeStamp;
 
         // Update internal timestamps that may be needed by later processing
-        if (frame->pts == AV_NOPTS_VALUE) {
-            frame->pts = frame->best_effort_timestamp;
+        if (m_tempFrame->pts == AV_NOPTS_VALUE) {
+            m_tempFrame->pts = m_tempFrame->best_effort_timestamp;
         }
 
         // Perform any required filtering
         if (m_filterGraph != nullptr) {
-            if (!m_filterGraph->sendFrame(frame)) {
-                av_frame_unref(*frame);
+            if (!m_filterGraph->sendFrame(m_tempFrame)) {
+                av_frame_unref(*m_tempFrame);
                 return false;
             }
-            if (!m_filterGraph->receiveFrame(frame)) {
-                av_frame_unref(*frame);
+            if (!m_filterGraph->receiveFrame(m_tempFrame)) {
+                av_frame_unref(*m_tempFrame);
                 return false;
             }
             // Check if we actually got a new frame or we need to continue
-            if (frame->height == 0) {
+            if (m_tempFrame->height == 0) {
                 continue;
             }
         }
@@ -701,25 +680,24 @@ bool Stream::decodeNextFrames() noexcept
         // Check type of memory pointer requested and perform a memory move
         if (m_outputHost) {
             // TODO: need some sort of buffer pool
-            Frame::FramePtr frame2;
-            *frame2 = av_frame_alloc();
-            if (*frame == nullptr) {
-                av_frame_unref(*frame);
+            Frame::FramePtr frame2(av_frame_alloc());
+            if (*frame2 == nullptr) {
+                av_frame_unref(*m_tempFrame);
                 log("Failed to allocate new host frame"s, LogLevel::Error);
                 return false;
             }
-            const auto ret2 = av_hwframe_transfer_data(*frame2, *frame, 0);
+            const auto ret2 = av_hwframe_transfer_data(*frame2, *m_tempFrame, 0);
             if (ret2 < 0) {
-                av_frame_unref(*frame);
+                av_frame_unref(*m_tempFrame);
+                av_frame_unref(*frame2);
                 log("Failed to copy frame to host: "s += getFfmpegErrorString(ret), LogLevel::Error);
                 return false;
             }
-            frame = move(frame2);
+            m_tempFrame = move(frame2);
         }
 
         // Add the new frame to the pong buffer
-        m_bufferPong.emplace_back(make_shared<Frame>(frame, timeStamp, frameNum));
-        frame = Frame::FramePtr(av_frame_alloc());
+        m_bufferPong.emplace_back(make_shared<Frame>(m_tempFrame, timeStamp, frameNum));
     }
 }
 
