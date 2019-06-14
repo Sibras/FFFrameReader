@@ -519,7 +519,6 @@ bool Stream::decodeNextBlock() noexcept
     auto maxPackets = m_bufferLength;
     do {
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
-
         auto ret = av_read_frame(m_formatContext.get(), &packet);
         if (ret < 0) {
             if (ret != AVERROR_EOF) {
@@ -532,7 +531,7 @@ bool Stream::decodeNextBlock() noexcept
             avcodec_send_packet(m_codecContext.get(), nullptr);
         } else if (m_index == packet.stream_index) {
             // Convert timebase
-            av_packet_rescale_ts(&packet, m_formatContext->streams[0]->time_base, m_codecContext->time_base);
+            av_packet_rescale_ts(&packet, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
             ret = avcodec_send_packet(m_codecContext.get(), &packet);
             if (ret < 0) {
                 log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
@@ -657,9 +656,7 @@ bool Stream::decodeNextFrames() noexcept
         m_lastDecodedTimeStamp = offsetTimeStamp;
 
         // Update internal timestamps that may be needed by later processing
-        if (m_tempFrame->pts == AV_NOPTS_VALUE) {
-            m_tempFrame->pts = m_tempFrame->best_effort_timestamp;
-        }
+        m_tempFrame->pts = m_tempFrame->best_effort_timestamp;
 
         // Perform any required filtering
         if (m_filterGraph != nullptr) {
