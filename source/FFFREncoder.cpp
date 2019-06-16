@@ -222,7 +222,9 @@ bool Encoder::encodeStream() const noexcept
             return true;
         }
         // Send frame to encoder
-        StreamUtils::rescale(frame->m_frame, StreamUtils::getTimeBase(m_stream.get()), m_codecContext->time_base);
+        frame->m_frame->best_effort_timestamp =
+            av_rescale_q(frame->getTimeStamp(), av_make_q(1, AV_TIME_BASE), m_codecContext->time_base);
+        frame->m_frame->pts = frame->m_frame->best_effort_timestamp;
         const auto ret = avcodec_send_frame(m_codecContext.get(), *frame->m_frame);
         if (ret < 0) {
             log("Failed to send packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);

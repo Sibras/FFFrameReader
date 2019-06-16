@@ -619,12 +619,11 @@ bool Stream::decodeNextFrames() noexcept
         // Store last decoded pts
         m_lastDecodedTimeStamp = offsetTimeStamp;
 
-        // Update internal timestamps that may be needed by later processing
-        m_tempFrame->best_effort_timestamp = timeToTimeStamp2(offsetTimeStamp);
-        m_tempFrame->pts = m_tempFrame->best_effort_timestamp;
-
         // Perform any required filtering
         if (m_filterGraph != nullptr) {
+            // Update internal timestamps to ensure they are valid
+            m_tempFrame->best_effort_timestamp = offsetTimeStamp;
+            m_tempFrame->pts = m_tempFrame->best_effort_timestamp;
             StreamUtils::rescale(
                 m_tempFrame, m_codecContext->time_base, av_buffersink_get_time_base(m_filterGraph->m_sink));
             if (!m_filterGraph->sendFrame(m_tempFrame)) {
