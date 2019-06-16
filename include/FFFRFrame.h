@@ -17,53 +17,14 @@
 #include "FFFRTypes.h"
 
 #include <cstdint>
-#include <memory>
-struct AVFrame;
 
 namespace Ffr {
-class Stream;
-
 class Frame
 {
     friend class Stream;
     friend class Filter;
     friend class Encoder;
     friend class FFR;
-
-    class FramePtr
-    {
-        friend class Frame;
-        friend class Filter;
-        friend class Stream;
-        friend class Encoder;
-        friend class FFR;
-
-    public:
-        ~FramePtr() noexcept;
-
-        FramePtr(const FramePtr& other) noexcept = delete;
-
-    private:
-        FramePtr() noexcept = default;
-
-        explicit FramePtr(AVFrame* frame) noexcept;
-
-        FramePtr(FramePtr&& other) noexcept;
-
-        FramePtr& operator=(FramePtr& other) noexcept;
-
-        FramePtr& operator=(FramePtr&& other) noexcept;
-
-        AVFrame*& operator*() noexcept;
-
-        const AVFrame* operator*() const noexcept;
-
-        AVFrame*& operator->() noexcept;
-
-        const AVFrame* operator->() const noexcept;
-
-        AVFrame* m_frame = nullptr;
-    };
 
 public:
     Frame() = default;

@@ -17,6 +17,11 @@
 
 #include <any>
 #include <cstdint>
+#include <memory>
+
+struct AVFormatContext;
+struct AVCodecContext;
+struct AVFrame;
 
 namespace Ffr {
 enum class DecodeType
@@ -114,6 +119,7 @@ public:
         Veryslow,
         Placebo,
     };
+
     EncoderOptions() = default;
 
     explicit EncoderOptions(DecodeType type) noexcept;
@@ -138,5 +144,94 @@ public:
     uint8_t m_quality = 125;              /**< The quality of the output video. 0 is worst, 255 is best. */
     Preset m_preset = Preset::Medium; /**< The preset compression level to use. Higher values result in smaller files
                              but increased encoding time. */
+};
+
+class FormatContextPtr
+{
+    friend class Stream;
+    friend class Filter;
+    friend class Encoder;
+    friend class StreamUtils;
+    friend class Frame;
+
+    FormatContextPtr() = default;
+
+    explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
+
+    [[nodiscard]] AVFormatContext* get() const noexcept;
+
+    AVFormatContext* operator->() const noexcept;
+
+    std::shared_ptr<AVFormatContext> m_formatContext = nullptr;
+};
+
+class CodecContextPtr
+{
+    friend class Stream;
+    friend class Filter;
+    friend class Encoder;
+    friend class StreamUtils;
+    friend class Frame;
+
+    CodecContextPtr() = default;
+
+    explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
+
+    [[nodiscard]] AVCodecContext* get() const noexcept;
+
+    AVCodecContext* operator->() const noexcept;
+
+    std::shared_ptr<AVCodecContext> m_codecContext = nullptr;
+};
+
+class FramePtr
+{
+    friend class Frame;
+    friend class Filter;
+    friend class Stream;
+    friend class Encoder;
+    friend class StreamUtils;
+    friend class FFR;
+
+public:
+    ~FramePtr() noexcept;
+
+    FramePtr(const FramePtr& other) noexcept = delete;
+
+private:
+    FramePtr() noexcept = default;
+
+    explicit FramePtr(AVFrame* frame) noexcept;
+
+    FramePtr(FramePtr&& other) noexcept;
+
+    FramePtr& operator=(FramePtr& other) noexcept;
+
+    FramePtr& operator=(FramePtr&& other) noexcept;
+
+    AVFrame*& operator*() noexcept;
+
+    const AVFrame* operator*() const noexcept;
+
+    AVFrame*& operator->() noexcept;
+
+    const AVFrame* operator->() const noexcept;
+
+    AVFrame* m_frame = nullptr;
+};
+
+class OutputFormatContextPtr
+{
+    friend class Encoder;
+
+    OutputFormatContextPtr() = default;
+
+    explicit OutputFormatContextPtr(AVFormatContext* formatContext) noexcept;
+
+    [[nodiscard]] AVFormatContext* get() const noexcept;
+
+    AVFormatContext* operator->() const noexcept;
+
+    std::shared_ptr<AVFormatContext> m_formatContext = nullptr;
 };
 } // namespace Ffr

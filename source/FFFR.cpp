@@ -31,64 +31,6 @@ extern "C" {
 using namespace std;
 
 namespace Ffr {
-DecoderOptions::DecoderOptions(const DecodeType type) noexcept
-    : m_type(type)
-{}
-
-bool DecoderOptions::operator==(const DecoderOptions& other) const noexcept
-{
-    const bool ret = this->m_type == other.m_type && this->m_bufferLength == other.m_bufferLength &&
-        this->m_device == other.m_device;
-    if (!ret) {
-        return ret;
-    }
-    if (this->m_type == DecodeType::Software) {
-        return true;
-    }
-    try {
-        if (this->m_type == DecodeType::Cuda) {
-            return any_cast<CUcontext>(this->m_context) == any_cast<CUcontext>(other.m_context);
-        }
-    } catch (...) {
-        return false;
-    }
-    return false;
-}
-
-bool DecoderOptions::operator!=(const DecoderOptions& other) const noexcept
-{
-    return !(*this == other);
-}
-
-bool DecoderOptions::operator<(const DecoderOptions& other) const noexcept
-{
-    if (this->m_type < other.m_type) {
-        return true;
-    }
-    if (other.m_type < this->m_type) {
-        return false;
-    }
-    if (this->m_bufferLength < other.m_bufferLength) {
-        return true;
-    }
-    if (other.m_bufferLength < this->m_bufferLength) {
-        return false;
-    }
-    try {
-        if (this->m_type == DecodeType::Cuda) {
-            if (any_cast<CUcontext>(this->m_context) < any_cast<CUcontext>(other.m_context)) {
-                return true;
-            }
-            if (any_cast<CUcontext>(other.m_context) < any_cast<CUcontext>(this->m_context)) {
-                return false;
-            }
-        }
-    } catch (...) {
-        return false;
-    }
-    return this->m_device < other.m_device;
-}
-
 void setLogLevel(const LogLevel level) noexcept
 {
     av_log_set_level(static_cast<int>(level));

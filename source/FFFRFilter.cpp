@@ -45,9 +45,8 @@ AVFilterGraph* Filter::FilterGraphPtr::operator->() const noexcept
     return m_filterGraph.get();
 }
 
-Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format,
-    const Stream::FormatContextPtr& formatContext, const uint32_t streamIndex,
-    const Stream::CodecContextPtr& codecContext) noexcept
+Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, const FormatContextPtr& formatContext,
+    const uint32_t streamIndex, const CodecContextPtr& codecContext) noexcept
 {
     // Make a filter graph to perform any required conversions
     FilterGraphPtr tempGraph(avfilter_graph_alloc());
@@ -223,7 +222,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format,
     m_sink = bufferOutContext;
 }
 
-bool Filter::sendFrame(Frame::FramePtr& frame) const noexcept
+bool Filter::sendFrame(FramePtr& frame) const noexcept
 {
     const auto err = av_buffersrc_add_frame(m_source, *frame);
     if (err < 0) {
@@ -233,7 +232,7 @@ bool Filter::sendFrame(Frame::FramePtr& frame) const noexcept
     return true;
 }
 
-bool Filter::receiveFrame(Frame::FramePtr& frame) const noexcept
+bool Filter::receiveFrame(FramePtr& frame) const noexcept
 {
     // Get the next available frame
     const auto err = av_buffersink_get_frame(m_sink, *frame);

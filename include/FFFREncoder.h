@@ -61,23 +61,6 @@ public:
         EncoderOptions::Preset preset, ConstructorLock) noexcept;
 
 private:
-    class OutputFormatContextPtr
-    {
-        friend class Encoder;
-
-        OutputFormatContextPtr() = default;
-
-        explicit OutputFormatContextPtr(AVFormatContext* formatContext) noexcept;
-
-        [[nodiscard]] AVFormatContext* get() const noexcept;
-
-        AVFormatContext* operator->() const noexcept;
-
-        std::shared_ptr<AVFormatContext> m_formatContext = nullptr;
-    };
-
-    using CodecContextPtr = Stream::CodecContextPtr;
-
     OutputFormatContextPtr m_formatContext;
     CodecContextPtr m_codecContext;
     std::shared_ptr<Stream> m_stream;

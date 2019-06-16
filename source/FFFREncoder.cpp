@@ -85,20 +85,6 @@ string getPresetString(const EncoderOptions::Preset preset)
     }
 }
 
-Encoder::OutputFormatContextPtr::OutputFormatContextPtr(AVFormatContext* formatContext) noexcept
-    : m_formatContext(formatContext, [](AVFormatContext* p) { avformat_free_context(p); })
-{}
-
-AVFormatContext* Encoder::OutputFormatContextPtr::get() const noexcept
-{
-    return m_formatContext.get();
-}
-
-AVFormatContext* Encoder::OutputFormatContextPtr::operator->() const noexcept
-{
-    return m_formatContext.get();
-}
-
 bool Encoder::encodeStream(
     const std::string& fileName, const std::shared_ptr<Stream>& stream, const EncoderOptions& options) noexcept
 {

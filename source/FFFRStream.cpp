@@ -34,34 +34,6 @@ extern "C" {
 }
 
 namespace Ffr {
-Stream::FormatContextPtr::FormatContextPtr(AVFormatContext* formatContext) noexcept
-    : m_formatContext(formatContext, [](AVFormatContext* p) { avformat_close_input(&p); })
-{}
-
-AVFormatContext* Stream::FormatContextPtr::operator->() const noexcept
-{
-    return m_formatContext.get();
-}
-
-AVFormatContext* Stream::FormatContextPtr::get() const noexcept
-{
-    return m_formatContext.get();
-}
-
-Stream::CodecContextPtr::CodecContextPtr(AVCodecContext* codecContext) noexcept
-    : m_codecContext(codecContext, [](AVCodecContext* p) { avcodec_free_context(&p); })
-{}
-
-AVCodecContext* Stream::CodecContextPtr::operator->() const noexcept
-{
-    return m_codecContext.get();
-}
-
-AVCodecContext* Stream::CodecContextPtr::get() const noexcept
-{
-    return m_codecContext.get();
-}
-
 Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
     const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost, Crop crop, Resolution scale,
     PixelFormat format, ConstructorLock) noexcept
@@ -582,7 +554,7 @@ bool Stream::decodeNextFrames() noexcept
     // Loop through and retrieve all decoded frames
     while (true) {
         if (*m_tempFrame == nullptr) {
-            m_tempFrame = Frame::FramePtr(av_frame_alloc());
+            m_tempFrame = FramePtr(av_frame_alloc());
             if (*m_tempFrame == nullptr) {
                 log("Failed to allocate new frame"s, LogLevel::Error);
                 return false;
@@ -648,7 +620,7 @@ bool Stream::decodeNextFrames() noexcept
             for (auto i = previous + 1; i < frameNum; i++) {
                 ++fillFrameNum;
                 fillTimeStamp = frameToTime2(fillFrameNum);
-                Frame::FramePtr frameClone(av_frame_clone(*m_tempFrame));
+                FramePtr frameClone(av_frame_clone(*m_tempFrame));
                 m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum));
             }
         }
@@ -680,7 +652,7 @@ bool Stream::decodeNextFrames() noexcept
         // Check type of memory pointer requested and perform a memory move
         if (m_outputHost) {
             // TODO: need some sort of buffer pool
-            Frame::FramePtr frame2(av_frame_alloc());
+            FramePtr frame2(av_frame_alloc());
             if (*frame2 == nullptr) {
                 av_frame_unref(*m_tempFrame);
                 log("Failed to allocate new host frame"s, LogLevel::Error);

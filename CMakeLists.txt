@@ -66,6 +66,7 @@ set(FFFR_SOURCES
     source/FFFREncoder.cpp
     source/FFFRUtility.cpp
     source/FFFRFormatConvert.cu
+    source/FFFRTypes.cpp
     include/FFFRDecoderContext.h
     include/FFFRFilter.h
     include/FFFRUtility.h

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #pragma once
+#include "FFFRFrame.h"
 #include "FFFRStream.h"
 
 namespace Ffr {

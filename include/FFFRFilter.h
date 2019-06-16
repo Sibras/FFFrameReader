@@ -57,8 +57,8 @@ public:
      * @param streamIndex   Zero-based index of the stream.
      * @param codecContext  Context for the codec.
      */
-    Filter(Resolution scale, Crop crop, PixelFormat format, const Stream::FormatContextPtr& formatContext,
-        uint32_t streamIndex, const Stream::CodecContextPtr& codecContext) noexcept;
+    Filter(Resolution scale, Crop crop, PixelFormat format, const FormatContextPtr& formatContext, uint32_t streamIndex,
+        const CodecContextPtr& codecContext) noexcept;
 
     ~Filter() = default;
 
@@ -75,14 +75,14 @@ public:
      * @param [in,out] frame The input frame.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool sendFrame(Frame::FramePtr& frame) const noexcept;
+    [[nodiscard]] bool sendFrame(FramePtr& frame) const noexcept;
 
     /**
      * Receive frame from filter graph
      * @param [in,out] frame The frame.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool receiveFrame(Frame::FramePtr& frame) const noexcept;
+    [[nodiscard]] bool receiveFrame(FramePtr& frame) const noexcept;
 
     /**
      * Gets the width of output frames.

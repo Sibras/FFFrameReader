@@ -29,57 +29,6 @@ extern "C" {
 using namespace std;
 
 namespace Ffr {
-Frame::FramePtr::FramePtr(AVFrame* frame) noexcept
-    : m_frame(frame)
-{}
-
-Frame::FramePtr::~FramePtr() noexcept
-{
-    if (m_frame != nullptr) {
-        av_frame_free(&m_frame);
-    }
-}
-
-Frame::FramePtr::FramePtr(FramePtr&& other) noexcept
-    : m_frame(other.m_frame)
-{
-    other.m_frame = nullptr;
-}
-
-Frame::FramePtr& Frame::FramePtr::operator=(FramePtr& other) noexcept
-{
-    m_frame = other.m_frame;
-    other.m_frame = nullptr;
-    return *this;
-}
-
-Frame::FramePtr& Frame::FramePtr::operator=(FramePtr&& other) noexcept
-{
-    m_frame = other.m_frame;
-    other.m_frame = nullptr;
-    return *this;
-}
-
-AVFrame*& Frame::FramePtr::operator*() noexcept
-{
-    return m_frame;
-}
-
-const AVFrame* Frame::FramePtr::operator*() const noexcept
-{
-    return m_frame;
-}
-
-AVFrame*& Frame::FramePtr::operator->() noexcept
-{
-    return m_frame;
-}
-
-const AVFrame* Frame::FramePtr::operator->() const noexcept
-{
-    return m_frame;
-}
-
 Frame::Frame(FramePtr& frame, const int64_t timeStamp, const int64_t frameNum) noexcept
     : m_frame(move(frame))
     , m_timeStamp(timeStamp)

@@ -14,19 +14,16 @@
  * limitations under the License.
  */
 #pragma once
-#include "FFFRFrame.h"
 #include "FFFRTypes.h"
 
 #include <cstdint>
-#include <memory>
 #include <mutex>
 #include <vector>
-struct AVFormatContext;
-struct AVCodecContext;
 
 namespace Ffr {
 class DecoderContext;
 class Filter;
+class Frame;
 
 class Stream
 {
@@ -169,40 +166,6 @@ public:
     [[nodiscard]] bool seekFrame(int64_t frame) noexcept;
 
 private:
-    class FormatContextPtr
-    {
-        friend class Stream;
-        friend class Filter;
-        friend class Encoder;
-
-        FormatContextPtr() = default;
-
-        explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
-
-        [[nodiscard]] AVFormatContext* get() const noexcept;
-
-        AVFormatContext* operator->() const noexcept;
-
-        std::shared_ptr<AVFormatContext> m_formatContext = nullptr;
-    };
-
-    class CodecContextPtr
-    {
-        friend class Stream;
-        friend class Filter;
-        friend class Encoder;
-
-        CodecContextPtr() = default;
-
-        explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
-
-        [[nodiscard]] AVCodecContext* get() const noexcept;
-
-        AVCodecContext* operator->() const noexcept;
-
-        std::shared_ptr<AVCodecContext> m_codecContext = nullptr;
-    };
-
     std::recursive_mutex m_mutex;
 
     uint32_t m_bufferLength = 0;                      /**< Length of the ping and pong buffers */
@@ -211,8 +174,8 @@ private:
         0; /**< The position in the ping buffer of the next available frame in the decoded stream. */
     std::vector<std::shared_ptr<Frame>> m_bufferPong; /**< The secondary buffer used to store decoded frames */
     std::shared_ptr<Filter> m_filterGraph = nullptr;  /**< The filter graph for optional transformations. */
-    bool m_outputHost = true;    /**< True to output each frame to host CPU memory (only affects hardware decoding) */
-    Frame::FramePtr m_tempFrame; /**< The temporary frame used for decoding */
+    bool m_outputHost = true; /**< True to output each frame to host CPU memory (only affects hardware decoding) */
+    FramePtr m_tempFrame;     /**< The temporary frame used for decoding */
 
     FormatContextPtr m_formatContext;
     int32_t m_index = -1; /**< Zero-based index of the video stream  */
