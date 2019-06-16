@@ -32,11 +32,14 @@ public:
 
     /**
      * Constructor.
-     * @param [in,out] frame     The frame pointer to frame data. This is reset to nullptr on function exit.
-     * @param          timeStamp The time stamp for the current frame.
-     * @param          frameNum  The zero-indexed frame number in the stream.
+     * @param [in] frame         The frame pointer to frame data. This is reset to nullptr on function exit.
+     * @param      timeStamp     The time stamp for the current frame.
+     * @param      frameNum      The zero-indexed frame number in the stream.
+     * @param      formatContext Context for the format.
+     * @param      codecContext  Context for the codec.
      */
-    Frame(FramePtr& frame, int64_t timeStamp, int64_t frameNum) noexcept;
+    Frame(FramePtr& frame, int64_t timeStamp, int64_t frameNum, FormatContextPtr formatContext,
+        CodecContextPtr codecContext) noexcept;
 
     ~Frame() noexcept = default;
 
@@ -111,5 +114,9 @@ private:
     FramePtr m_frame;
     int64_t m_timeStamp = 0;
     int64_t m_frameNum = 0;
+
+    FormatContextPtr m_formatContext = FormatContextPtr();
+    int32_t m_index = -1; /**< Zero-based index of the video stream  */
+    CodecContextPtr m_codecContext = CodecContextPtr();
 };
 } // namespace Ffr

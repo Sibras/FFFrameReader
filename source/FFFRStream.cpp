@@ -611,7 +611,8 @@ bool Stream::decodeNextFrames() noexcept
                 ++fillFrameNum;
                 fillTimeStamp = frameToTime2(fillFrameNum);
                 FramePtr frameClone(av_frame_clone(*m_tempFrame));
-                m_bufferPong.emplace_back(make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum));
+                m_bufferPong.emplace_back(
+                    make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum, m_formatContext, m_codecContext));
             }
         }
 
@@ -660,7 +661,8 @@ bool Stream::decodeNextFrames() noexcept
         }
 
         // Add the new frame to the pong buffer
-        m_bufferPong.emplace_back(make_shared<Frame>(m_tempFrame, timeStamp, frameNum));
+        m_bufferPong.emplace_back(
+            make_shared<Frame>(m_tempFrame, timeStamp, frameNum, m_formatContext, m_codecContext));
     }
 }
 

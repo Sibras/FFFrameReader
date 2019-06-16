@@ -29,10 +29,13 @@ extern "C" {
 using namespace std;
 
 namespace Ffr {
-Frame::Frame(FramePtr& frame, const int64_t timeStamp, const int64_t frameNum) noexcept
+Frame::Frame(FramePtr& frame, const int64_t timeStamp, const int64_t frameNum, FormatContextPtr formatContext,
+    CodecContextPtr codecContext) noexcept
     : m_frame(move(frame))
     , m_timeStamp(timeStamp)
     , m_frameNum(frameNum)
+    , m_formatContext(move(formatContext))
+    , m_codecContext(move(codecContext))
 {}
 
 int64_t Frame::getTimeStamp() const noexcept
