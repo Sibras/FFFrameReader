@@ -55,21 +55,17 @@ public:
         DecoderOptions options;
         if (params.m_useNvdec) {
             options.m_type = DecodeType::Cuda;
-            // Setup a cuda context
-            auto err = cuInit(0);
-            ASSERT_EQ(err, CUDA_SUCCESS);
-            CUdevice device;
-            err = cuDeviceGet(&device, 0);
-            ASSERT_EQ(err, CUDA_SUCCESS);
             if (params.m_useContext) {
+                // Setup a cuda context
+                auto err = cuInit(0);
+                ASSERT_EQ(err, CUDA_SUCCESS);
+                CUdevice device;
+                err = cuDeviceGet(&device, 0);
+                ASSERT_EQ(err, CUDA_SUCCESS);
                 err = cuCtxCreate(&m_cudaContext, CU_CTX_SCHED_BLOCKING_SYNC, device);
                 ASSERT_EQ(err, CUDA_SUCCESS);
 
                 options.m_context = m_cudaContext;
-            } else {
-                // Use default cuda context
-                err = cuDevicePrimaryCtxRetain(&m_cudaContext, 0);
-                ASSERT_EQ(err, CUDA_SUCCESS);
             }
         }
         options.m_outputHost = params.m_outputToHost;
