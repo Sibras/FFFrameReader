@@ -32,10 +32,28 @@ AVRational StreamUtils::getSampleAspectRatio(const Stream* const stream) noexcep
 
 AVPixelFormat StreamUtils::getPixelFormat(const Stream* const stream) noexcept
 {
+    AVPixelFormat ret;
     if (stream->m_filterGraph.get() != nullptr) {
-        return static_cast<AVPixelFormat>(av_buffersink_get_format(stream->m_filterGraph->m_sink));
+        ret = static_cast<AVPixelFormat>(av_buffersink_get_format(stream->m_filterGraph->m_sink));
     }
-    return stream->m_codecContext->sw_pix_fmt;
+    ret = stream->m_codecContext->sw_pix_fmt;
+    // Remove old deprecated jpeg formats
+    if (ret == AV_PIX_FMT_YUVJ411P) {
+        return AV_PIX_FMT_YUV411P;
+    }
+    if (ret == AV_PIX_FMT_YUVJ420P) {
+        return AV_PIX_FMT_YUV420P;
+    }
+    if (ret == AV_PIX_FMT_YUVJ422P) {
+        return AV_PIX_FMT_YUV422P;
+    }
+    if (ret == AV_PIX_FMT_YUVJ440P) {
+        return AV_PIX_FMT_YUV440P;
+    }
+    if (ret == AV_PIX_FMT_YUVJ444P) {
+        return AV_PIX_FMT_YUV444P;
+    }
+    return ret;
 }
 
 AVRational StreamUtils::getFrameRate(const Stream* stream) noexcept
