@@ -17,6 +17,7 @@
 
 #include "FFFRDecoderContext.h"
 #include "FFFRFilter.h"
+#include "FFFRStreamUtils.h"
 #include "FFFRUtility.h"
 #include "FFFrameReader.h"
 
@@ -38,6 +39,7 @@ Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
     const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost, Crop crop, Resolution scale,
     PixelFormat format, ConstructorLock) noexcept
 {
+    // Open the input file
     AVFormatContext* formatPtr = nullptr;
     auto ret = avformat_open_input(&formatPtr, fileName.c_str(), nullptr, nullptr);
     FormatContextPtr tempFormat(formatPtr);
@@ -105,9 +107,10 @@ Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
         return;
     }
 
+    // Ensure codec parameters are correctly setup
     tempCodec->framerate = av_guess_frame_rate(tempFormat.get(), stream, nullptr);
-
     tempCodec->pkt_timebase = stream->time_base;
+
     av_opt_set_int(tempCodec.get(), "refcounted_frames", 1, 0);
 
     // Check if any scaling/cropping is needed
@@ -288,21 +291,16 @@ uint32_t Stream::getHeight() const noexcept
 
 double Stream::getAspectRatio() const noexcept
 {
-    if (m_filterGraph.get() != nullptr) {
-        return m_filterGraph->getAspectRatio();
-    }
-    if (m_codecContext->sample_aspect_ratio.num != 0) {
-        return av_q2d(av_mul_q(av_make_q(getWidth(), getHeight()), m_codecContext->sample_aspect_ratio));
+    const auto sampleRatio = StreamUtils::getSampleAspectRatio(this);
+    if (sampleRatio.num != 0) {
+        return av_q2d(av_mul_q(av_make_q(getWidth(), getHeight()), sampleRatio));
     }
     return static_cast<double>(getWidth()) / static_cast<double>(getHeight());
 }
 
 PixelFormat Stream::getPixelFormat() const noexcept
 {
-    if (m_filterGraph.get() != nullptr) {
-        return m_filterGraph->getPixelFormat();
-    }
-    return Ffr::getPixelFormat(m_codecContext->sw_pix_fmt);
+    return Ffr::getPixelFormat(StreamUtils::getPixelFormat(this));
 }
 
 int64_t Stream::getTotalFrames() const noexcept
@@ -317,18 +315,12 @@ int64_t Stream::getDuration() const noexcept
 
 double Stream::getFrameRate() const noexcept
 {
-    if (m_filterGraph.get() != nullptr) {
-        return m_filterGraph->getFrameRate();
-    }
-    if (m_codecContext->framerate.num != 0) {
-        return av_q2d(m_codecContext->framerate);
-    }
-    return av_q2d(m_formatContext->streams[m_index]->r_frame_rate);
+    return av_q2d(StreamUtils::getFrameRate(this));
 }
 
 uint32_t Stream::getFrameSize() const noexcept
 {
-    return av_image_get_buffer_size(Ffr::getPixelFormat(getPixelFormat()), getWidth(), getHeight(), 32);
+    return av_image_get_buffer_size(StreamUtils::getPixelFormat(this), getWidth(), getHeight(), 32);
 }
 
 shared_ptr<Frame> Stream::peekNextFrame() noexcept
@@ -597,13 +589,11 @@ bool Stream::decodeNextFrames() noexcept
                 m_tempFrame->best_effort_timestamp = m_tempFrame->pkt_dts;
             }
         }
-        if (m_tempFrame->best_effort_timestamp == AV_NOPTS_VALUE) {
-            // Try and just rebuild it from the previous frame
-            m_tempFrame->best_effort_timestamp = frameToTimeStamp2(timeStampToFrame2(m_lastDecodedTimeStamp) + 1) +
-                av_rescale_q(m_startTimeStamp, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
-        }
         int64_t offsetTimeStamp = m_tempFrame->best_effort_timestamp;
-        if (m_startTimeStamp != 0) {
+        if (offsetTimeStamp == AV_NOPTS_VALUE) {
+            // Try and just rebuild it from the previous frame
+            offsetTimeStamp = frameToTimeStamp2(timeStampToFrame2(m_lastDecodedTimeStamp) + 1);
+        } else if (m_startTimeStamp != 0) {
             // Remove the start time from calculations
             offsetTimeStamp -=
                 av_rescale_q(m_startTimeStamp, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
@@ -629,12 +619,13 @@ bool Stream::decodeNextFrames() noexcept
         m_lastDecodedTimeStamp = offsetTimeStamp;
 
         // Update internal timestamps that may be needed by later processing
+        m_tempFrame->best_effort_timestamp = timeToTimeStamp2(offsetTimeStamp);
         m_tempFrame->pts = m_tempFrame->best_effort_timestamp;
 
         // Perform any required filtering
         if (m_filterGraph != nullptr) {
-            m_tempFrame->pts = av_rescale_q(
-                m_tempFrame->pts, m_codecContext->time_base, av_buffersink_get_time_base(m_filterGraph->m_sink));
+            StreamUtils::rescale(
+                m_tempFrame, m_codecContext->time_base, av_buffersink_get_time_base(m_filterGraph->m_sink));
             if (!m_filterGraph->sendFrame(m_tempFrame)) {
                 av_frame_unref(*m_tempFrame);
                 return false;

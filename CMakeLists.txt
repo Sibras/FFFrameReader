@@ -67,10 +67,12 @@ set(FFFR_SOURCES
     source/FFFRUtility.cpp
     source/FFFRFormatConvert.cu
     source/FFFRTypes.cpp
+    source/FFFRStreamUtils.cpp
     include/FFFRDecoderContext.h
     include/FFFRFilter.h
     include/FFFRUtility.h
     include/FFFRTypes.h
+    include/FFFRStreamUtils.h
 )
 
 set(FFFR_HEADERS

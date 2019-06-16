@@ -24,6 +24,7 @@ class Frame
     friend class Stream;
     friend class Filter;
     friend class Encoder;
+    friend class StreamUtils;
     friend class FFR;
 
 public:

@@ -77,9 +77,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
     inParams->frame_rate = formatContext->streams[streamIndex]->r_frame_rate;
     inParams->height = inHeight;
     inParams->width = inWidth;
-    inParams->sample_aspect_ratio = formatContext->streams[streamIndex]->sample_aspect_ratio.num ?
-        formatContext->streams[streamIndex]->sample_aspect_ratio :
-        codecContext->sample_aspect_ratio;
+    inParams->sample_aspect_ratio = codecContext->sample_aspect_ratio;
     inParams->time_base = av_inv_q(inParams->frame_rate);
     if (codecContext->hw_frames_ctx != nullptr) {
         inParams->hw_frames_ctx = av_buffer_ref(codecContext->hw_frames_ctx);

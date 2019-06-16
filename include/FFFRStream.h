@@ -29,6 +29,7 @@ class Stream
 {
     friend class Filter;
     friend class Encoder;
+    friend class StreamUtils;
 
 public:
     Stream() = delete;
