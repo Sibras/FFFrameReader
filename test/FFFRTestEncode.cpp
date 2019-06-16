@@ -44,12 +44,12 @@ static std::vector<TestParamsEncode> g_testDataEncode = {
     {2, "test10.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true},
 };
 
-class TestDecoder
+class TestEncoder
 {
 public:
-    TestDecoder() = default;
+    TestEncoder() = default;
 
-    ~TestDecoder()
+    ~TestEncoder()
     {
         m_stream = nullptr;
     }
@@ -88,7 +88,7 @@ protected:
         m_decoder.TearDown();
     }
 
-    TestDecoder m_decoder;
+    TestEncoder m_decoder;
 };
 
 TEST_P(EncodeTest1, encodeStream)
