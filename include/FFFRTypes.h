@@ -59,9 +59,9 @@ enum class PixelFormat : int32_t
     NV12 = 23,   /**< planar YUV 4:2:0, 12bpp, 1 plane for Y and 1 plane for the UV components, which are interleaved
                     (first byte U and the following byte V) */
 
-    GBR8P = 73, /**< planar GBR 4:4:4 24bpp */
+    RGB8P = 73, /**< planar RGB 4:4:4 24bpp */
 
-    GBR32FP = 178, /**< IEEE-754 single precision planar GBR 4:4:4, 96bpp */
+    RGB32FP = 178, /**< IEEE-754 single precision planar RGB 4:4:4, 96bpp */
 
     RGB8 = 2, /**< packed RGB 8:8:8, 24bpp, RGBRGB... */
 };

@@ -50,8 +50,22 @@ int64_t Frame::getFrameNumber() const noexcept
 
 std::pair<uint8_t* const, int32_t> Frame::getFrameData(const uint32_t plane) const noexcept
 {
-    int32_t lineSize = m_frame->linesize[plane];
-    uint8_t* const data = m_frame->data[plane];
+    if (plane >= static_cast<uint32_t>(getNumberPlanes())) {
+        return make_pair(nullptr, 0);
+    }
+    auto plane2 = plane;
+    if (getPixelFormat() == PixelFormat::RGB8P || getPixelFormat() == PixelFormat::RGB32FP) {
+        // Re organise frame data so that it is converted from ffmpegs internal GBR format
+        if (plane == 0) {
+            plane2 = 2;
+        } else if (plane == 1) {
+            plane2 = 0;
+        } else {
+            plane2 = 1;
+        }
+    }
+    int32_t lineSize = m_frame->linesize[plane2];
+    uint8_t* const data = m_frame->data[plane2];
     return make_pair(data, lineSize);
 }
 
@@ -80,7 +94,7 @@ PixelFormat Frame::getPixelFormat() const noexcept
     return Ffr::getPixelFormat(framesContext->sw_format);
 }
 
-int32_t Frame::getNumberFrames() const noexcept
+int32_t Frame::getNumberPlanes() const noexcept
 {
     if (m_frame->hw_frames_ctx == nullptr) {
         return av_pix_fmt_count_planes(static_cast<AVPixelFormat>(m_frame->format));
