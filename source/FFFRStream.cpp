@@ -65,8 +65,32 @@ Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
     AVStream* stream = tempFormat->streams[ret];
     const int32_t index = ret;
 
+    // Check if any scaling/cropping is needed
+    const auto inHeight = stream->codecpar->height;
+    const auto inWidth = stream->codecpar->width;
+    Resolution postScale = scale;
+    bool cropRequired = (crop.m_top != 0 || crop.m_bottom != 0 || crop.m_left != 0 || crop.m_right != 0);
+    if (cropRequired) {
+        // Check if scale is actually required after the crop
+        const uint32_t width = inWidth - crop.m_left - crop.m_right;
+        const uint32_t height = inHeight - crop.m_top - crop.m_bottom;
+        if (width == postScale.m_width) {
+            postScale.m_width = 0;
+        }
+        if (height == postScale.m_height) {
+            postScale.m_height = 0;
+        }
+    }
+    if (postScale.m_width == static_cast<uint32_t>(inWidth)) {
+        postScale.m_width = 0;
+    }
+    if (postScale.m_height == static_cast<uint32_t>(inHeight)) {
+        postScale.m_height = 0;
+    }
+    bool scaleRequired = (postScale.m_height != 0 || postScale.m_width != 0);
+
     if (decoderContext.get() != nullptr) {
-        if (decoderContext->getType() == DecodeType::Cuda) {
+        if (decoderContext->getType() == DecodeType::Cuda && (cropRequired || scaleRequired)) {
             // Use cuvid decoder instead of nvdec hardware accel
             string cuvidName = decoder->name;
             cuvidName += "_cuvid";
@@ -112,30 +136,6 @@ Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
     tempCodec->pkt_timebase = stream->time_base;
 
     av_opt_set_int(tempCodec.get(), "refcounted_frames", 1, 0);
-
-    // Check if any scaling/cropping is needed
-    const auto inHeight = tempCodec->height;
-    const auto inWidth = tempCodec->width;
-    Resolution postScale = scale;
-    bool cropRequired = (crop.m_top != 0 || crop.m_bottom != 0 || crop.m_left != 0 || crop.m_right != 0);
-    if (cropRequired) {
-        // Check if scale is actually required after the crop
-        const uint32_t width = inWidth - crop.m_left - crop.m_right;
-        const uint32_t height = inHeight - crop.m_top - crop.m_bottom;
-        if (width == postScale.m_width) {
-            postScale.m_width = 0;
-        }
-        if (height == postScale.m_height) {
-            postScale.m_height = 0;
-        }
-    }
-    if (postScale.m_width == static_cast<uint32_t>(inWidth)) {
-        postScale.m_width = 0;
-    }
-    if (postScale.m_height == static_cast<uint32_t>(inHeight)) {
-        postScale.m_height = 0;
-    }
-    bool scaleRequired = (postScale.m_height != 0 || postScale.m_width != 0);
 
     // Setup any required hardware decoding parameters
     AVDictionary* opts = nullptr;
