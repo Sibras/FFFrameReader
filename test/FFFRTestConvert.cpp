@@ -14,23 +14,31 @@
  * limitations under the License.
  */
 #include "FFFRTestData.h"
+#include "FFFRUtility.h"
 #include "FFFrameReader.h"
 
 #include <cuda.h>
+#include <fstream>
 #include <gtest/gtest.h>
+
+extern "C" {
+#include <libavutil/imgutils.h>
+}
+
 using namespace Ffr;
 
 struct TestParamsConvert
 {
     uint32_t m_testDataIndex;
     PixelFormat m_format;
+    std::string m_imageFile;
 };
 
 static std::vector<TestParamsConvert> g_testDataConvert = {
-    {0, PixelFormat::RGB8},
-    {0, PixelFormat::YUV420P},
-    {0, PixelFormat::RGB8P},
-    {0, PixelFormat::RGB32FP},
+    {1, PixelFormat::RGB8, "test1"},
+    {1, PixelFormat::YUV420P, "test2"},
+    {1, PixelFormat::RGB8P, "test3"},
+    {1, PixelFormat::RGB32FP, "test4"},
 };
 
 class TestConvert
@@ -80,6 +88,57 @@ public:
         }
     }
 
+    void saveImage(const PixelFormat format, const uint32_t width, const uint32_t height, const std::string& filename)
+    {
+        if (format != PixelFormat::RGB32FP && format != PixelFormat::RGB8P && format != PixelFormat::RGB8) {
+            return;
+        }
+        std::ofstream ofs;
+        try {
+            // Copy data to host
+            std::vector<uint8_t> hostBuffer;
+            const auto imageSize = getImageSize(format, width, height);
+            hostBuffer.reserve(imageSize);
+            ASSERT_EQ(cuCtxPushCurrent(m_context), CUDA_SUCCESS);
+            ASSERT_EQ(cuMemcpyDtoH_v2(hostBuffer.data(), m_cudaBuffer, imageSize), CUDA_SUCCESS);
+            ASSERT_EQ(cuCtxSynchronize(), CUDA_SUCCESS);
+            CUcontext dummy;
+            ASSERT_EQ(cuCtxPopCurrent(&dummy), CUDA_SUCCESS);
+            ofs.open(filename + ".ppm", std::ios::binary);
+            ASSERT_FALSE(ofs.fail());
+            ofs << "P6\n" << width << " " << height << "\n255\n";
+            // Get each data frame
+            uint8_t* outPlanes[4];
+            int32_t outStep[4];
+            av_image_fill_arrays(outPlanes, outStep, hostBuffer.data(), getPixelFormat(format), width, height, 32);
+            // Loop over each pixel and output to file
+            uint32_t offset = 0;
+            for (uint32_t i = 0; i < height; ++i) {
+                for (uint32_t j = 0; j < width; ++j) {
+                    uint8_t r, g, b;
+                    if (format == PixelFormat::RGB32FP) {
+                        const auto jOffset = j * sizeof(float);
+                        r = static_cast<uint8_t>(*reinterpret_cast<float*>(&(outPlanes[0][offset + jOffset])) * 255.0f);
+                        g = static_cast<uint8_t>(*reinterpret_cast<float*>(&(outPlanes[1][offset + jOffset])) * 255.0f);
+                        b = static_cast<uint8_t>(*reinterpret_cast<float*>(&(outPlanes[2][offset + jOffset])) * 255.0f);
+                    } else if (format == PixelFormat::RGB8P) {
+                        r = outPlanes[0][offset + j];
+                        g = outPlanes[1][offset + j];
+                        b = outPlanes[2][offset + j];
+                    } else {
+                        r = outPlanes[0][offset + (j * 3)];
+                        g = outPlanes[0][offset + (j * 3) + 1];
+                        b = outPlanes[0][offset + (j * 3) + 2];
+                    }
+                    ofs << r << g << b;
+                }
+                offset += outStep[0];
+            }
+            ofs.close();
+        } catch (...) {
+        }
+    }
+
     std::shared_ptr<Stream> m_stream = nullptr;
     CUcontext m_context = nullptr;
     CUdeviceptr m_cudaBuffer = reinterpret_cast<CUdeviceptr>(nullptr);
@@ -115,6 +174,10 @@ TEST_P(ConvertTest1, convert)
 
         // Copy/Convert image data into output
         ASSERT_TRUE(convertFormat(frame1, reinterpret_cast<uint8_t*>(m_decoder.m_cudaBuffer), GetParam().m_format));
+
+        // Save to image for visual inspection
+        m_decoder.saveImage(GetParam().m_format, frame1->getWidth(), frame1->getHeight(),
+            GetParam().m_imageFile + "-" + std::to_string(j));
     }
 }
 
