@@ -43,9 +43,12 @@ static std::vector<TestParams> g_testData = {
 #if 0
     // These are internal testing files and are not redistributed
     {"data/CLIP0000818_000_77aabf.mkv", 3840, 2160, 16.0 / 9.0, 1116, 44640000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
-    {"data/MenMC_50BR_Finals_Canon - Cut.mp4", 3840, 2160, 16.0 / 9.0, 249, 9960000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
-    {"data/MenMC_50BR_Finals_Canon.MP4", 3840, 2160, 16.0 / 9.0, 2124, 84960000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
+    {"data/MenMC_50BR_Finals_Canon - Cut.mp4", 3840, 2160, 16.0 / 9.0, 249, 9960000, 25.0, 40000,
+        Ffr::PixelFormat::YUV420P},
+    {"data/MenMC_50BR_Finals_Canon.MP4", 3840, 2160, 16.0 / 9.0, 2124, 84960000, 25.0, 40000,
+        Ffr::PixelFormat::YUV420P},
     {"data/MVI_0048.MP4", 3840, 2160, 16.0 / 9.0, 8592, 171840000, 50.0, 20000, Ffr::PixelFormat::YUV420P},
-    {"data/Women_400IM_Heat2_Sony.MXF", 3840, 2160, 16.0 / 9.0, 9204, 368160000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
+    {"data/Women_400IM_Heat2_Sony.MXF", 3840, 2160, 16.0 / 9.0, 9204, 368160000, 25.0, 40000,
+        Ffr::PixelFormat::YUV420P},
 #endif
 };

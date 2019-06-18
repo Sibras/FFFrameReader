@@ -49,11 +49,6 @@ class TestEncoder
 public:
     TestEncoder() = default;
 
-    ~TestEncoder()
-    {
-        m_stream = nullptr;
-    }
-
     void SetUp(const TestParamsEncode& params)
     {
         DecoderOptions options;

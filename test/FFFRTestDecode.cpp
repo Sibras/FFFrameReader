@@ -44,7 +44,7 @@ public:
 
     ~TestDecoder()
     {
-        m_stream = nullptr;
+        m_stream.reset();
         if (m_cudaContext != nullptr) {
             cuCtxDestroy(m_cudaContext);
         }
