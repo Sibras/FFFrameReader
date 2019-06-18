@@ -16,11 +16,10 @@ The library supports software decoding as well as some hardware decoders with ba
 To use this library you first need to create a Stream object that is used to represent the decoded file. 
 A default Stream object will use normal software decoding on the CPU and can be created using the following:
 ~~~~
-auto ret = Stream::getStream("filename");
-if (ret.index() == 0) {
+auto stream = Stream::getStream("filename");
+if (stream == nullptr) {
     // File opening has failed
 }
-auto stream = std::get<1>(ret);
 ~~~~
 Streams can also be optionally passed a set of options (@see DecoderOptions) that can be used to enable
 hardware accelerated decoding, resizing, cropping and various other decoding parameters. For instance to 
@@ -28,35 +27,34 @@ use NVIDIA GPU accelerated decoding you can create decoder options as follows:
 ~~~~
 DecoderOptions options(DecodeType::Cuda);
 ~~~~
-Options for software decoding but apply resizing can be created as follows:
+Options for software decoding but with resizing can be created as follows:
 ~~~~
 DecoderOptions options;
 options.m_scale = {1280, 720};
 ~~~~
 Once decoder options have been created they can then be used to open various files by passing them to the stream creation:
 ~~~~
-auto ret = Stream::getStream(fileName, options);
+auto stream = Stream::getStream(fileName, options);
 ~~~~
 A stream object can then be used to get information about the opened file (such as resolution, duration etc.) and to
 read image frames from the video. To get the next frame in a video you can use the following in a loop:
 ~~~~
-auto ret2 = stream->getNextFrame();
-if (ret2.index() == 0) {
+auto frame = stream->getNextFrame();
+if (frame == nullptr) {
     // Failed to get the next frame, there was either an internal error or the end of the file has been reached
 }
-auto frame = std::get<1>(ret2);
 ~~~~
 This creates a frame object that has the information for the requested frame (such as its time stamp, frame number
 etc.). It also has the actual image data itself that can be retrieved as follows:
 ~~~~
-auto data1 = frame->getFrameData(1);
+auto data1 = frame->getFrameData(00);
 ~~~~
 The format of the data stored in the returned pointer depends on the input video and the decoder options. By default
-many videos will be coded using YUV422 which in that case means there are 3 different image planes (Y,U or V planes respectively).
-To get a specific image plane; getFrameData can be used by passing the desired plane. This function will returna pointer 
+many videos will be coded using YUV420 which in that case means there are 3 different image planes (Y,U or V planes respectively).
+To get a specific image plane; getFrameData can be used by passing the desired plane. This function will return a pointer 
 to the start of the plane and the line size of each row in the image plane. The number of planes in each frame can be determined by:
 ~~~~
-auto planes = frame->getNumberFrames();
+auto planes = frame->getNumberPlanes();
 ~~~~
 By default when using hardware decoding the decoded frames will be output to system host memory. To keep the frames in device 
 memory setup the decoder options such that:
