@@ -22,7 +22,7 @@ __device__ __forceinline__ float clamp(const float f, const float a, const float
     return fmaxf(a, fminf(f, b));
 }
 
-__device__ __forceinline__ float3 YUVToRGB(const char3 yuv)
+__device__ __forceinline__ float3 YUVToRGB(const uchar3 yuv)
 {
     // Get YCbCr values
     const float luma = static_cast<float>(yuv.x);
@@ -30,9 +30,8 @@ __device__ __forceinline__ float3 YUVToRGB(const char3 yuv)
     const float chromaCr = static_cast<float>(yuv.z) - 128.0f;
 
     // Convert to RGB using BT601
-    return make_float3(clamp(luma + 1.13983 * chromaCr, 0, 255.0f),
-        clamp(luma - 0.39465f * chromaCb - 0.58060f * chromaCr, 0, 255.0f),
-        clamp(luma + 2.03211f * chromaCb, 0, 255.0f));
+    return make_float3(
+        luma + 1.13983 * chromaCr, luma - 0.39465f * chromaCb - 0.58060f * chromaCr, luma + 2.03211f * chromaCb);
 }
 
 struct Pixel2
@@ -75,7 +74,7 @@ __device__ __forceinline__ Pixel2 getNV12ToRGB(
     //  To try and be a bit more cache friendly Y is processed in 2 pixels (row) at a time instead of 4
     //  This replaces 2 Y loads at a time with 2 UV loads for each 2xY row
 
-    char3 yuvi[2];
+    uchar3 yuvi[2];
     const uint32_t sourceOffset = y * sourceStep + x;
     yuvi[0].x = source.m_plane1[sourceOffset];
     yuvi[1].x = source.m_plane1[sourceOffset + 1];
@@ -100,16 +99,30 @@ __device__ __forceinline__ Pixel2 getNV12ToRGB(
 }
 
 template<typename T>
-__device__ __forceinline__ float3 getRGB(const float3 pixel)
+class UpPack
+{
+public:
+    typedef float3 Type;
+};
+
+template<>
+class UpPack<uint8_t>
+{
+public:
+    typedef uchar3 Type;
+};
+
+template<typename T>
+__device__ __forceinline__ T getRGB(const float3 pixel)
 {
     // Normalise float values
-    return make_float3(pixel.x / 255.0f, pixel.y / 255.0f, pixel.z / 255.0f);
+    return make_float3(__saturatef(pixel.x / 255.0f), __saturatef(pixel.y / 255.0f), __saturatef(pixel.z / 255.0f));
 }
 
-template<uint8_t>
-__device__ __forceinline__ char3 getRGB(const float3 pixel)
+template<>
+__device__ __forceinline__ uchar3 getRGB(const float3 pixel)
 {
-    return make_char3(pixel.x, pixel.y, pixel.z);
+    return make_uchar3(clamp(pixel.x, 0.0f, 255.0f), clamp(pixel.y, 0.0f, 255.0f), clamp(pixel.z, 0.0f, 255.0f));
 }
 
 template<typename T>
@@ -125,8 +138,8 @@ __device__ __forceinline__ void convertNV12ToRGBP(const NV12Planes source, const
 
     Pixel2 pixels = getNV12ToRGB(x, y, source, sourceStep);
 
-    const auto pixel1 = getRGB<T>(pixels.m_pixels[0]);
-    const auto pixel2 = getRGB<T>(pixels.m_pixels[1]);
+    const auto pixel1 = getRGB<typename UpPack<T>::Type>(pixels.m_pixels[0]);
+    const auto pixel2 = getRGB<typename UpPack<T>::Type>(pixels.m_pixels[1]);
     const uint32_t destOffset = y * destStep + x;
     dest.m_plane1[destOffset] = pixel1.x;
     dest.m_plane1[destOffset + 1] = pixel2.x;
