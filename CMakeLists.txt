@@ -56,7 +56,15 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
     endif()
 endif()
 
+find_package(CUDA QUIET REQUIRED)
+
 # Add project source files
+set(FFFR_SOURCES_CUDA
+    source/FFFRFormatConvert.cu
+)
+
+set(FFFR_PTX_EMBEDDED ${CMAKE_CURRENT_BINARY_DIR}/FFFREmbeddedPTX.cpp)
+
 set(FFFR_SOURCES
     source/FFFR.cpp
     source/FFFRStream.cpp
@@ -65,7 +73,6 @@ set(FFFR_SOURCES
     source/FFFRFrame.cpp
     source/FFFREncoder.cpp
     source/FFFRUtility.cpp
-    source/FFFRFormatConvert.cu
     source/FFFRTypes.cpp
     source/FFFRStreamUtils.cpp
     include/FFFRDecoderContext.h
@@ -73,6 +80,7 @@ set(FFFR_SOURCES
     include/FFFRUtility.h
     include/FFFRTypes.h
     include/FFFRStreamUtils.h
+    ${FFFR_PTX_EMBEDDED}
 )
 
 set(FFFR_HEADERS
@@ -80,6 +88,39 @@ set(FFFR_HEADERS
     include/FFFRStream.h
     include/FFFRFrame.h
     include/FFFREncoder.h
+)
+
+# Add cuda ptx generation
+add_library(FFFRPTX OBJECT ${FFFR_SOURCES_CUDA})
+set_target_properties(FFFRPTX PROPERTIES
+    CUDA_PTX_COMPILATION ON
+    LINKER_LANGUAGE CUDA
+)
+
+# Use bin2c found in cuda toolkit to embed ptx into final executable
+get_filename_component(CUDA_COMPILER_DIR "${CMAKE_CUDA_COMPILER}" DIRECTORY)
+find_program(BIN_2_C
+  NAMES bin2c
+  PATHS ${CUDA_COMPILER_DIR}
+  )
+if(NOT BIN_2_C)
+  message(FATAL_ERROR
+    "bin2c not found:\n"
+    "  CMAKE_CUDA_COMPILER='${CMAKE_CUDA_COMPILER}'\n"
+    "  CUDA_COMPILER_DIR='${CUDA_COMPILER_DIR}'\n"
+    )
+endif()
+
+add_custom_command(
+  OUTPUT "${FFFR_PTX_EMBEDDED}"
+  COMMAND ${CMAKE_COMMAND}
+    "-DBIN_TO_C_COMMAND=${BIN_2_C}"
+    "-DOBJECTS=$<TARGET_OBJECTS:FFFRPTX>"
+    "-DOUTPUT=${FFFR_PTX_EMBEDDED}"
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
+  VERBATIM
+  DEPENDS $<TARGET_OBJECTS:FFFRPTX>
+  COMMENT "Converting PTX files to a C header"
 )
 
 # Add source to this project's executable.
@@ -106,6 +147,8 @@ set_target_properties(FfFrameReader PROPERTIES
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
 
+add_dependencies(FfFrameReader FFFRPTX)
+
 # Enable all compile warnings
 if(MSVC)
   target_compile_options(FfFrameReader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /WX /experimental:external /external:anglebrackets /external:W3>)
@@ -129,8 +172,6 @@ find_library(AVUTIL_LIBRARY NAMES avutil)
 find_library(SWSCALE_LIBRARY NAMES swscale)
 find_library(POSTPROC_LIBRARY NAMES postproc)
 find_library(SWRESAMPLE_LIBRARY NAMES swresample)
-
-find_package(CUDA QUIET REQUIRED)
 
 target_include_directories(FfFrameReader PRIVATE
     ${PROJECT_SOURCE_DIR}/include
@@ -178,6 +219,7 @@ if(BUILD_TESTING)
         test/FFFRTestFrame.cpp
         test/FFFRTestFilter.cpp
         test/FFFRTestEncode.cpp
+        test/FFFRTestConvert.cpp
         test/FFFRTestData.h
     )
 

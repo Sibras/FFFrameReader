@@ -63,10 +63,10 @@ int32_t getImageSize(PixelFormat format, uint32_t width, uint32_t height) noexce
 /**
  * Convert pixel format using cuda.
  * @param       frame     The input frame.
- * @param [out] outMem    Memory location to store output (must be allocated with enough size for outpur frame see
+ * @param [out] outMem    Memory location to store output (must be allocated with enough size for output frame see
  *  @getImageSize).
  * @param       outFormat The pixel format to convert to.
  * @returns True if it succeeds, false if it fails.
  */
-bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem[3], PixelFormat outFormat) noexcept;
+bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem, PixelFormat outFormat) noexcept;
 } // namespace Ffr

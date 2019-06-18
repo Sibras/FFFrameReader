@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#include <crt/host_defines.h>
 #include <cstdint>
-#include <cuda_runtime.h>
+#include <driver_types.h>
 
-namespace Ffr {
 __device__ __forceinline__ float clamp(const float f, const float a, const float b)
 {
     return fmaxf(a, fminf(f, b));
@@ -41,8 +40,22 @@ struct Pixel2
     float3 m_pixels[2];
 };
 
+struct NV12Planes
+{
+    uint8_t* m_plane1;
+    uint8_t* m_plane2;
+};
+
+template<typename T>
+struct RGBPlanes
+{
+    T* m_plane1;
+    T* m_plane2;
+    T* m_plane3;
+};
+
 __device__ __forceinline__ Pixel2 getNV12ToRGB(
-    const uint32_t x, const uint32_t y, const uint8_t* const source[2], const uint32_t sourceStep)
+    const uint32_t x, const uint32_t y, const NV12Planes source, const uint32_t sourceStep)
 {
     // NV12 is stored as 2 planes: the first plane contains Y the second plane contains U+V interleaved
     // There are 1 U+V sample for every 2x2 Y block
@@ -64,13 +77,13 @@ __device__ __forceinline__ Pixel2 getNV12ToRGB(
 
     char3 yuvi[2];
     const uint32_t sourceOffset = y * sourceStep + x;
-    yuvi[0].x = source[0][sourceOffset];
-    yuvi[1].x = source[0][sourceOffset + 1];
+    yuvi[0].x = source.m_plane1[sourceOffset];
+    yuvi[1].x = source.m_plane1[sourceOffset + 1];
 
     const uint32_t chromaOffset = y >> 1;
     const uint32_t chromaSourceOffset = chromaOffset * sourceStep + x;
-    const uint8_t chromaCb = source[1][chromaSourceOffset];
-    const uint8_t chromaCr = source[1][chromaSourceOffset + 1];
+    const uint8_t chromaCb = source.m_plane2[chromaSourceOffset];
+    const uint8_t chromaCr = source.m_plane2[chromaSourceOffset + 1];
 
     // This doesn't perform any chroma interpolation, this feature would need to be added later if needed
 
@@ -100,8 +113,8 @@ __device__ __forceinline__ char3 getRGB(const float3 pixel)
 }
 
 template<typename T>
-__global__ void convertNV12ToRGBP(const uint8_t* const source[2], const uint32_t sourceStep, const uint32_t width,
-    const uint32_t height, uint8_t* dest[3], const uint32_t destStep)
+__device__ __forceinline__ void convertNV12ToRGBP(const NV12Planes source, const uint32_t sourceStep,
+    const uint32_t width, const uint32_t height, RGBPlanes<T> dest, const uint32_t destStep)
 {
     const uint32_t x = blockIdx.x * (blockDim.x << 1) + (threadIdx.x << 1);
     const uint32_t y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -115,38 +128,24 @@ __global__ void convertNV12ToRGBP(const uint8_t* const source[2], const uint32_t
     const auto pixel1 = getRGB<T>(pixels.m_pixels[0]);
     const auto pixel2 = getRGB<T>(pixels.m_pixels[1]);
     const uint32_t destOffset = y * destStep + x;
-    dest[0][destOffset] = pixel1.x;
-    dest[0][destOffset + 1] = pixel2.x;
-    dest[1][destOffset] = pixel1.y;
-    dest[1][destOffset + 1] = pixel2.y;
-    dest[2][destOffset] = pixel1.z;
-    dest[2][destOffset + 1] = pixel2.z;
+    dest.m_plane1[destOffset] = pixel1.x;
+    dest.m_plane1[destOffset + 1] = pixel2.x;
+    dest.m_plane2[destOffset] = pixel1.y;
+    dest.m_plane2[destOffset + 1] = pixel2.y;
+    dest.m_plane3[destOffset] = pixel1.z;
+    dest.m_plane3[destOffset + 1] = pixel2.z;
 }
 
-__forceinline__ int divUp(const uint32_t total, const uint32_t grain)
+extern "C" {
+__global__ void convertNV12ToRGB8P(const NV12Planes source, const uint32_t sourceStep, const uint32_t width,
+    const uint32_t height, const RGBPlanes<uint8_t> dest, const uint32_t destStep)
 {
-    return (total + grain - 1) / grain;
+    convertNV12ToRGBP<uint8_t>(source, sourceStep, width, height, dest, destStep);
 }
 
-cudaError_t convertNV12ToRGB8P(const uint8_t* const source[2], const uint32_t sourceStep, const uint32_t width,
-    const uint32_t height, uint8_t* dest[3], const uint32_t destStep)
+__global__ void convertNV12ToRGB32FP(const NV12Planes source, const uint32_t sourceStep, const uint32_t width,
+    const uint32_t height, const RGBPlanes<float> dest, const uint32_t destStep)
 {
-    const dim3 blockDim(8, 8, 1);
-    const dim3 gridDim(divUp(width, blockDim.x), divUp(height, blockDim.y), 1);
-
-    convertNV12ToRGBP<char3><<<gridDim, blockDim>>>(source, sourceStep, width, height, dest, destStep);
-
-    return cudaPeekAtLastError();
+    convertNV12ToRGBP<float>(source, sourceStep, width, height, dest, destStep / sizeof(float));
 }
-
-cudaError_t convertNV12ToRGB32FP(const uint8_t* const source[2], const uint32_t sourceStep, const uint32_t width,
-    const uint32_t height, uint8_t* dest[3], const uint32_t destStep)
-{
-    const dim3 blockDim(8, 8, 1);
-    const dim3 gridDim(divUp(width, blockDim.x), divUp(height, blockDim.y), 1);
-
-    convertNV12ToRGBP<char3><<<gridDim, blockDim>>>(source, sourceStep, width, height, dest, destStep);
-
-    return cudaPeekAtLastError();
 }
-} // namespace Ffr
