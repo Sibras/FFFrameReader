@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <crt/host_defines.h>
 #include <cstdint>
-#include <driver_types.h>
 
 __device__ __forceinline__ float clamp(const float f, const float a, const float b)
 {
