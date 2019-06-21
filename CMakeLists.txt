@@ -48,6 +48,9 @@ option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
 # Build test related commands?
 option(BUILD_TESTING "Create test programs" OFF)
 
+# Build with nppi commands? This requires cuda 10.1 or better
+option(BUILD_NPPI "Build using NVIDIA libnnpi format conversion" ON)
+
 # Default to a release build if desired configuration is not specified.
 if(NOT CMAKE_CONFIGURATION_TYPES)
     if(NOT CMAKE_BUILD_TYPE)
@@ -63,7 +66,13 @@ set(FFFR_SOURCES_CUDA
     source/FFFRFormatConvert.cu
 )
 
-set(FFFR_PTX_EMBEDDED ${CMAKE_CURRENT_BINARY_DIR}/FFFREmbeddedPTX.cpp)
+set(FFFR_PTX_EMBEDDED
+    ${CMAKE_CURRENT_BINARY_DIR}/FFFREmbeddedPTX.cpp
+)
+
+set(FFFR_SOURCES_CONFIG
+    ${CMAKE_CURRENT_BINARY_DIR}/config.h
+)
 
 set(FFFR_SOURCES
     source/FFFR.cpp
@@ -81,6 +90,7 @@ set(FFFR_SOURCES
     include/FFFRTypes.h
     include/FFFRStreamUtils.h
     ${FFFR_PTX_EMBEDDED}
+    ${FFFR_SOURCES_CONFIG}
 )
 
 set(FFFR_HEADERS
@@ -122,6 +132,8 @@ add_custom_command(
   DEPENDS $<TARGET_OBJECTS:FFFRPTX>
   COMMENT "Converting PTX files to a C header"
 )
+
+configure_file(include/config.h.in config.h @ONLY)
 
 # Add source to this project's executable.
 if(BUILD_SHARED_LIBS)
@@ -180,6 +192,7 @@ target_include_directories(FfFrameReader PRIVATE
     ${AVFILTER_INCLUDE_DIR}
     ${AVUTIL_INCLUDE_DIR}
     ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_link_libraries(FfFrameReader
     PRIVATE ${AVCODEC_LIBRARY}
@@ -228,6 +241,7 @@ if(BUILD_TESTING)
     target_include_directories(FFFRTest PRIVATE
         ${PROJECT_SOURCE_DIR}/include
         ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+        ${CMAKE_CURRENT_BINARY_DIR}
     )
 
     target_link_libraries(

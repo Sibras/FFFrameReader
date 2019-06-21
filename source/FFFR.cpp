@@ -15,9 +15,12 @@
  */
 #include "FFFRUtility.h"
 #include "FFFrameReader.h"
+#include "config.h"
 
 #include <map>
-#include <nppi_color_conversion.h>
+#if BUILD_NPPI
+#    include <nppi_color_conversion.h>
+#endif
 #include <string>
 
 extern "C" {
@@ -78,9 +81,10 @@ private:
         int m_kernelNV12ToRGB8PMem = 0;
         CUfunction m_kernelNV12ToRGB32FP = nullptr;
         int m_kernelNV12ToRGB32FPMem = 0;
+        CUcontext m_context = nullptr;
         CUstream m_stream = nullptr;
 
-        explicit KernelContext(const CUstream stream)
+        explicit KernelContext(const CUcontext context, const CUstream stream)
         {
             auto err = cuModuleLoadData(&m_module, FFFRFormatConvert);
             if (err != CUDA_SUCCESS) {
@@ -109,24 +113,36 @@ private:
             cuFuncGetAttribute(&m_kernelNV12ToRGB8PMem, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, m_kernelNV12ToRGB8P);
             cuFuncGetAttribute(&m_kernelNV12ToRGB32FPMem, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, m_kernelNV12ToRGB32FP);
 
+            m_context = context;
             m_stream = stream;
         }
 
         ~KernelContext()
         {
-            if (m_module != nullptr) {
-                cuModuleUnload(m_module);
+            if (m_context != nullptr) {
+                if (cuCtxPushCurrent(m_context) != CUDA_SUCCESS) {
+                    log("Failed to set CUDA context"s, LogLevel::Error);
+                }
+                if (m_module != nullptr) {
+                    cuModuleUnload(m_module);
+                }
+                CUcontext dummy;
+                cuCtxPopCurrent(&dummy);
             }
         }
 
         [[nodiscard]] bool isValid() const
         {
-            return m_kernelNV12ToRGB32FP != nullptr;
+            return m_context != nullptr;
         }
     };
 
     static mutex s_mutex;
+#if BUILD_NPPI
     static map<CUcontext, pair<NppStreamContext, shared_ptr<KernelContext>>> s_contextProperties;
+#else
+    static map<CUcontext, shared_ptr<KernelContext>> s_contextProperties;
+#endif
 
     static bool setupContext(const CUcontext context, const CUstream stream)
     {
@@ -135,6 +151,7 @@ private:
             return true;
         }
 
+#if BUILD_NPPI
         // Create Npp context
         NppStreamContext nppContext = {};
         nppContext.hStream = stream;
@@ -152,15 +169,20 @@ private:
             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, nppContext.nCudaDeviceId);
         cuDeviceGetAttribute(&nppContext.nCudaDevAttrComputeCapabilityMinor,
             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, nppContext.nCudaDeviceId);
+#endif
 
         // Create custom context properties
-        auto kernelProperties = make_shared<KernelContext>(stream);
+        auto kernelProperties = make_shared<KernelContext>(context, stream);
         if (!kernelProperties->isValid()) {
             return false;
         }
 
         // Add new properties to internal list
+#if BUILD_NPPI
         s_contextProperties[context] = make_pair(nppContext, move(kernelProperties));
+#else
+        s_contextProperties[context] = move(kernelProperties);
+#endif
         return true;
     }
 
@@ -172,38 +194,49 @@ private:
     static CUresult convertNV12ToRGB8P(uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
         uint8_t* dest[3], uint32_t destStep, KernelContext* context)
     {
-        const dim3 blockDim(8, 8, 1);
-        const dim3 gridDim(divUp(width, blockDim.x), divUp(height, blockDim.y), 1);
+        const uint32_t blockX = 8;
+        const uint32_t blockY = 8;
 
         NV12Planes inMem = {reinterpret_cast<CUdeviceptr>(source[0]), reinterpret_cast<CUdeviceptr>(source[1])};
         RGBPlanes outMem = {reinterpret_cast<CUdeviceptr>(dest[0]), reinterpret_cast<CUdeviceptr>(dest[1]),
             reinterpret_cast<CUdeviceptr>(dest[2])};
         void* args[] = {&inMem, &sourceStep, &width, &height, &outMem, &destStep};
-        return cuLaunchKernel(context->m_kernelNV12ToRGB8P, gridDim.x, gridDim.y, gridDim.z, blockDim.x, blockDim.y,
-            blockDim.z, context->m_kernelNV12ToRGB8PMem, context->m_stream, args, nullptr);
+        return cuLaunchKernel(context->m_kernelNV12ToRGB8P, divUp(width, blockX), divUp(height, blockY), 1, blockX,
+            blockY, 1, context->m_kernelNV12ToRGB8PMem, context->m_stream, args, nullptr);
     }
 
     static CUresult convertNV12ToRGB32FP(uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
         uint8_t* dest[3], uint32_t destStep, KernelContext* context)
     {
-        const dim3 blockDim(8, 8, 1);
-        const dim3 gridDim(divUp(width, blockDim.x), divUp(height, blockDim.y), 1);
+        const uint32_t blockX = 8;
+        const uint32_t blockY = 8;
 
         NV12Planes inMem = {reinterpret_cast<CUdeviceptr>(source[0]), reinterpret_cast<CUdeviceptr>(source[1])};
         RGBPlanes outMem = {reinterpret_cast<CUdeviceptr>(dest[0]), reinterpret_cast<CUdeviceptr>(dest[1]),
             reinterpret_cast<CUdeviceptr>(dest[2])};
         void* args[] = {&inMem, &sourceStep, &width, &height, &outMem, &destStep};
-        return cuLaunchKernel(context->m_kernelNV12ToRGB32FP, gridDim.x, gridDim.y, gridDim.z, blockDim.x, blockDim.y,
-            blockDim.z, context->m_kernelNV12ToRGB32FPMem, context->m_stream, args, nullptr);
+        return cuLaunchKernel(context->m_kernelNV12ToRGB32FP, divUp(width, blockX), divUp(height, blockY), 1, blockX,
+            blockY, 1, context->m_kernelNV12ToRGB32FPMem, context->m_stream, args, nullptr);
     }
 
-    static NppStatus cudaErrorToNppStatus(const CUresult err)
+#if BUILD_NPPI
+    static CUresult cudaNppStatusToError(const NppStatus err)
     {
-        if (err == CUDA_SUCCESS) {
-            return NPP_SUCCESS;
+        if (err == NPP_SUCCESS) {
+            return CUDA_SUCCESS;
         }
-        return NPP_CUDA_KERNEL_EXECUTION_ERROR;
+        if (err == NPP_NO_MEMORY_ERROR) {
+            return CUDA_ERROR_OUT_OF_MEMORY;
+        }
+        if (err == NPP_CUDA_KERNEL_EXECUTION_ERROR) {
+            return CUDA_ERROR_LAUNCH_FAILED;
+        }
+        if (err == NPP_INVALID_DEVICE_POINTER_ERROR) {
+            return CUDA_ERROR_ILLEGAL_ADDRESS;
+        }
+        return CUDA_ERROR_UNKNOWN;
     }
+#endif
 
 public:
     static bool convertFormat(
@@ -221,7 +254,13 @@ public:
             return false;
         }
         const auto stream = cudaDevice->stream;
+#if BUILD_NPPI
         NppStreamContext nppContext;
+
+        NppiSize roi;
+        roi.width = frame->getWidth();
+        roi.height = frame->getHeight();
+#endif
         shared_ptr<KernelContext> kernelProps;
         {
             lock_guard<mutex> lock(s_mutex);
@@ -229,21 +268,23 @@ public:
                 return false;
             }
             // Get required data
+#if BUILD_NPPI
             nppContext = s_contextProperties[cudaDevice->cuda_ctx].first;
             kernelProps = s_contextProperties[cudaDevice->cuda_ctx].second;
+#else
+            kernelProps = s_contextProperties[cudaDevice->cuda_ctx];
+#endif
         }
-
-        NppiSize roi;
-        roi.width = frame->getWidth();
-        roi.height = frame->getHeight();
 
         uint8_t* outPlanes[4];
         int32_t outStep[4];
-        av_image_fill_arrays(outPlanes, outStep, outMem, getPixelFormat(outFormat), roi.width, roi.height, 32);
+        av_image_fill_arrays(
+            outPlanes, outStep, outMem, getPixelFormat(outFormat), frame->getWidth(), frame->getHeight(), 32);
 
         const auto data1 = frame->getFrameData(0);
-        NppStatus ret = NPP_ERROR_RESERVED;
+        CUresult ret = CUDA_ERROR_UNKNOWN;
         switch (frame->getPixelFormat()) {
+#if BUILD_NPPI
             case PixelFormat::YUV420P: {
                 const auto data2 = frame->getFrameData(1);
                 const auto data3 = frame->getFrameData(2);
@@ -251,11 +292,13 @@ public:
                 int32_t inStep[3] = {data1.second, data2.second, data3.second};
                 switch (outFormat) {
                     case PixelFormat::RGB8P: {
-                        ret = nppiYUV420ToRGB_8u_P3R_Ctx(inMem, inStep, outPlanes, outStep[0], roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiYUV420ToRGB_8u_P3R_Ctx(inMem, inStep, outPlanes, outStep[0], roi, nppContext));
                         break;
                     }
                     case PixelFormat::RGB8: {
-                        ret = nppiYUV420ToRGB_8u_P3C3R_Ctx(inMem, inStep, outPlanes[0], outStep[0], roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiYUV420ToRGB_8u_P3C3R_Ctx(inMem, inStep, outPlanes[0], outStep[0], roi, nppContext));
                         break;
                     }
                     default:
@@ -270,11 +313,13 @@ public:
                 int32_t inStep[3] = {data1.second, data2.second, data3.second};
                 switch (outFormat) {
                     case PixelFormat::RGB8P: {
-                        ret = nppiYUV422ToRGB_8u_P3R_Ctx(inMem, inStep, outPlanes, outStep[0], roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiYUV422ToRGB_8u_P3R_Ctx(inMem, inStep, outPlanes, outStep[0], roi, nppContext));
                         break;
                     }
                     case PixelFormat::RGB8: {
-                        ret = nppiYUV422ToRGB_8u_P3C3R_Ctx(inMem, inStep, outPlanes[0], outStep[0], roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiYUV422ToRGB_8u_P3C3R_Ctx(inMem, inStep, outPlanes[0], outStep[0], roi, nppContext));
                         break;
                     }
                     default:
@@ -288,11 +333,13 @@ public:
                 const uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
                 switch (outFormat) {
                     case PixelFormat::RGB8P: {
-                        ret = nppiYUVToRGB_8u_P3R_Ctx(inMem, data1.second, outPlanes, outStep[0], roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiYUVToRGB_8u_P3R_Ctx(inMem, data1.second, outPlanes, outStep[0], roi, nppContext));
                         break;
                     }
                     case PixelFormat::RGB8: {
-                        ret = nppiYUVToRGB_8u_P3C3R_Ctx(inMem, data1.second, outPlanes[0], outStep[0], roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiYUVToRGB_8u_P3C3R_Ctx(inMem, data1.second, outPlanes[0], outStep[0], roi, nppContext));
                         break;
                     }
                     default:
@@ -300,27 +347,31 @@ public:
                 }
                 break;
             }
+#endif
             case PixelFormat::NV12: {
                 const auto data2 = frame->getFrameData(1);
                 uint8_t* inMem[2] = {data1.first, data2.first};
                 switch (outFormat) {
+#if BUILD_NPPI
                     case PixelFormat::RGB8: {
-                        ret =
-                            nppiNV12ToRGB_8u_P2C3R_Ctx(inMem, data1.second, outPlanes[0], outStep[0], roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiNV12ToRGB_8u_P2C3R_Ctx(inMem, data1.second, outPlanes[0], outStep[0], roi, nppContext));
                         break;
                     }
                     case PixelFormat::YUV420P: {
-                        ret = nppiNV12ToYUV420_8u_P2P3R_Ctx(inMem, data1.second, outPlanes, outStep, roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiNV12ToYUV420_8u_P2P3R_Ctx(inMem, data1.second, outPlanes, outStep, roi, nppContext));
                         break;
                     }
+#endif
                     case PixelFormat::RGB8P: {
-                        ret = cudaErrorToNppStatus(convertNV12ToRGB8P(
-                            inMem, data1.second, roi.width, roi.height, outPlanes, outStep[0], kernelProps.get()));
+                        ret = convertNV12ToRGB8P(inMem, data1.second, frame->getWidth(), frame->getHeight(), outPlanes,
+                            outStep[0], kernelProps.get());
                         break;
                     }
                     case PixelFormat::RGB32FP: {
-                        ret = cudaErrorToNppStatus(convertNV12ToRGB32FP(
-                            inMem, data1.second, roi.width, roi.height, outPlanes, outStep[0], kernelProps.get()));
+                        ret = convertNV12ToRGB32FP(inMem, data1.second, frame->getWidth(), frame->getHeight(),
+                            outPlanes, outStep[0], kernelProps.get());
                         break;
                     }
                     default:
@@ -328,21 +379,22 @@ public:
                 }
                 break;
             }
+#if BUILD_NPPI
             case PixelFormat::RGB8: {
                 switch (outFormat) {
                     case PixelFormat::YUV444P: {
-                        ret = nppiRGBToYUV_8u_C3P3R_Ctx(
-                            data1.first, data1.second, outPlanes, outStep[0], roi, nppContext);
+                        ret = cudaNppStatusToError(nppiRGBToYUV_8u_C3P3R_Ctx(
+                            data1.first, data1.second, outPlanes, outStep[0], roi, nppContext));
                         break;
                     }
                     case PixelFormat::YUV422P: {
-                        ret = nppiRGBToYUV422_8u_C3P3R_Ctx(
-                            data1.first, data1.second, outPlanes, outStep, roi, nppContext);
+                        ret = cudaNppStatusToError(nppiRGBToYUV422_8u_C3P3R_Ctx(
+                            data1.first, data1.second, outPlanes, outStep, roi, nppContext));
                         break;
                     }
                     case PixelFormat::YUV420P: {
-                        ret = nppiRGBToYUV420_8u_C3P3R_Ctx(
-                            data1.first, data1.second, outPlanes, outStep, roi, nppContext);
+                        ret = cudaNppStatusToError(nppiRGBToYUV420_8u_C3P3R_Ctx(
+                            data1.first, data1.second, outPlanes, outStep, roi, nppContext));
                         break;
                     }
                     default:
@@ -356,15 +408,18 @@ public:
                 const uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
                 switch (outFormat) {
                     case PixelFormat::YUV444P: {
-                        ret = nppiRGBToYUV_8u_P3R_Ctx(inMem, data1.second, outPlanes, outStep[0], roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiRGBToYUV_8u_P3R_Ctx(inMem, data1.second, outPlanes, outStep[0], roi, nppContext));
                         break;
                     }
                     case PixelFormat::YUV422P: {
-                        ret = nppiRGBToYUV422_8u_P3R_Ctx(inMem, data1.second, outPlanes, outStep, roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiRGBToYUV422_8u_P3R_Ctx(inMem, data1.second, outPlanes, outStep, roi, nppContext));
                         break;
                     }
                     case PixelFormat::YUV420P: {
-                        ret = nppiRGBToYUV420_8u_P3R_Ctx(inMem, data1.second, outPlanes, outStep, roi, nppContext);
+                        ret = cudaNppStatusToError(
+                            nppiRGBToYUV420_8u_P3R_Ctx(inMem, data1.second, outPlanes, outStep, roi, nppContext));
                         break;
                     }
                     default:
@@ -372,6 +427,7 @@ public:
                 }
                 break;
             }
+#endif
             default:
                 break;
         }
@@ -380,19 +436,20 @@ public:
         if (cuCtxPopCurrent(&dummy) != CUDA_SUCCESS) {
             log("Failed to restore CUDA context", LogLevel::Error);
         }
-        if (ret != NPP_SUCCESS) {
-            if (ret == NPP_ERROR_RESERVED) {
+        if (ret != CUDA_SUCCESS || err != CUDA_SUCCESS) {
+            if (ret == CUDA_ERROR_UNKNOWN) {
                 log("Format conversion not currently supported", LogLevel::Error);
-            } else if (ret == NPP_CUDA_KERNEL_EXECUTION_ERROR) {
+            } else if (ret == CUDA_ERROR_LAUNCH_FAILED) {
                 log("CUDA kernel for format conversion failed", LogLevel::Error);
             } else {
                 log("Format conversion failed: "s += to_string(ret), LogLevel::Error);
             }
-        }
-        if (err != CUDA_SUCCESS) {
-            const char* errorString;
-            cuGetErrorName(err, &errorString);
-            log("Format conversion failed: "s += errorString, LogLevel::Error);
+            if (err != CUDA_SUCCESS) {
+                const char* errorString;
+                cuGetErrorName(err, &errorString);
+                log("Format conversion failed: "s += errorString, LogLevel::Error);
+                return false;
+            }
             return false;
         }
         return true;
@@ -405,5 +462,9 @@ bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem, const P
 }
 
 mutex FFR::s_mutex;
+#if BUILD_NPPI
 map<CUcontext, pair<NppStreamContext, shared_ptr<FFR::KernelContext>>> FFR::s_contextProperties;
+#else
+map<CUcontext, shared_ptr<FFR::KernelContext>> FFR::s_contextProperties;
+#endif
 } // namespace Ffr

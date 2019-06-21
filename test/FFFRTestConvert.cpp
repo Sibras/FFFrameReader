@@ -16,6 +16,7 @@
 #include "FFFRTestData.h"
 #include "FFFRUtility.h"
 #include "FFFrameReader.h"
+#include "config.h"
 
 #include <cuda.h>
 #include <fstream>
@@ -35,8 +36,10 @@ struct TestParamsConvert
 };
 
 static std::vector<TestParamsConvert> g_testDataConvert = {
+#if BUILD_NPPI
     {1, PixelFormat::RGB8, "test1"},
     {1, PixelFormat::YUV420P, "test2"},
+#endif
     {1, PixelFormat::RGB8P, "test3"},
     {1, PixelFormat::RGB32FP, "test4"},
 };
@@ -100,7 +103,7 @@ public:
             const auto imageSize = getImageSize(format, width, height);
             hostBuffer.reserve(imageSize);
             ASSERT_EQ(cuCtxPushCurrent(m_context), CUDA_SUCCESS);
-            ASSERT_EQ(cuMemcpyDtoH_v2(hostBuffer.data(), m_cudaBuffer, imageSize), CUDA_SUCCESS);
+            ASSERT_EQ(cuMemcpyDtoH(hostBuffer.data(), m_cudaBuffer, imageSize), CUDA_SUCCESS);
             ASSERT_EQ(cuCtxSynchronize(), CUDA_SUCCESS);
             CUcontext dummy;
             ASSERT_EQ(cuCtxPopCurrent(&dummy), CUDA_SUCCESS);
