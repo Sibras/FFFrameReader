@@ -131,6 +131,7 @@ DecoderContext::DecoderContext(const DecodeType type, const std::any& context, c
                     cudaDevice->cuda_ctx = any_cast<CUcontext>(context);
                 } catch (...) {
                 }
+                cudaDevice->stream = nullptr;
             }
             const auto ret = av_hwdevice_ctx_init(tempDevice.get());
             if (ret < 0) {

@@ -91,7 +91,8 @@ public:
         }
     }
 
-    void saveImage(const PixelFormat format, const uint32_t width, const uint32_t height, const std::string& filename)
+    void saveImage(
+        const PixelFormat format, const uint32_t width, const uint32_t height, const std::string& filename) const
     {
         if (format != PixelFormat::RGB32FP && format != PixelFormat::RGB8P && format != PixelFormat::RGB8) {
             return;

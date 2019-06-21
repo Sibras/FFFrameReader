@@ -86,6 +86,13 @@ private:
 
         explicit KernelContext(const CUcontext context, const CUstream stream)
         {
+            // Ensure that the primary context is retained until the module is unloaded
+            CUcontext temp;
+            cuDevicePrimaryCtxRetain(&temp, 0);
+            if (temp != context) {
+                cuDevicePrimaryCtxRelease(0);
+            }
+
             auto err = cuModuleLoadData(&m_module, FFFRFormatConvert);
             if (err != CUDA_SUCCESS) {
                 const char* errorString;
@@ -120,14 +127,21 @@ private:
         ~KernelContext()
         {
             if (m_context != nullptr) {
-                if (cuCtxPushCurrent(m_context) != CUDA_SUCCESS) {
-                    log("Failed to set CUDA context"s, LogLevel::Error);
+                // We cant guarantee the context hasnt been destroyed unless it is the primary context
+                CUcontext temp;
+                cuDevicePrimaryCtxRetain(&temp, 0);
+                if (temp == m_context) {
+                    if (cuCtxPushCurrent(m_context) != CUDA_SUCCESS) {
+                        log("Failed to set CUDA context"s, LogLevel::Error);
+                    }
+                    if (m_module != nullptr) {
+                        cuModuleUnload(m_module);
+                    }
+                    CUcontext dummy;
+                    cuCtxPopCurrent(&dummy);
+                    cuDevicePrimaryCtxRelease(0);
+                    cuDevicePrimaryCtxRelease(0);
                 }
-                if (m_module != nullptr) {
-                    cuModuleUnload(m_module);
-                }
-                CUcontext dummy;
-                cuCtxPopCurrent(&dummy);
             }
         }
 
