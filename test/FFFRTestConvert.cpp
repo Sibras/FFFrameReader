@@ -53,15 +53,22 @@ public:
     {
         // Create a cuda context to be shared by decoder and this test
         ASSERT_EQ(cuInit(0), CUDA_SUCCESS);
-        ASSERT_EQ(cuCtxGetCurrent(&m_context), CUDA_SUCCESS);
+        CUcontext context = nullptr;
+        ASSERT_EQ(cuCtxGetCurrent(&context), CUDA_SUCCESS);
         if (m_context == nullptr) {
-            ASSERT_EQ(cuDevicePrimaryCtxRetain(&m_context, 0), CUDA_SUCCESS);
+            CUdevice dev;
+            ASSERT_EQ(cuDeviceGet(&dev, 0), CUDA_SUCCESS);
+            ASSERT_EQ(cuDevicePrimaryCtxRetain(&context, dev), CUDA_SUCCESS);
+            m_context = std::shared_ptr<std::remove_pointer<CUcontext>::type>(
+                context, [dev](CUcontext) { cuDevicePrimaryCtxRelease(dev); });
+        } else {
+            m_context = std::shared_ptr<std::remove_pointer<CUcontext>::type>(context, [](CUcontext) {});
         }
 
         DecoderOptions options;
         options.m_type = DecodeType::Cuda;
         options.m_outputHost = false;
-        options.m_context = m_context;
+        options.m_context = m_context.get();
         m_stream = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
         ASSERT_NE(m_stream, nullptr);
 
@@ -70,7 +77,7 @@ public:
         const int height = m_stream->peekNextFrame()->getHeight();
 
         // Allocate new memory to store frame data
-        ASSERT_EQ(cuCtxPushCurrent(m_context), CUDA_SUCCESS);
+        ASSERT_EQ(cuCtxPushCurrent(m_context.get()), CUDA_SUCCESS);
         const auto outFrameSize = getImageSize(params.m_format, width, height);
         ASSERT_EQ(cuMemAlloc(&m_cudaBuffer, outFrameSize), CUDA_SUCCESS);
         CUcontext dummy;
@@ -81,14 +88,12 @@ public:
     {
         m_stream.reset();
         if (reinterpret_cast<void*>(m_cudaBuffer) != nullptr) {
-            ASSERT_EQ(cuCtxPushCurrent(m_context), CUDA_SUCCESS);
+            ASSERT_EQ(cuCtxPushCurrent(m_context.get()), CUDA_SUCCESS);
             ASSERT_EQ(cuMemFree(m_cudaBuffer), CUDA_SUCCESS);
             CUcontext dummy;
             ASSERT_EQ(cuCtxPopCurrent(&dummy), CUDA_SUCCESS);
         }
-        if (m_context != nullptr) {
-            cuDevicePrimaryCtxRelease(0);
-        }
+        m_context = nullptr;
     }
 
     void saveImage(
@@ -103,7 +108,7 @@ public:
             std::vector<uint8_t> hostBuffer;
             const auto imageSize = getImageSize(format, width, height);
             hostBuffer.reserve(imageSize);
-            ASSERT_EQ(cuCtxPushCurrent(m_context), CUDA_SUCCESS);
+            ASSERT_EQ(cuCtxPushCurrent(m_context.get()), CUDA_SUCCESS);
             ASSERT_EQ(cuMemcpyDtoH(hostBuffer.data(), m_cudaBuffer, imageSize), CUDA_SUCCESS);
             ASSERT_EQ(cuCtxSynchronize(), CUDA_SUCCESS);
             CUcontext dummy;
@@ -144,7 +149,7 @@ public:
     }
 
     std::shared_ptr<Stream> m_stream = nullptr;
-    CUcontext m_context = nullptr;
+    std::shared_ptr<std::remove_pointer<CUcontext>::type> m_context = nullptr;
     CUdeviceptr m_cudaBuffer = reinterpret_cast<CUdeviceptr>(nullptr);
 };
 
