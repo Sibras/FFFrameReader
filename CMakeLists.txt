@@ -233,6 +233,7 @@ if(BUILD_TESTING)
         test/FFFRTestFilter.cpp
         test/FFFRTestEncode.cpp
         test/FFFRTestConvert.cpp
+        test/FFFRTestShared.cpp
         test/FFFRTestData.h
     )
 

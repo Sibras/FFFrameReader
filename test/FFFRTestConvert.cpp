@@ -28,6 +28,9 @@ extern "C" {
 
 using namespace Ffr;
 
+extern void saveImage(PixelFormat format, uint32_t width, uint32_t height, const std::string& filename,
+    uint8_t* buffer[4], int32_t step[4]) noexcept;
+
 struct TestParamsConvert
 {
     uint32_t m_testDataIndex;
@@ -37,11 +40,11 @@ struct TestParamsConvert
 
 static std::vector<TestParamsConvert> g_testDataConvert = {
 #if BUILD_NPPI
-    {1, PixelFormat::RGB8, "test1"},
-    {1, PixelFormat::YUV420P, "test2"},
+    {1, PixelFormat::RGB8, "test-convert-1"},
+    {1, PixelFormat::YUV420P, "test-convert-2"},
 #endif
-    {1, PixelFormat::RGB8P, "test3"},
-    {1, PixelFormat::RGB32FP, "test4"},
+    {1, PixelFormat::RGB8P, "test-convert-3"},
+    {1, PixelFormat::RGB32FP, "test-convert-4"},
 };
 
 class TestConvert
@@ -102,50 +105,22 @@ public:
         if (format != PixelFormat::RGB32FP && format != PixelFormat::RGB8P && format != PixelFormat::RGB8) {
             return;
         }
-        std::ofstream ofs;
-        try {
-            // Copy data to host
-            std::vector<uint8_t> hostBuffer;
-            const auto imageSize = getImageSize(format, width, height);
-            hostBuffer.reserve(imageSize);
-            ASSERT_EQ(cuCtxPushCurrent(m_context.get()), CUDA_SUCCESS);
-            ASSERT_EQ(cuMemcpyDtoH(hostBuffer.data(), m_cudaBuffer, imageSize), CUDA_SUCCESS);
-            ASSERT_EQ(cuCtxSynchronize(), CUDA_SUCCESS);
-            CUcontext dummy;
-            ASSERT_EQ(cuCtxPopCurrent(&dummy), CUDA_SUCCESS);
-            ofs.open(filename + ".ppm", std::ios::binary);
-            ASSERT_FALSE(ofs.fail());
-            ofs << "P6\n" << width << " " << height << "\n255\n";
-            // Get each data frame
-            uint8_t* outPlanes[4];
-            int32_t outStep[4];
-            av_image_fill_arrays(outPlanes, outStep, hostBuffer.data(), getPixelFormat(format), width, height, 32);
-            // Loop over each pixel and output to file
-            uint32_t offset = 0;
-            for (uint32_t i = 0; i < height; ++i) {
-                for (uint32_t j = 0; j < width; ++j) {
-                    uint8_t r, g, b;
-                    if (format == PixelFormat::RGB32FP) {
-                        const auto jOffset = j * sizeof(float);
-                        r = static_cast<uint8_t>(*reinterpret_cast<float*>(&(outPlanes[0][offset + jOffset])) * 255.0f);
-                        g = static_cast<uint8_t>(*reinterpret_cast<float*>(&(outPlanes[1][offset + jOffset])) * 255.0f);
-                        b = static_cast<uint8_t>(*reinterpret_cast<float*>(&(outPlanes[2][offset + jOffset])) * 255.0f);
-                    } else if (format == PixelFormat::RGB8P) {
-                        r = outPlanes[0][offset + j];
-                        g = outPlanes[1][offset + j];
-                        b = outPlanes[2][offset + j];
-                    } else {
-                        r = outPlanes[0][offset + (j * 3)];
-                        g = outPlanes[0][offset + (j * 3) + 1];
-                        b = outPlanes[0][offset + (j * 3) + 2];
-                    }
-                    ofs << r << g << b;
-                }
-                offset += outStep[0];
-            }
-            ofs.close();
-        } catch (...) {
-        }
+        // Copy data to host
+        std::vector<uint8_t> hostBuffer;
+        const auto imageSize = getImageSize(format, width, height);
+        hostBuffer.reserve(imageSize);
+        ASSERT_EQ(cuCtxPushCurrent(m_context.get()), CUDA_SUCCESS);
+        ASSERT_EQ(cuMemcpyDtoH(hostBuffer.data(), m_cudaBuffer, imageSize), CUDA_SUCCESS);
+        ASSERT_EQ(cuCtxSynchronize(), CUDA_SUCCESS);
+        CUcontext dummy;
+        ASSERT_EQ(cuCtxPopCurrent(&dummy), CUDA_SUCCESS);
+
+        // Get each data frame
+        uint8_t* outPlanes[4];
+        int32_t outStep[4];
+        av_image_fill_arrays(outPlanes, outStep, hostBuffer.data(), getPixelFormat(format), width, height, 32);
+
+        ::saveImage(format, width, height, filename, outPlanes, outStep);
     }
 
     std::shared_ptr<Stream> m_stream = nullptr;

@@ -20,6 +20,9 @@
 
 using namespace Ffr;
 
+extern void saveImage(PixelFormat format, uint32_t width, uint32_t height, const std::string& filename,
+    uint8_t* buffer[4], int32_t step[4]) noexcept;
+
 struct TestParamsFilter
 {
     uint32_t m_testDataIndex;
@@ -27,23 +30,24 @@ struct TestParamsFilter
     Resolution m_scale;
     Crop m_crop;
     PixelFormat m_format;
+    std::string m_imageFile;
 };
 
 static std::vector<TestParamsFilter> g_testDataFilter = {
-    {0, DecodeType::Software, {1280, 720}, {0, 0, 0, 0}, PixelFormat::Auto},
-    {0, DecodeType::Software, {1280, 720}, {0, 360, 0, 640}, PixelFormat::Auto},
-    {0, DecodeType::Software, {1280, 720}, {180, 180, 320, 320}, PixelFormat::Auto},
-    {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::YUV422P},
-    {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8},
-    {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8P},
-    //{0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB32FP},
-    {0, DecodeType::Cuda, {1280, 720}, {0, 0, 0, 0}, PixelFormat::Auto},
-    {0, DecodeType::Cuda, {1280, 720}, {0, 360, 0, 640}, PixelFormat::Auto},
-    {0, DecodeType::Cuda, {1280, 720}, {180, 180, 320, 320}, PixelFormat::Auto},
-    //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::YUV422P},
-    //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8},
-    //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8P},
-    //{0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB32FP},
+    {0, DecodeType::Software, {1280, 720}, {0, 0, 0, 0}, PixelFormat::Auto, "test-filter-1"},
+    {0, DecodeType::Software, {1280, 720}, {0, 360, 0, 640}, PixelFormat::Auto, "test-filter-2"},
+    {0, DecodeType::Software, {1280, 720}, {180, 180, 320, 320}, PixelFormat::Auto, "test-filter-3"},
+    {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::YUV422P, "test-filter-4"},
+    {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8, "test-filter-5"},
+    {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8P, "test-filter-6"},
+    //{0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB32FP, "test-filter-7"},
+    {0, DecodeType::Cuda, {1280, 720}, {0, 0, 0, 0}, PixelFormat::Auto, "test-filter-8"},
+    {0, DecodeType::Cuda, {1280, 720}, {0, 360, 0, 640}, PixelFormat::Auto, "test-filter-9"},
+    {0, DecodeType::Cuda, {1280, 720}, {180, 180, 320, 320}, PixelFormat::Auto, "test-filter-10"},
+    //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::YUV422P, "test-filter-11"},
+    //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8, "test-filter-12"},
+    //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8P, "test-filter-13"},
+    //{0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB32FP, "test-filter-14"},
 };
 
 class FilterTest1 : public ::testing::TestWithParam<TestParamsFilter>
@@ -135,4 +139,30 @@ TEST_P(FilterTest1, getLoop25)
         ++frameNum;
     }
 }
+
+TEST_P(FilterTest1, output)
+{
+    if (GetParam().m_format == PixelFormat::RGB32FP || GetParam().m_format == PixelFormat::RGB8P ||
+        GetParam().m_format == PixelFormat::RGB8) {
+        ASSERT_TRUE(m_stream->seekFrame(m_stream->getTotalFrames() / 2));
+        const auto frame1 = m_stream->getNextFrame();
+        ASSERT_NE(frame1, nullptr);
+
+        // Check if known pixel format
+        ASSERT_NE(frame1->getPixelFormat(), Ffr::PixelFormat::Auto);
+
+        // Save to image for visual inspection
+        uint8_t* outPlanes[4];
+        int32_t outStep[4];
+        outPlanes[0] = frame1->getFrameData(0).first;
+        outStep[0] = frame1->getFrameData(0).second;
+        for (int32_t i = 1; i < getPixelFormatPlanes(frame1->getPixelFormat()); i++) {
+            outPlanes[i] = frame1->getFrameData(i).first;
+            outStep[i] = frame1->getFrameData(i).second;
+        }
+        saveImage(
+            GetParam().m_format, frame1->getWidth(), frame1->getHeight(), GetParam().m_imageFile, outPlanes, outStep);
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P(FilterTestData, FilterTest1, ::testing::ValuesIn(g_testDataFilter));
