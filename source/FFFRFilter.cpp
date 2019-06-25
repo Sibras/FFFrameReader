@@ -68,7 +68,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
 
     // Set the input buffer parameters
     const auto inFormat = codecContext->pix_fmt == AV_PIX_FMT_NONE ?
-        formatContext->streams[streamIndex]->codecpar->format :
+        static_cast<AVPixelFormat>(formatContext->streams[streamIndex]->codecpar->format) :
         codecContext->pix_fmt;
     const auto inHeight = codecContext->height;
     const auto inWidth = codecContext->width;
