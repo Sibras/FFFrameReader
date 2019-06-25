@@ -34,10 +34,16 @@ static std::vector<TestParamsFilter> g_testDataFilter = {
     {0, DecodeType::Software, {1280, 720}, {0, 360, 0, 640}, PixelFormat::Auto},
     {0, DecodeType::Software, {1280, 720}, {180, 180, 320, 320}, PixelFormat::Auto},
     {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::YUV422P},
+    {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8},
+    {0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8P},
+    //{0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB32FP},
     {0, DecodeType::Cuda, {1280, 720}, {0, 0, 0, 0}, PixelFormat::Auto},
     {0, DecodeType::Cuda, {1280, 720}, {0, 360, 0, 640}, PixelFormat::Auto},
     {0, DecodeType::Cuda, {1280, 720}, {180, 180, 320, 320}, PixelFormat::Auto},
     //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::YUV422P},
+    //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8},
+    //{0, DecodeType::Cuda, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB8P},
+    //{0, DecodeType::Software, {1920, 1080}, {0, 0, 0, 0}, PixelFormat::RGB32FP},
 };
 
 class FilterTest1 : public ::testing::TestWithParam<TestParamsFilter>
