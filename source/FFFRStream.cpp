@@ -147,8 +147,9 @@ Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
             return;
         }
         // Enable extra hardware frames to ensure we don't run out of buffers
-        tempCodec->extra_hw_frames = bufferLength;
-        if (decoderContext->getType() == DecodeType::Cuda) {
+        const auto extraFrames = std::max(getCodecDelay(tempCodec), static_cast<int32_t>(bufferLength)) + 5;
+        tempCodec->extra_hw_frames = extraFrames;
+        if (decoderContext->getType() == DecodeType::Cuda && (cropRequired || scaleRequired)) {
             // Use internal cuvid filtering capabilities
             if (scaleRequired) {
                 const string resizeString = (to_string(postScale.m_width) += 'x') += to_string(postScale.m_height);
@@ -161,8 +162,7 @@ Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
                 av_dict_set(&opts, "crop", cropString.c_str(), 0);
                 cropRequired = false;
             }
-            const uint32_t surfaces =
-                std::max(std::max(static_cast<uint32_t>(getCodecDelay(tempCodec)), bufferLength) + 5, 25U);
+            const uint32_t surfaces = std::max(extraFrames, 25);
             const string surfacesString = to_string(surfaces);
             av_dict_set(&opts, "surfaces", surfacesString.c_str(), 0);
         }
@@ -650,8 +650,8 @@ bool Stream::decodeNextFrames() noexcept
                 return false;
             }
             const auto ret2 = av_hwframe_transfer_data(*frame2, *m_tempFrame, 0);
+            av_frame_unref(*m_tempFrame);
             if (ret2 < 0) {
-                av_frame_unref(*m_tempFrame);
                 av_frame_unref(*frame2);
                 log("Failed to copy frame to host: "s += getFfmpegErrorString(ret), LogLevel::Error);
                 return false;
