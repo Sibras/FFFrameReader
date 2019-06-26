@@ -57,6 +57,11 @@ int32_t getImageSize(const PixelFormat format, const uint32_t width, const uint3
     return av_image_get_buffer_size(getPixelFormat(format), width, height, 32);
 }
 
+int32_t getImagePlaneStep(const PixelFormat format, const uint32_t width, const uint32_t plane) noexcept
+{
+    return av_image_get_linesize(getPixelFormat(format), width, plane);
+}
+
 class FFR
 {
 private:

@@ -56,9 +56,18 @@ int32_t getPixelFormatPlanes(PixelFormat format) noexcept;
  * @param format Describes the pixel format.
  * @param width  The width.
  * @param height The height.
- * @returns The image size or negative value if error.
+ * @returns The image size (bytes) or negative value if error.
  */
 int32_t getImageSize(PixelFormat format, uint32_t width, uint32_t height) noexcept;
+
+/**
+ * Gets the size of an image line.
+ * @param format Describes the format to use.
+ * @param width  The width.
+ * @param plane  The image plane.
+ * @returns The image plane step (bytes) or negative value if error.
+ */
+int32_t getImagePlaneStep(PixelFormat format, uint32_t width, uint32_t plane) noexcept;
 
 /**
  * Convert pixel format using cuda.
