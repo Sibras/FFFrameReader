@@ -57,9 +57,22 @@ int32_t getImageSize(const PixelFormat format, const uint32_t width, const uint3
     return av_image_get_buffer_size(getPixelFormat(format), width, height, 32);
 }
 
-int32_t getImagePlaneStep(const PixelFormat format, const uint32_t width, const uint32_t plane) noexcept
+int32_t getImageLineStep(const PixelFormat format, const uint32_t width, const uint32_t plane) noexcept
 {
     return av_image_get_linesize(getPixelFormat(format), width, plane);
+}
+
+int32_t getImagePlaneStep(
+    const PixelFormat format, const uint32_t width, const uint32_t height, const uint32_t plane) noexcept
+{
+    if (static_cast<int32_t>(plane) >= getPixelFormatPlanes(format)) {
+        return -1;
+    }
+    uint8_t* outPlanes[4];
+    int32_t outStep[4];
+    av_image_fill_arrays(outPlanes, outStep, nullptr, getPixelFormat(format), width, height, 32);
+    const auto ret = plane == 0 ? reinterpret_cast<size_t>(outPlanes[0]) : outPlanes[plane] - outPlanes[plane - 1];
+    return static_cast<int32_t>(ret);
 }
 
 class FFR
