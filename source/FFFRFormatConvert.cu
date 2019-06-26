@@ -130,7 +130,7 @@ __device__ __forceinline__ void convertNV12ToRGBP(const NV12Planes source, const
     const uint32_t x = blockIdx.x * (blockDim.x << 1) + (threadIdx.x << 1);
     const uint32_t y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (x >= width || y >= height) {
+    if (x >= width - 1 || y >= height) {
         return;
     }
 
