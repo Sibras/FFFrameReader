@@ -23,6 +23,10 @@ struct AVFormatContext;
 struct AVCodecContext;
 struct AVFrame;
 
+namespace Fmc {
+class MultiCrop;
+}
+
 namespace Ffr {
 enum class DecodeType
 {
@@ -48,6 +52,12 @@ struct Crop
     uint32_t m_bottom; /**< The offset in pixels from bottom of frame */
     uint32_t m_left;   /**< The offset in pixels from left of frame */
     uint32_t m_right;  /**< The offset in pixels from right of frame */
+};
+
+struct Rational
+{
+    int32_t m_numerator;
+    int32_t m_denominator;
 };
 
 enum class PixelFormat : int32_t
@@ -192,6 +202,7 @@ class FramePtr
     friend class Encoder;
     friend class StreamUtils;
     friend class FFR;
+    friend class Fmc::MultiCrop;
 
 public:
     ~FramePtr() noexcept;

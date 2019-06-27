@@ -20,6 +20,7 @@
 
 extern "C" {
 #include <libavutil/pixfmt.h>
+#include <libavutil/rational.h>
 }
 
 namespace Ffr {
@@ -43,4 +44,11 @@ PixelFormat getPixelFormat(AVPixelFormat format) noexcept;
  * @returns The pixel format.
  */
 AVPixelFormat getPixelFormat(PixelFormat format) noexcept;
+
+/**
+ * Gets a rational.
+ * @param ratio The ratio.
+ * @returns The rational.
+ */
+Rational getRational(AVRational ratio);
 } // namespace Ffr

@@ -89,16 +89,20 @@ bool Encoder::encodeStream(
     const std::string& fileName, const std::shared_ptr<Stream>& stream, const EncoderOptions& options) noexcept
 {
     // Create the new encoder
-    const shared_ptr<Encoder> encoder =
-        make_shared<Encoder>(fileName, stream, options.m_type, options.m_quality, options.m_preset, ConstructorLock());
-    if (encoder->m_codecContext.get() == nullptr) {
+    const shared_ptr<Encoder> encoder = make_shared<Encoder>(fileName, stream->getWidth(), stream->getHeight(),
+        getRational(StreamUtils::getSampleAspectRatio(stream.get())), stream->getPixelFormat(),
+        getRational(StreamUtils::getFrameRate(stream.get())),
+        stream->getDuration() - (stream->m_lastDecodedTimeStamp >= 0 ? stream->m_lastDecodedTimeStamp : 0),
+        options.m_type, options.m_quality, options.m_preset, ConstructorLock());
+    if (!encoder->isEncoderValid()) {
         // Encoder creation failed
         return false;
     }
-    return encoder->encodeStream();
+    return encoder->encodeStream(stream);
 }
 
-Encoder::Encoder(const std::string& fileName, const std::shared_ptr<Stream>& stream, const EncodeType codecType,
+Encoder::Encoder(const std::string& fileName, const uint32_t width, const uint32_t height, const Rational aspect,
+    const PixelFormat format, const Rational frameRate, const int64_t duration, const EncodeType codecType,
     const uint8_t quality, const EncoderOptions::Preset preset, ConstructorLock) noexcept
 {
     AVFormatContext* formatPtr = nullptr;
@@ -127,11 +131,11 @@ Encoder::Encoder(const std::string& fileName, const std::shared_ptr<Stream>& str
     }
 
     // Setup encoding parameters
-    tempCodec->height = stream->getHeight();
-    tempCodec->width = stream->getWidth();
-    tempCodec->sample_aspect_ratio = StreamUtils::getSampleAspectRatio(stream.get());
-    tempCodec->pix_fmt = StreamUtils::getPixelFormat(stream.get());
-    tempCodec->framerate = StreamUtils::getFrameRate(stream.get());
+    tempCodec->height = height;
+    tempCodec->width = width;
+    tempCodec->sample_aspect_ratio = {aspect.m_numerator, aspect.m_denominator};
+    tempCodec->pix_fmt = getPixelFormat(format);
+    tempCodec->framerate = {frameRate.m_numerator, frameRate.m_denominator};
     tempCodec->time_base = av_inv_q(tempCodec->framerate);
     av_opt_set_int(tempCodec.get(), "refcounted_frames", 1, 0);
 
@@ -184,43 +188,42 @@ Encoder::Encoder(const std::string& fileName, const std::shared_ptr<Stream>& str
     }
 
     // Give muxer hint about duration
-    outStream->duration =
-        av_rescale_q(stream->getDuration() - (stream->m_lastDecodedTimeStamp >= 0 ? stream->m_lastDecodedTimeStamp : 0),
-            av_make_q(1, AV_TIME_BASE), outStream->time_base);
+    outStream->duration = av_rescale_q(duration, av_make_q(1, AV_TIME_BASE), outStream->time_base);
     tempFormat->duration = outStream->duration;
 
     // Make the new encoder
     m_formatContext = move(tempFormat);
     m_codecContext = move(tempCodec);
-    m_stream = stream;
 }
 
-bool Encoder::encodeStream() const noexcept
+bool Encoder::isEncoderValid() const noexcept
+{
+    return (m_codecContext.get() != nullptr);
+}
+
+bool Encoder::encodeStream(const std::shared_ptr<Stream>& stream) const noexcept
 {
     while (true) {
         // Get next frame
-        auto frame = m_stream->getNextFrame();
+        auto frame = stream->getNextFrame();
         if (frame == nullptr) {
-            if (!m_stream->isEndOfFile()) {
+            if (!stream->isEndOfFile()) {
                 return false;
             }
-            // Send a flush frame
-            auto ret = avcodec_send_frame(m_codecContext.get(), nullptr);
-            if (ret < 0) {
-                log("Failed to send flush packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
-                return false;
-            }
-            if (!encodeFrames()) {
-                return false;
-            }
-            av_interleaved_write_frame(m_formatContext.get(), nullptr);
-            ret = av_write_trailer(m_formatContext.get());
-            if (ret < 0) {
-                log("Failed to write file trailer: "s += getFfmpegErrorString(ret), LogLevel::Error);
+            if (!encodeFrame(frame)) {
                 return false;
             }
             return true;
         }
+        if (!encodeFrame(frame)) {
+            return false;
+        }
+    }
+}
+
+bool Encoder::encodeFrame(const std::shared_ptr<Frame>& frame) const noexcept
+{
+    if (frame != nullptr) {
         // Send frame to encoder
         frame->m_frame->best_effort_timestamp =
             av_rescale_q(frame->getTimeStamp(), av_make_q(1, AV_TIME_BASE), m_codecContext->time_base);
@@ -230,13 +233,30 @@ bool Encoder::encodeStream() const noexcept
             log("Failed to send packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
             return false;
         }
-        if (!encodeFrames()) {
+        if (!muxFrames()) {
+            return false;
+        }
+    } else {
+        // Send a flush frame
+        auto ret = avcodec_send_frame(m_codecContext.get(), nullptr);
+        if (ret < 0) {
+            log("Failed to send flush packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+            return false;
+        }
+        if (!muxFrames()) {
+            return false;
+        }
+        av_interleaved_write_frame(m_formatContext.get(), nullptr);
+        ret = av_write_trailer(m_formatContext.get());
+        if (ret < 0) {
+            log("Failed to write file trailer: "s += getFfmpegErrorString(ret), LogLevel::Error);
             return false;
         }
     }
+    return true;
 }
 
-bool Encoder::encodeFrames() const noexcept
+bool Encoder::muxFrames() const noexcept
 {
     // Get all encoder packets
     AVPacket packet;

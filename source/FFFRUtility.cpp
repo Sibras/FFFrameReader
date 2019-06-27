@@ -71,4 +71,9 @@ AVPixelFormat getPixelFormat(PixelFormat format) noexcept
     // Can just do a direct cast
     return static_cast<AVPixelFormat>(format);
 }
+
+Rational getRational(const AVRational ratio)
+{
+    return Rational{ratio.num, ratio.den};
+}
 } // namespace Ffr

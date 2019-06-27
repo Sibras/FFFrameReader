@@ -45,36 +45,55 @@ public:
 
     class ConstructorLock
     {
-        friend bool encodeStream(
-            const std::string& fileName, const std::shared_ptr<Stream>& stream, const EncoderOptions& options) noexcept;
+        friend class Encoder;
+        friend class Fmc::MultiCrop;
     };
 
     /**
      * Constructor.
-     * @param fileName  File name of the file to write to.
-     * @param stream    The stream to use as input.
+     * @param fileName    File name of the file to write to.
+     * @param width       The output width.
+     * @param height      The output height.
+     * @param aspect      The sample aspect ratio.
+     * @param format      Describes the format to use.
+     * @param frameRate   The frame rate.
+     * @param duration    The duration of the output encode.
      * @param codecType Type of the codec to encode with.
      * @param quality   The encode quality.
      * @param preset    The encode preset.
      */
-    Encoder(const std::string& fileName, const std::shared_ptr<Stream>& stream, EncodeType codecType, uint8_t quality,
-        EncoderOptions::Preset preset, ConstructorLock) noexcept;
+    Encoder(const std::string& fileName, uint32_t width, uint32_t height, Rational aspect, PixelFormat format,
+        Rational frameRate, int64_t duration, EncodeType codecType, uint8_t quality, EncoderOptions::Preset preset,
+        ConstructorLock) noexcept;
+
+    /**
+     * Query if this object is valid.
+     * @returns True if the encoder is valid, false if not.
+     */
+    [[nodiscard]] bool isEncoderValid() const noexcept;
 
 private:
     OutputFormatContextPtr m_formatContext;
     CodecContextPtr m_codecContext;
-    std::shared_ptr<Stream> m_stream;
 
     /**
      * Encodes all frames found in input stream from its current position.
+     * @param stream The stream.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool encodeStream() const noexcept;
+    [[nodiscard]] bool encodeStream(const std::shared_ptr<Stream>& stream) const noexcept;
+
+    /**
+     * Encode frame.
+     * @param frame The frame.
+     * @returns True if it succeeds, false if it fails.
+     */
+    [[nodiscard]] bool encodeFrame(const std::shared_ptr<Frame>& frame) const noexcept;
 
     /**
      * Writes encoded frames to output.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool encodeFrames() const noexcept;
+    [[nodiscard]] bool muxFrames() const noexcept;
 };
 } // namespace Ffr

@@ -55,7 +55,7 @@ public:
 
     class ConstructorLock
     {
-        friend std::shared_ptr<Stream> getStream(const std::string& fileName, const DecoderOptions& options) noexcept;
+        friend class Stream;
     };
 
     /**
