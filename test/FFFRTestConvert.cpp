@@ -45,6 +45,12 @@ static std::vector<TestParamsConvert> g_testDataConvert = {
 #endif
     {1, PixelFormat::RGB8P, "test-convert-3"},
     {1, PixelFormat::RGB32FP, "test-convert-4"},
+#if BUILD_NPPI
+    {3, PixelFormat::RGB8, "test-convert-5"},
+    {3, PixelFormat::YUV420P, "test-convert-6"},
+#endif
+    {3, PixelFormat::RGB8P, "test-convert-7"},
+    {3, PixelFormat::RGB32FP, "test-convert-8"},
 };
 
 class TestConvert

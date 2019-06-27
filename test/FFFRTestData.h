@@ -40,6 +40,7 @@ static std::vector<TestParams> g_testData = {
         Ffr::PixelFormat::YUV420P},
     {"data/board_game-h264.mkv", 1280, 720, 16.0 / 9.0, 50, 2000000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
     {"data/tvl_missing_pts.avi", 2048, 2048, 1.0, 375, 15000000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
+    {"data/board_game-h264-cropped.mkv", 52, 28, 52.0 / 28.0, 50, 2000000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
 #if 0
     // These are internal testing files and are not redistributed
     {"data/CLIP0000818_000_77aabf.mkv", 3840, 2160, 16.0 / 9.0, 1116, 44640000, 25.0, 40000, Ffr::PixelFormat::YUV420P},

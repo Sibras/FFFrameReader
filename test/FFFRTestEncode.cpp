@@ -42,6 +42,11 @@ static std::vector<TestParamsEncode> g_testDataEncode = {
     {2, "test08.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false},
     {2, "test09.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false},
     {2, "test10.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true},
+    {3, "test11.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast, false},
+    {3, "test12.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast, false},
+    {3, "test13.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false},
+    {3, "test14.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false},
+    {3, "test15.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true},
 };
 
 class TestEncoder
