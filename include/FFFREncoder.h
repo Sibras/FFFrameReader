@@ -20,6 +20,8 @@
 namespace Ffr {
 class Encoder
 {
+    friend class Fmc::MultiCrop;
+
 public:
     Encoder() = delete;
 

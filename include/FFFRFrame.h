@@ -26,6 +26,7 @@ class Frame
     friend class Encoder;
     friend class StreamUtils;
     friend class FFR;
+    friend class Fmc::MultiCrop;
 
 public:
     Frame() = default;
