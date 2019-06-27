@@ -81,7 +81,8 @@ public:
 
         // Allocate new memory to store frame data
         ASSERT_EQ(cuCtxPushCurrent(m_context.get()), CUDA_SUCCESS);
-        const auto outFrameSize = getImageSize(params.m_format, width, height) + 25; // 25 added to test for stomping
+        const auto outFrameSize = getImageSize(params.m_format, width, height) +
+            getImagePlaneStep(params.m_format, width, height, 0); // extra added to test for stomping
         ASSERT_EQ(cuMemAlloc(&m_cudaBuffer, outFrameSize), CUDA_SUCCESS);
         ASSERT_EQ(cuMemsetD8(m_cudaBuffer, 254, outFrameSize), CUDA_SUCCESS);
         CUcontext dummy;
@@ -108,7 +109,8 @@ public:
         }
         // Copy data to host
         std::vector<uint8_t> hostBuffer;
-        const auto imageSize = getImageSize(format, width, height) + 25;
+        const auto padding = getImagePlaneStep(format, width, height, 0);
+        const auto imageSize = getImageSize(format, width, height) + padding;
         hostBuffer.reserve(imageSize);
         ASSERT_EQ(cuCtxPushCurrent(m_context.get()), CUDA_SUCCESS);
         ASSERT_EQ(cuMemcpyDtoH(hostBuffer.data(), m_cudaBuffer, imageSize), CUDA_SUCCESS);
@@ -124,8 +126,8 @@ public:
         ::saveImage(format, width, height, filename, outPlanes, outStep);
 
         // Check for memory stomping
-        for (uint32_t i = 0; i < 25; i++) {
-            ASSERT_EQ(hostBuffer.data()[imageSize - 25 + i], 254);
+        for (int32_t i = 0; i < padding; i++) {
+            ASSERT_EQ(hostBuffer.data()[imageSize - padding + i], 254);
         }
     }
 
