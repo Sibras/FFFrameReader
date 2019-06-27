@@ -59,7 +59,7 @@ int32_t getImageSize(const PixelFormat format, const uint32_t width, const uint3
 
 int32_t getImageLineStep(const PixelFormat format, const uint32_t width, const uint32_t plane) noexcept
 {
-    return av_image_get_linesize(getPixelFormat(format), width, plane);
+    return FFALIGN(av_image_get_linesize(getPixelFormat(format), width, plane), 32);
 }
 
 int32_t getImagePlaneStep(
