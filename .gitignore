@@ -45,3 +45,9 @@ install/
 *.MP4
 *.AVI
 *.MXF
+
+# Image files
+*.jpg
+*.bmp
+*.png
+*.ppm
