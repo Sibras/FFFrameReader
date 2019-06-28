@@ -250,6 +250,8 @@ if(BUILD_TESTING)
         PRIVATE FfFrameReader
         PRIVATE GTest::GTest
         PRIVATE GTest::Main
+        PRIVATE ${CUDA_CUDA_LIBRARY}
+        PRIVATE ${AVUTIL_LIBRARY}
     )
 
     set_target_properties(
