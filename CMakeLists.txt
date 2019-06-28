@@ -258,16 +258,6 @@ if(BUILD_TESTING)
         FFFRTest PROPERTIES
         EXCLUDE_FROM_ALL true
     )
-    
-    if(MSVC_IDE)
-        set_target_properties(
-            FFFRTest PROPERTIES
-            VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test"
-            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/test"
-            RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/test"
-            RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/test"
-        )
-    endif()
 
     add_dependencies(FFFRTest FfFrameReader)
 
