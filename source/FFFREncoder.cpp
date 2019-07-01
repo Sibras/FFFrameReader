@@ -92,7 +92,8 @@ bool Encoder::encodeStream(
     const shared_ptr<Encoder> encoder = make_shared<Encoder>(fileName, stream->getWidth(), stream->getHeight(),
         getRational(StreamUtils::getSampleAspectRatio(stream.get())), stream->getPixelFormat(),
         getRational(StreamUtils::getFrameRate(stream.get())),
-        stream->getDuration() - (stream->m_lastDecodedTimeStamp >= 0 ? stream->m_lastDecodedTimeStamp : 0),
+        stream->getDuration() -
+            (stream->m_lastDecodedTimeStamp >= 0 ? stream->timeStampToTime(stream->m_lastDecodedTimeStamp) : 0),
         options.m_type, options.m_quality, options.m_preset, ConstructorLock());
     if (!encoder->isEncoderValid()) {
         // Encoder creation failed
