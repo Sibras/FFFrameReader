@@ -406,12 +406,12 @@ bool Stream::seek(const int64_t timeStamp) noexcept
             // Dump all frames before requested one
             while (true) {
                 // Get next frame
-                auto frame = peekNextFrame();
-                if (frame == nullptr) {
+                auto ret = peekNextFrame();
+                if (ret == nullptr) {
                     return false;
                 }
                 // Check if we have found our requested time stamp or it is within the timestamp range of the next frame
-                if (timeStamp < (frame->getTimeStamp() + frameToTime(1))) {
+                if (timeStamp < (ret->getTimeStamp() + frameToTime(1))) {
                     break;
                 }
                 // Remove frames from ping buffer
@@ -425,8 +425,7 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     // packets from the current position into buffer.
     const auto timeStamp2 = timeToTimeStamp2(timeStamp);
     if (timeStamp2 > m_lastDecodedTimeStamp) {
-        // Forward decode if within some predefined range of existing point. If this is a recurse then we need to
-        // compensate for potentially huge gaps between seek frames.
+        // Forward decode if within some predefined range of existing point.
         const auto timeStep = timeStampToFrame2(timeStamp2 - m_lastDecodedTimeStamp);
         if (timeStep <= getCodecKeyFrameDistance()) {
             // Loop through until the requested timestamp is found (or nearest timestamp rounded up if exact match
@@ -463,7 +462,76 @@ bool Stream::seek(const int64_t timeStamp) noexcept
 
 bool Stream::seekFrame(const int64_t frame) noexcept
 {
-    return seekFrameInternal(frame, false);
+    if (frame >= getTotalFrames()) {
+        // Early out if seek is not possible
+        return false;
+    }
+
+    lock_guard<recursive_mutex> lock(m_mutex);
+    // Check if we actually have any frames in the current buffer
+    if (m_bufferPingHead < m_bufferPing.size()) {
+        // Check if the frame is in the current buffer
+        if ((frame >= m_bufferPing[m_bufferPingHead]->getFrameNumber()) &&
+            (frame <= m_bufferPing.back()->getFrameNumber())) {
+            // Dump all frames before requested one
+            while (true) {
+                // Get next frame
+                auto ret = peekNextFrame();
+                if (ret == nullptr) {
+                    return false;
+                }
+                // Check if we have found our requested frame
+                if (frame <= ret->getFrameNumber()) {
+                    break;
+                }
+                // Remove frames from ping buffer
+                popFrame();
+            }
+            return true;
+        }
+    }
+
+    // Check if this is a forward seek within some predefined small range. If so then just continue reading
+    // packets from the current position into buffer.
+    const auto timeStamp2 = frameToTimeStamp2(frame);
+    if (frame > m_lastDecodedTimeStamp) {
+        // Forward decode if within some predefined range of existing point.
+        const auto timeStep = timeStampToFrame2(timeStamp2 - m_lastDecodedTimeStamp);
+        if (timeStep <= getCodecKeyFrameDistance()) {
+            // Loop through until the requested timestamp is found (or nearest timestamp rounded up if exact match
+            // could not be found). Discard all frames occuring before timestamp
+
+            // Clean out current buffer
+            m_bufferPing.resize(0);
+            m_bufferPingHead = 0;
+
+            // Decode the next block of frames
+            return decodeNextBlock(timeStamp2);
+        }
+    }
+
+    // Seek to desired timestamp
+    avcodec_flush_buffers(m_codecContext.get());
+    m_lastDecodedTimeStamp = -1;
+    const auto frameInternal = frame + timeStampToFrame(m_startTimeStamp);
+    const auto err =
+        avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
+    if (err < 0) {
+        m_frameSeekSupported = false;
+        log("Failed to seek to specified frame "s += to_string(frame) += ": "s += getFfmpegErrorString(err) +=
+            " (retrying using timestamp based seek)"s,
+            LogLevel::Error);
+
+        // Try and seek just using a timestamp
+        return seek(frameToTime(frame));
+    }
+
+    // Clean out current buffer
+    m_bufferPing.resize(0);
+    m_bufferPingHead = 0;
+
+    // Decode the next block of frames
+    return decodeNextBlock(timeStamp2);
 }
 
 int64_t Stream::timeToTimeStamp(const int64_t time) const noexcept
@@ -738,102 +806,6 @@ void Stream::popFrame() noexcept
     }
     // Release reference and pop frame
     m_bufferPing[m_bufferPingHead++] = make_shared<Frame>();
-}
-
-bool Stream::seekFrameInternal(const int64_t frame, const bool recursed) noexcept
-{
-    if (frame >= getTotalFrames()) {
-        // Early out if seek is not possible
-        return false;
-    }
-    lock_guard<recursive_mutex> lock(m_mutex);
-    // Check if we actually have any frames in the current buffer
-    if (m_bufferPing.size() > 0) {
-        // Check if the frame is in the current buffer
-        if ((m_bufferPingHead < m_bufferPing.size()) && (frame >= m_bufferPing[m_bufferPingHead]->getFrameNumber()) &&
-            (frame <= m_bufferPing.back()->getFrameNumber())) {
-            // Dump all frames before requested one
-            while (true) {
-                // Get next frame
-                auto ret = peekNextFrame();
-                if (ret == nullptr) {
-                    return false;
-                }
-                // Check if we have found our requested frame
-                if (frame <= ret->getFrameNumber()) {
-                    break;
-                }
-                // Remove frames from ping buffer
-                popFrame();
-            }
-            return true;
-        }
-
-        // Check if this is a forward seek within some predefined small range. If so then just continue reading
-        // packets from the current position into buffer.
-        if (frame > m_bufferPing.back()->getFrameNumber()) {
-            // Forward decode if within some predefined range of existing point. If this is a recurse then we need to
-            // compensate for potentially huge gaps between seek frames.
-            const int64_t frameRange = (!recursed) ? m_bufferLength * 3 : 1000;
-            if (frame <= m_bufferPing.back()->getFrameNumber() + frameRange) {
-                // Loop through until the requested frame is found. Discard all frames occuring before requested one
-
-                // Clean out current buffer
-                m_bufferPing.resize(0);
-                m_bufferPingHead = 0;
-
-                // Decode the next block of frames
-                if (!decodeNextBlock()) {
-                    return false;
-                }
-
-                // Search through buffer until time stamp is found
-                return seekFrameInternal(frame, recursed);
-            }
-        }
-    }
-
-    // If we have recursed and still haven't found the frame then we never will
-    if (recursed || !m_frameSeekSupported) {
-        if (m_frameSeekSupported) {
-            m_frameSeekSupported = false;
-            log("Failed to seek to specified frame "s += to_string(frame) += " (retrying using timestamp based seek)"s,
-                LogLevel::Error);
-        } else if (recursed) {
-            return false;
-        }
-
-        // Try and seek just using a timestamp
-        return seek(frameToTime(frame));
-    }
-
-    // Seek to desired timestamp
-    avcodec_flush_buffers(m_codecContext.get());
-    m_lastDecodedTimeStamp = -1;
-    const auto frameInternal = frame + timeStampToFrame(m_startTimeStamp);
-    const auto err =
-        avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
-    if (err < 0) {
-        m_frameSeekSupported = false;
-        log("Failed to seek to specified frame "s += to_string(frame) += ": "s += getFfmpegErrorString(err) +=
-            " (retrying using timestamp based seek)"s,
-            LogLevel::Error);
-
-        // Try and seek just using a timestamp
-        return seek(frameToTime(frame));
-    }
-
-    // Clean out current buffer
-    m_bufferPing.resize(0);
-    m_bufferPingHead = 0;
-
-    // Decode the next block of frames
-    if (!decodeNextBlock()) {
-        return false;
-    }
-
-    // Search through buffer until time stamp is found
-    return seekFrameInternal(frame, true);
 }
 
 int32_t Stream::getCodecDelay() const noexcept

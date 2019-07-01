@@ -307,14 +307,6 @@ private:
     void popFrame() noexcept;
 
     /**
-     * Seeks the stream to the given frame number.
-     * @param frame The zero-indexed frame number to seek to.
-     * @param recursed  True if function has recursed into itself.
-     * @returns True if it succeeds, false if it fails.
-     */
-    [[nodiscard]] bool seekFrameInternal(int64_t frame, bool recursed) noexcept;
-
-    /**
      * Return the maximum number of input frames needed by this stream's codec before it can produce output.
      * @note We expect to have to wait this many frames to receive output; any more and a decode stall is detected.
      * @returns The codec delay.
