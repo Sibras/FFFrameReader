@@ -183,7 +183,7 @@ private:
     CodecContextPtr m_codecContext;
 
     int64_t m_startTimeStamp = 0;        /**< PTS of the first frame in the stream time base */
-    int64_t m_lastDecodedTimeStamp = -1; /**< The stream time stamp of the last decoded frame */
+    int64_t m_lastDecodedTimeStamp = -1; /**< The decoder time stamp of the last decoded frame */
     bool m_frameSeekSupported = true;    /**< True if frame seek supported */
     int64_t m_totalFrames = 0;           /**< Stream video duration in frames */
     int64_t m_totalDuration = 0;         /**< Stream video duration in microseconds (AV_TIME_BASE) */
@@ -288,29 +288,23 @@ private:
 
     /**
      * Decodes the next block of frames into the pong buffer. Once complete swaps the ping/pong buffers.
+     * @param flushTillTime (Optional) All frames with decoder time stamps before this will be discarded.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool decodeNextBlock() noexcept;
+    [[nodiscard]] bool decodeNextBlock(int64_t flushTillTime = -1) noexcept;
 
     /**
      * Decodes any frames currently pending in the decoder.
+     * @param flushTillTime (Optional) All frames with decoder time stamps before this will be discarded.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool decodeNextFrames() noexcept;
+    [[nodiscard]] bool decodeNextFrames(int64_t flushTillTime = -1) noexcept;
 
     /**
      * Pops the next available frame from the buffer.
      * @note This requires that peekNextFrame() be called first to ensure there is a valid frame to pop.
      */
     void popFrame() noexcept;
-
-    /**
-     * Seeks the stream to the given time stamp.
-     * @param timeStamp The time stamp to seek to (in micro-seconds).
-     * @param recursed  True if function has recursed into itself.
-     * @returns True if it succeeds, false if it fails.
-     */
-    [[nodiscard]] bool seekInternal(int64_t timeStamp, bool recursed) noexcept;
 
     /**
      * Seeks the stream to the given frame number.
@@ -326,6 +320,12 @@ private:
      * @returns The codec delay.
      */
     [[nodiscard]] int32_t getCodecDelay() const noexcept;
+
+    /**
+     * Gets the maximum possible frames that may occur between key frames.
+     * @returns The codec key frame distance.
+     */
+    [[nodiscard]] int32_t getCodecKeyFrameDistance() const noexcept;
 
     /**
      * Return the maximum number of input frames needed by a codec before it can produce output.
