@@ -239,6 +239,7 @@ bool Stream::initialise() noexcept
             i->m_timeStamp -= startTime;
             i->m_frameNum = timeToFrame2(i->m_timeStamp);
         }
+        m_lastDecodedTimeStamp = timeToTimeStamp2(m_bufferPing.back()->getTimeStamp());
     }
     return true;
 }
@@ -355,32 +356,59 @@ shared_ptr<Frame> Stream::getNextFrame() noexcept
 
 vector<shared_ptr<Frame>> Stream::getNextFrameSequence(const vector<int64_t>& frameSequence) noexcept
 {
-    // Note: for best performance when using this the buffer size should be small enough to not waste to much memory
     lock_guard<recursive_mutex> lock(m_mutex);
     vector<shared_ptr<Frame>> ret;
-    int64_t start = 0;
+    const auto startFrame = m_bufferPingHead < m_bufferPing.size() ? m_bufferPing.front()->getFrameNumber() :
+                                                                     timeStampToFrame2(m_lastDecodedTimeStamp) + 1;
     for (const auto& i : frameSequence) {
-        if (i < start) {
-            // Invalid sequence list
-            log("Invalid sequence list passed to getNextFrameSequence(). Sequences in the list must be in ascending order"s,
-                LogLevel::Error);
+        // Use seek function as that will determine if seek or just a forward decode is needed
+        if (!seekFrame(startFrame + i)) {
             break;
-        }
-        // Remove all frames until first in sequence
-        for (int64_t j = start; j < i; j++) {
-            // Must peek to check there is actually a new frame
-            auto frame = peekNextFrame();
-            if (frame == nullptr) {
-                break;
-            }
-            popFrame();
         }
         auto frame = getNextFrame();
         if (frame == nullptr) {
             break;
         }
         ret.emplace_back(move(frame));
-        start = i + 1;
+    }
+    return ret;
+}
+
+std::vector<std::shared_ptr<Frame>> Stream::getNextFrames(const std::vector<int64_t>& frameSequence) noexcept
+{
+    lock_guard<recursive_mutex> lock(m_mutex);
+    vector<shared_ptr<Frame>> ret;
+    const auto startTime = m_bufferPingHead < m_bufferPing.size() ?
+        m_bufferPing.front()->getTimeStamp() :
+        timeStampToTime2(m_lastDecodedTimeStamp) + frameToTime2(1);
+    for (const auto& i : frameSequence) {
+        // Use seek function as that will determine if seek or just a forward decode is needed
+        if (!seek(startTime + i)) {
+            break;
+        }
+        auto frame = getNextFrame();
+        if (frame == nullptr) {
+            break;
+        }
+        ret.emplace_back(move(frame));
+    }
+    return ret;
+}
+
+std::vector<std::shared_ptr<Frame>> Stream::getFrames(const std::vector<int64_t>& frameSequence) noexcept
+{
+    lock_guard<recursive_mutex> lock(m_mutex);
+    vector<shared_ptr<Frame>> ret;
+    for (const auto& i : frameSequence) {
+        // Use seek function as that will determine if seek or just a forward decode is needed
+        if (!seek(i)) {
+            break;
+        }
+        auto frame = getNextFrame();
+        if (frame == nullptr) {
+            break;
+        }
+        ret.emplace_back(move(frame));
     }
     return ret;
 }
