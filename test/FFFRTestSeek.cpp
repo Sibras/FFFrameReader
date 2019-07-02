@@ -237,7 +237,7 @@ TEST_P(SeekTest1, getNextFrameByIndexSeek)
     }
 }
 
-TEST_P(SeekTest1, getNextFrameByIndex)
+TEST_P(SeekTest1, getNextFramesByIndex)
 {
     // Ensure that value in list is greater than buffer size
     const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
