@@ -35,7 +35,7 @@ extern "C" {
 }
 
 namespace Ffr {
-Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
+Stream::Stream(const std::string& fileName, uint32_t bufferLength,
     const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost, Crop crop, Resolution scale,
     PixelFormat format, ConstructorLock) noexcept
 {
@@ -65,12 +65,17 @@ Stream::Stream(const std::string& fileName, const uint32_t bufferLength,
     AVStream* stream = tempFormat->streams[ret];
     const int32_t index = ret;
 
-    // Check if any scaling/cropping is needed
+    // Validate input parameters
     const auto inHeight = stream->codecpar->height;
     const auto inWidth = stream->codecpar->width;
+    bufferLength = std::max(bufferLength, 1u);
+
+    // Check if any scaling/cropping is needed
     Resolution postScale = scale;
     bool cropRequired = (crop.m_top != 0 || crop.m_bottom != 0 || crop.m_left != 0 || crop.m_right != 0);
     if (cropRequired) {
+        crop.m_left = std::min(crop.m_left, inWidth - crop.m_right - 1);
+        crop.m_top = std::min(crop.m_top, inHeight - crop.m_bottom - 1);
         // Check if scale is actually required after the crop
         const uint32_t width = inWidth - crop.m_left - crop.m_right;
         const uint32_t height = inHeight - crop.m_top - crop.m_bottom;
