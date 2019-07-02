@@ -228,6 +228,7 @@ if(BUILD_TESTING)
 
     set(FFFR_TEST_SOURCES
         test/FFFRTestStream.cpp
+        test/FFFRTestSeek.cpp
         test/FFFRTestDecode.cpp
         test/FFFRTestFrame.cpp
         test/FFFRTestFilter.cpp
