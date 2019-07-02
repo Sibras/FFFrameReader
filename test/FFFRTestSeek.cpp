@@ -57,8 +57,7 @@ TEST_P(SeekTest1, seek)
     constexpr int64_t seekFrames = 80;
     const int64_t actualSeek =
         seekFrames >= std::get<1>(GetParam()).m_totalFrames ? std::get<1>(GetParam()).m_totalFrames - 5 : seekFrames;
-    const double timeStamp1 = (static_cast<double>(actualSeek) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-    const auto time1 = llround(timeStamp1);
+    const auto time1 = m_stream->frameToTime(actualSeek);
     ASSERT_TRUE(m_stream->seek(time1));
     const auto frame1 = m_stream->getNextFrame();
     ASSERT_NE(frame1, nullptr);
@@ -69,8 +68,7 @@ TEST_P(SeekTest1, seekSmall)
 {
     ASSERT_NE(m_stream->getNextFrame(), nullptr);
     // Seek forward 2 frames only.
-    const double timeStamp1 = (static_cast<double>(2) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-    const auto time1 = llround(timeStamp1);
+    const auto time1 = m_stream->frameToTime(2);
     ASSERT_TRUE(m_stream->seek(time1));
     const auto frame1 = m_stream->getNextFrame();
     ASSERT_NE(frame1, nullptr);
@@ -82,8 +80,7 @@ TEST_P(SeekTest1, seekFail)
     ASSERT_FALSE(m_stream->seek(m_stream->getDuration()));
     ASSERT_FALSE(m_stream->seek(m_stream->getDuration() + 300000));
     // Check we can do a valid seek after a failed one
-    const double timeStamp1 = (static_cast<double>(2) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-    const auto time1 = llround(timeStamp1);
+    const auto time1 = m_stream->frameToTime(2);
     ASSERT_TRUE(m_stream->seek(time1));
     const auto frame1 = m_stream->getNextFrame();
     ASSERT_NE(frame1, nullptr);
@@ -136,8 +133,7 @@ TEST_P(SeekTest1, seekBack)
     constexpr int64_t seekFrames = 80;
     const int64_t actualSeek =
         seekFrames >= std::get<1>(GetParam()).m_totalFrames ? std::get<1>(GetParam()).m_totalFrames - 5 : seekFrames;
-    const double timeStamp1 = (static_cast<double>(actualSeek) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-    const auto time1 = llround(timeStamp1);
+    const auto time1 = m_stream->frameToTime(actualSeek);
     ASSERT_TRUE(m_stream->seek(time1));
     auto frame1 = m_stream->getNextFrame();
     ASSERT_NE(frame1, nullptr);
@@ -182,15 +178,13 @@ TEST_P(SeekTest1, getNextFramesSeek)
     constexpr int64_t seekFrames = 80;
     const int64_t actualSeek =
         seekFrames >= std::get<1>(GetParam()).m_totalFrames ? std::get<1>(GetParam()).m_totalFrames - 9 : seekFrames;
-    const double timeStamp1 = (static_cast<double>(actualSeek) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-    const auto time1 = llround(timeStamp1);
+    const auto time1 = m_stream->frameToTime(actualSeek);
     ASSERT_TRUE(m_stream->seek(time1));
     // Now get frame sequence offset from current
     const std::vector<int64_t> framesList1 = {0, 1, 5, 7, 8};
     std::vector<int64_t> timesList1;
     for (const auto& i : framesList1) {
-        const double timeStamp2 = (static_cast<double>(i) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-        const auto time2 = llround(timeStamp2);
+        const auto time2 = m_stream->frameToTime(i);
         timesList1.emplace_back(time2);
     }
     const auto frames1 = m_stream->getNextFrames(timesList1);
@@ -198,9 +192,7 @@ TEST_P(SeekTest1, getNextFramesSeek)
     // Check that the returned frames are correct
     auto j = 0;
     for (auto& i : frames1) {
-        const double timeStamp2 =
-            static_cast<double>(framesList1[j] + actualSeek) * (1000000.0 / std::get<1>(GetParam()).m_frameRate);
-        const auto time2 = llround(timeStamp2);
+        const auto time2 = m_stream->frameToTime(framesList1[j] + actualSeek);
         ASSERT_EQ(i->getTimeStamp(), time2);
         ++j;
     }
@@ -212,8 +204,7 @@ TEST_P(SeekTest1, getNextFrames)
     const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
     std::vector<int64_t> timesList1;
     for (const auto& i : framesList1) {
-        const double timeStamp2 = (static_cast<double>(i) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-        const auto time2 = llround(timeStamp2);
+        const auto time2 = m_stream->frameToTime(i);
         timesList1.emplace_back(time2);
     }
     const auto frames1 = m_stream->getNextFrames(timesList1);
@@ -262,15 +253,13 @@ TEST_P(SeekTest1, getNextFrameByIndex)
 TEST_P(SeekTest1, getFrames)
 {
     // Seek forward 2 frames only. This should not effect result
-    const double timeStamp1 = (static_cast<double>(2) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-    const auto time1 = llround(timeStamp1);
+    const auto time1 = m_stream->frameToTime(2);
     ASSERT_TRUE(m_stream->seek(time1));
     // Ensure that value in list is greater than buffer size
     const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
     std::vector<int64_t> timesList1;
     for (const auto& i : framesList1) {
-        const double timeStamp2 = (static_cast<double>(i) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-        const auto time2 = llround(timeStamp2);
+        const auto time2 = m_stream->frameToTime(i);
         timesList1.emplace_back(time2);
     }
     const auto frames1 = m_stream->getFrames(timesList1);
@@ -286,8 +275,7 @@ TEST_P(SeekTest1, getFrames)
 TEST_P(SeekTest1, getFramesByIndex)
 {
     // Seek forward 2 frames only. This should not effect result
-    const double timeStamp1 = (static_cast<double>(2) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-    const auto time1 = llround(timeStamp1);
+    const auto time1 = m_stream->frameToTime(2);
     ASSERT_TRUE(m_stream->seek(time1));
     // Ensure that value in list is greater than buffer size
     const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};

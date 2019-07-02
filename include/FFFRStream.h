@@ -197,6 +197,22 @@ public:
      */
     [[nodiscard]] bool seekFrame(int64_t frame) noexcept;
 
+    /**
+     * Convert a zero-based frame number to time value represented in microseconds (AV_TIME_BASE).
+     * @note This will not be fully accurate when dealing with VFR video streams.
+     * @param frame The zero-based frame number
+     * @return The converted time.
+     */
+    [[nodiscard]] int64_t frameToTime(int64_t frame) const noexcept;
+
+    /**
+     * Convert a time value represented in microseconds (AV_TIME_BASE) to a zero-based frame number.
+     * @note This will not be fully accurate when dealing with VFR video streams.
+     * @param time The time in microseconds (AV_TIME_BASE).
+     * @return The converted frame index.
+     */
+    [[nodiscard]] int64_t timeToFrame(int64_t time) const noexcept;
+
 private:
     std::recursive_mutex m_mutex;
 
@@ -286,28 +302,12 @@ private:
     [[nodiscard]] int64_t timeStampToFrame2(int64_t timeStamp) const noexcept;
 
     /**
-     * Convert a zero-based frame number to time value represented in microseconds (AV_TIME_BASE).
-     * @note This will not be fully accurate when dealing with VFR video streams.
-     * @param frame The zero-based frame number
-     * @return The converted time.
-     */
-    [[nodiscard]] int64_t frameToTime(int64_t frame) const noexcept;
-
-    /**
      * Convert a zero-based codec frame number to time value represented in microseconds (AV_TIME_BASE).
      * @note This will not be fully accurate when dealing with VFR video streams.
      * @param frame The zero-based frame number
      * @return The converted time.
      */
     [[nodiscard]] int64_t frameToTime2(int64_t frame) const noexcept;
-
-    /**
-     * Convert a time value represented in microseconds (AV_TIME_BASE) to a zero-based frame number.
-     * @note This will not be fully accurate when dealing with VFR video streams.
-     * @param time The time in microseconds (AV_TIME_BASE).
-     * @return The converted frame index.
-     */
-    [[nodiscard]] int64_t timeToFrame(int64_t time) const noexcept;
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to a zero-based codec frame number.

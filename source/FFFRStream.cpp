@@ -585,6 +585,16 @@ bool Stream::seekFrame(const int64_t frame) noexcept
     return decodeNextBlock(timeStamp2);
 }
 
+int64_t Stream::frameToTime(const int64_t frame) const noexcept
+{
+    return av_rescale_q(frame, av_make_q(AV_TIME_BASE, 1), m_formatContext->streams[m_index]->r_frame_rate);
+}
+
+int64_t Stream::timeToFrame(const int64_t time) const noexcept
+{
+    return av_rescale_q(time, av_make_q(1, AV_TIME_BASE), av_inv_q(m_formatContext->streams[m_index]->r_frame_rate));
+}
+
 int64_t Stream::timeToTimeStamp(const int64_t time) const noexcept
 {
     static_assert(AV_TIME_BASE == 1000000, "FFmpeg internal time_base does not match expected value");
@@ -634,19 +644,9 @@ int64_t Stream::timeStampToFrame2(const int64_t timeStamp) const noexcept
     return av_rescale_q(timeStamp, m_codecContext->time_base, av_inv_q(m_codecContext->framerate));
 }
 
-int64_t Stream::frameToTime(const int64_t frame) const noexcept
-{
-    return av_rescale_q(frame, av_make_q(AV_TIME_BASE, 1), m_formatContext->streams[m_index]->r_frame_rate);
-}
-
 int64_t Stream::frameToTime2(const int64_t frame) const noexcept
 {
     return av_rescale_q(frame, av_make_q(AV_TIME_BASE, 1), m_codecContext->framerate);
-}
-
-int64_t Stream::timeToFrame(const int64_t time) const noexcept
-{
-    return av_rescale_q(time, av_make_q(1, AV_TIME_BASE), av_inv_q(m_formatContext->streams[m_index]->r_frame_rate));
 }
 
 int64_t Stream::timeToFrame2(const int64_t time) const noexcept
