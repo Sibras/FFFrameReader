@@ -443,7 +443,7 @@ bool Stream::isEndOfFile() const noexcept
 
 bool Stream::seek(const int64_t timeStamp) noexcept
 {
-    if (timeStamp >= getDuration()) {
+    if (timeStamp >= getDuration() || timeStamp < 0) {
         // Bail if seek is not possible
         return false;
     }

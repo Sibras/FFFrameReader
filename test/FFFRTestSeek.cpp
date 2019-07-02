@@ -79,6 +79,7 @@ TEST_P(SeekTest1, seekFail)
 {
     ASSERT_FALSE(m_stream->seek(m_stream->getDuration()));
     ASSERT_FALSE(m_stream->seek(m_stream->getDuration() + 300000));
+    ASSERT_FALSE(m_stream->seek(-1000000));
     // Check we can do a valid seek after a failed one
     const auto time1 = m_stream->frameToTime(2);
     ASSERT_TRUE(m_stream->seek(time1));
