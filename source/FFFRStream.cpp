@@ -359,26 +359,6 @@ shared_ptr<Frame> Stream::getNextFrame() noexcept
     return ret;
 }
 
-vector<shared_ptr<Frame>> Stream::getNextFrameSequence(const vector<int64_t>& frameSequence) noexcept
-{
-    lock_guard<recursive_mutex> lock(m_mutex);
-    vector<shared_ptr<Frame>> ret;
-    const auto startFrame = m_bufferPingHead < m_bufferPing.size() ? m_bufferPing.front()->getFrameNumber() :
-                                                                     timeStampToFrame2(m_lastDecodedTimeStamp) + 1;
-    for (const auto& i : frameSequence) {
-        // Use seek function as that will determine if seek or just a forward decode is needed
-        if (!seekFrame(startFrame + i)) {
-            break;
-        }
-        auto frame = getNextFrame();
-        if (frame == nullptr) {
-            break;
-        }
-        ret.emplace_back(move(frame));
-    }
-    return ret;
-}
-
 std::vector<std::shared_ptr<Frame>> Stream::getNextFrames(const std::vector<int64_t>& frameSequence) noexcept
 {
     lock_guard<recursive_mutex> lock(m_mutex);
@@ -400,6 +380,26 @@ std::vector<std::shared_ptr<Frame>> Stream::getNextFrames(const std::vector<int6
     return ret;
 }
 
+vector<shared_ptr<Frame>> Stream::getNextFramesByIndex(const vector<int64_t>& frameSequence) noexcept
+{
+    lock_guard<recursive_mutex> lock(m_mutex);
+    vector<shared_ptr<Frame>> ret;
+    const auto startFrame = m_bufferPingHead < m_bufferPing.size() ? m_bufferPing.front()->getFrameNumber() :
+                                                                     timeStampToFrame2(m_lastDecodedTimeStamp) + 1;
+    for (const auto& i : frameSequence) {
+        // Use seek function as that will determine if seek or just a forward decode is needed
+        if (!seekFrame(startFrame + i)) {
+            break;
+        }
+        auto frame = getNextFrame();
+        if (frame == nullptr) {
+            break;
+        }
+        ret.emplace_back(move(frame));
+    }
+    return ret;
+}
+
 std::vector<std::shared_ptr<Frame>> Stream::getFrames(const std::vector<int64_t>& frameSequence) noexcept
 {
     lock_guard<recursive_mutex> lock(m_mutex);
@@ -407,6 +407,24 @@ std::vector<std::shared_ptr<Frame>> Stream::getFrames(const std::vector<int64_t>
     for (const auto& i : frameSequence) {
         // Use seek function as that will determine if seek or just a forward decode is needed
         if (!seek(i)) {
+            break;
+        }
+        auto frame = getNextFrame();
+        if (frame == nullptr) {
+            break;
+        }
+        ret.emplace_back(move(frame));
+    }
+    return ret;
+}
+
+std::vector<std::shared_ptr<Frame>> Stream::getFramesByIndex(const std::vector<int64_t>& frameSequence) noexcept
+{
+    lock_guard<recursive_mutex> lock(m_mutex);
+    vector<shared_ptr<Frame>> ret;
+    for (const auto& i : frameSequence) {
+        // Use seek function as that will determine if seek or just a forward decode is needed
+        if (!seekFrame(i)) {
             break;
         }
         auto frame = getNextFrame();

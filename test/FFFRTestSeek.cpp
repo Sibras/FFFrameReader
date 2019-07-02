@@ -176,39 +176,6 @@ TEST_P(SeekTest1, seekFrameLoop)
     }
 }
 
-TEST_P(SeekTest1, getNextFrameSequenceSeek)
-{
-    // First seek to a frame
-    constexpr int64_t seekFrames = 80;
-    const int64_t actualSeek =
-        seekFrames >= std::get<1>(GetParam()).m_totalFrames ? std::get<1>(GetParam()).m_totalFrames - 9 : seekFrames;
-    ASSERT_TRUE(m_stream->seekFrame(actualSeek));
-    // Now get frame sequence offset from current
-    const std::vector<int64_t> framesList1 = {0, 1, 5, 7, 8};
-    const auto frames1 = m_stream->getNextFrameSequence(framesList1);
-    ASSERT_EQ(frames1.size(), framesList1.size());
-    // Check that the returned frames are correct
-    auto j = 0;
-    for (auto& i : frames1) {
-        ASSERT_EQ(i->getFrameNumber(), framesList1[j] + actualSeek);
-        ++j;
-    }
-}
-
-TEST_P(SeekTest1, getNextFrameSequence)
-{
-    // Ensure that value in list is greater than buffer size
-    const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
-    const auto frames1 = m_stream->getNextFrameSequence(framesList1);
-    ASSERT_EQ(frames1.size(), framesList1.size());
-    // Check that the returned frames are correct
-    auto j = 0;
-    for (auto& i : frames1) {
-        ASSERT_EQ(i->getFrameNumber(), framesList1[j]);
-        ++j;
-    }
-}
-
 TEST_P(SeekTest1, getNextFramesSeek)
 {
     // First seek to a frame
@@ -259,6 +226,39 @@ TEST_P(SeekTest1, getNextFrames)
     }
 }
 
+TEST_P(SeekTest1, getNextFrameByIndexSeek)
+{
+    // First seek to a frame
+    constexpr int64_t seekFrames = 80;
+    const int64_t actualSeek =
+        seekFrames >= std::get<1>(GetParam()).m_totalFrames ? std::get<1>(GetParam()).m_totalFrames - 9 : seekFrames;
+    ASSERT_TRUE(m_stream->seekFrame(actualSeek));
+    // Now get frame sequence offset from current
+    const std::vector<int64_t> framesList1 = {0, 1, 5, 7, 8};
+    const auto frames1 = m_stream->getNextFramesByIndex(framesList1);
+    ASSERT_EQ(frames1.size(), framesList1.size());
+    // Check that the returned frames are correct
+    auto j = 0;
+    for (auto& i : frames1) {
+        ASSERT_EQ(i->getFrameNumber(), framesList1[j] + actualSeek);
+        ++j;
+    }
+}
+
+TEST_P(SeekTest1, getNextFrameByIndex)
+{
+    // Ensure that value in list is greater than buffer size
+    const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
+    const auto frames1 = m_stream->getNextFramesByIndex(framesList1);
+    ASSERT_EQ(frames1.size(), framesList1.size());
+    // Check that the returned frames are correct
+    auto j = 0;
+    for (auto& i : frames1) {
+        ASSERT_EQ(i->getFrameNumber(), framesList1[j]);
+        ++j;
+    }
+}
+
 TEST_P(SeekTest1, getFrames)
 {
     // Seek forward 2 frames only. This should not effect result
@@ -279,6 +279,24 @@ TEST_P(SeekTest1, getFrames)
     auto j = 0;
     for (auto& i : frames1) {
         ASSERT_EQ(i->getTimeStamp(), timesList1[j]);
+        ++j;
+    }
+}
+
+TEST_P(SeekTest1, getFramesByIndex)
+{
+    // Seek forward 2 frames only. This should not effect result
+    const double timeStamp1 = (static_cast<double>(2) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
+    const auto time1 = llround(timeStamp1);
+    ASSERT_TRUE(m_stream->seek(time1));
+    // Ensure that value in list is greater than buffer size
+    const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
+    const auto frames1 = m_stream->getFramesByIndex(framesList1);
+    ASSERT_EQ(frames1.size(), framesList1.size());
+    // Check that the returned frames are correct
+    auto j = 0;
+    for (auto& i : frames1) {
+        ASSERT_EQ(i->getFrameNumber(), framesList1[j]);
         ++j;
     }
 }

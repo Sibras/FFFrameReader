@@ -135,17 +135,6 @@ public:
     [[nodiscard]] std::shared_ptr<Frame> getNextFrame() noexcept;
 
     /**
-     * Gets a sequence of frames offset from the current stream position using frame indices.
-     * @param frameSequence The frame sequence. This is a list of offset indices used to specify which frames to
-     *  retrieve. e.g. A sequence value of {0, 3, 6} will get the next frame as well as the 3rd frame after this and
-     *  then the third frame after that.
-     * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
-     * retrieved before the error are returned.
-     */
-    [[nodiscard]] std::vector<std::shared_ptr<Frame>> getNextFrameSequence(
-        const std::vector<int64_t>& frameSequence) noexcept;
-
-    /**
      * Gets a sequence of frames offset from the current stream position using time stamps.
      * @param frameSequence The frame sequence. This is a list of offset times used to specify which frames to
      *  retrieve. e.g. A sequence value of {0, 3000, 6000} will get the next frame as well as the the frame 3000us
@@ -156,6 +145,17 @@ public:
     [[nodiscard]] std::vector<std::shared_ptr<Frame>> getNextFrames(const std::vector<int64_t>& frameSequence) noexcept;
 
     /**
+     * Gets a sequence of frames offset from the current stream position using frame indices.
+     * @param frameSequence The frame sequence. This is a list of offset indices used to specify which frames to
+     *  retrieve. e.g. A sequence value of {0, 3, 6} will get the next frame as well as the 3rd frame after this and
+     *  then the third frame after that.
+     * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
+     * retrieved before the error are returned.
+     */
+    [[nodiscard]] std::vector<std::shared_ptr<Frame>> getNextFramesByIndex(
+        const std::vector<int64_t>& frameSequence) noexcept;
+
+    /**
      * Gets a sequence of frames based on there time stamps
      * @param frameSequence The frame sequence. This is a list of absolute times used to specify which frames to
      *  retrieve. e.g. A sequence value of {0, 3000, 6000} will get the first frame as well as the the frame 3000us
@@ -164,6 +164,17 @@ public:
      * retrieved before the error are returned.
      */
     [[nodiscard]] std::vector<std::shared_ptr<Frame>> getFrames(const std::vector<int64_t>& frameSequence) noexcept;
+
+    /**
+     * Gets a sequence of frames using frame indices.
+     * @param frameSequence The frame sequence. This is a list of absolute indices used to specify which frames to
+     *  retrieve. e.g. A sequence value of {0, 3, 6} will get the first frame as well as the 3rd frame and then the
+     *  third frame after that.
+     * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
+     * retrieved before the error are returned.
+     */
+    [[nodiscard]] std::vector<std::shared_ptr<Frame>> getFramesByIndex(
+        const std::vector<int64_t>& frameSequence) noexcept;
 
     /**
      * Query if the stream has reached end of input file.
