@@ -495,8 +495,8 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     avcodec_flush_buffers(m_codecContext.get());
     m_lastDecodedTimeStamp = -1;
     const auto localTimeStamp = timeToTimeStamp(timeStamp);
-    const auto err = avformat_seek_file(
-        m_formatContext.get(), m_index, INT64_MIN, localTimeStamp - (getCodecDelay() * 2), localTimeStamp, 0);
+    const auto err = avformat_seek_file(m_formatContext.get(), m_index,
+        localTimeStamp - frameToTimeStampNoOffset(getCodecKeyFrameDistance()), localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
         log("Failed seeking to specified time stamp "s += to_string(timeStamp) += getFfmpegErrorString(err),
             LogLevel::Error);
@@ -564,9 +564,9 @@ bool Stream::seekFrame(const int64_t frame) noexcept
     // Seek to desired timestamp
     avcodec_flush_buffers(m_codecContext.get());
     m_lastDecodedTimeStamp = -1;
-    const auto frameInternal = frame + timeStampToFrame(m_startTimeStamp);
-    const auto err =
-        avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
+    const auto frameInternal = frame + timeStampToFrameNoOffset(m_startTimeStamp);
+    const auto err = avformat_seek_file(m_formatContext.get(), m_index, frameInternal - getCodecKeyFrameDistance(),
+        frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
     if (err < 0) {
         m_frameSeekSupported = false;
         log("Failed to seek to specified frame "s += to_string(frame) += ": "s += getFfmpegErrorString(err) +=
@@ -628,6 +628,12 @@ int64_t Stream::frameToTimeStamp(const int64_t frame) const noexcept
             m_formatContext->streams[m_index]->time_base);
 }
 
+int64_t Stream::frameToTimeStampNoOffset(const int64_t frame) const noexcept
+{
+    return av_rescale_q(
+        frame, av_inv_q(m_formatContext->streams[m_index]->r_frame_rate), m_formatContext->streams[m_index]->time_base);
+}
+
 int64_t Stream::frameToTimeStamp2(const int64_t frame) const noexcept
 {
     return av_rescale_q(frame, av_inv_q(m_codecContext->framerate), m_codecContext->time_base);
@@ -636,6 +642,12 @@ int64_t Stream::frameToTimeStamp2(const int64_t frame) const noexcept
 int64_t Stream::timeStampToFrame(const int64_t timeStamp) const noexcept
 {
     return av_rescale_q(timeStamp - m_startTimeStamp, m_formatContext->streams[m_index]->time_base,
+        av_inv_q(m_formatContext->streams[m_index]->r_frame_rate));
+}
+
+int64_t Stream::timeStampToFrameNoOffset(const int64_t timeStamp) const noexcept
+{
+    return av_rescale_q(timeStamp, m_formatContext->streams[m_index]->time_base,
         av_inv_q(m_formatContext->streams[m_index]->r_frame_rate));
 }
 
@@ -940,7 +952,7 @@ int64_t Stream::getStreamFrames() const noexcept
 
     // Seek last key-frame.
     avcodec_flush_buffers(m_codecContext.get());
-    const auto maxSeek = frameToTimeStamp(1UL << 29UL);
+    const auto maxSeek = frameToTimeStampNoOffset(1UL << 29UL);
     if (avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, maxSeek, maxSeek, 0) < 0) {
         log("Failed to determine number of frames in stream"s, LogLevel::Error);
         return 0;
@@ -990,7 +1002,7 @@ int64_t Stream::getStreamDuration() const noexcept
 
     // Seek last key-frame.
     avcodec_flush_buffers(m_codecContext.get());
-    const auto maxSeek = frameToTimeStamp(1UL << 29UL);
+    const auto maxSeek = frameToTimeStampNoOffset(1UL << 29UL);
     if (avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, maxSeek, maxSeek, 0) < 0) {
         log("Failed to determine stream duration"s, LogLevel::Error);
         return 0;
