@@ -152,7 +152,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
             return;
         }
         // Enable extra hardware frames to ensure we don't run out of buffers
-        const auto extraFrames = std::max(getCodecDelay(tempCodec), static_cast<int32_t>(bufferLength)) + 5;
+        const auto extraFrames = std::max(getCodecDelay(tempCodec), static_cast<int32_t>(bufferLength));
         tempCodec->extra_hw_frames = extraFrames;
         if (decoderContext->getType() == DecodeType::Cuda && (cropRequired || scaleRequired)) {
             // Use internal cuvid filtering capabilities
@@ -703,7 +703,7 @@ bool Stream::decodeNextBlock(const int64_t flushTillTime) noexcept
 bool Stream::decodeNextFrames(const int64_t flushTillTime) noexcept
 {
     // Loop through and retrieve all decoded frames
-    while (true) {
+    do {
         if (*m_tempFrame == nullptr) {
             m_tempFrame = FramePtr(av_frame_alloc());
             if (*m_tempFrame == nullptr) {
@@ -830,7 +830,8 @@ bool Stream::decodeNextFrames(const int64_t flushTillTime) noexcept
         // Add the new frame to the pong buffer
         m_bufferPong.emplace_back(
             make_shared<Frame>(m_tempFrame, timeStamp, frameNum, m_formatContext, m_codecContext));
-    }
+    } while (m_bufferPong.size() < m_bufferLength);
+    return true;
 }
 
 void Stream::popFrame() noexcept
