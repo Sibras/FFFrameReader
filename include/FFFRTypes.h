@@ -107,6 +107,10 @@ public:
     uint32_t m_bufferLength = 10;             /**< Number of frames in the the decode buffer.
                                               This should be optimised based on reading/seeking pattern so as to minimise frame
                                               storage requirements but also maximise decode throughput. */
+    uint32_t m_seekThreshold = 0;             /**< Maximum number of frames for a forward seek to continue
+                                              to decode instead of seeking. This should be optimised based on a sources
+                                              key frame interval so that forward decoding is used when it provides faster seeks. A
+                                              value of 0 uses automatic detection. */
     std::any m_context;                       /**< Pointer to an existing context to be used for hardware
                                                decoding. This must match the hardware type specified in @m_type. */
     uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */

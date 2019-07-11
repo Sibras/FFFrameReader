@@ -62,6 +62,7 @@ public:
      * Constructor.
      * @param fileName       Filename of the file to open.
      * @param bufferLength   Number of frames in the the decode buffer.
+     * @param seekThreshold  Maximum number of frames for a forward seek to continue to decode instead of seeking.
      * @param decoderContext Pointer to an existing context to be used for hardware decoding.
      * @param outputHost     True to output each frame to host CPU memory (only affects hardware decoding).
      * @param crop           The output cropping or (0) if no crop should be performed.
@@ -69,8 +70,9 @@ public:
      *  after cropping.
      * @param format         The required output pixel format.
      */
-    Stream(const std::string& fileName, uint32_t bufferLength, const std::shared_ptr<DecoderContext>& decoderContext,
-        bool outputHost, Crop crop, Resolution scale, PixelFormat format, ConstructorLock) noexcept;
+    Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seekThreshold,
+        const std::shared_ptr<DecoderContext>& decoderContext, bool outputHost, Crop crop, Resolution scale,
+        PixelFormat format, ConstructorLock) noexcept;
 
     /**
      * Gets the width of the video stream.
@@ -234,6 +236,7 @@ private:
     bool m_frameSeekSupported = true;    /**< True if frame seek supported */
     int64_t m_totalFrames = 0;           /**< Stream video duration in frames */
     int64_t m_totalDuration = 0;         /**< Stream video duration in microseconds (AV_TIME_BASE) */
+    int64_t m_seekThreshold = 0; /**< Time stamp difference for determining if a forward seek should forward decode */
 
     /**
      * Initialises codec parameters needed for future operations.
@@ -301,6 +304,7 @@ private:
      * @return The converted frame index.
      */
     [[nodiscard]] int64_t timeStampToFrame(int64_t timeStamp) const noexcept;
+
     /**
      * Convert stream based time stamp to an equivalent zero-based frame number.
      * @note This will not be fully accurate when dealing with VFR video streams.
@@ -334,6 +338,13 @@ private:
     [[nodiscard]] int64_t timeToFrame2(int64_t time) const noexcept;
 
     /**
+     * Convert codec based time stamp to stream based time stamp.
+     * @param timeStamp The time stamp represented in the codecs internal time base.
+     * @return The converted frame index.
+     */
+    [[nodiscard]] int64_t timeStamp2ToTimeStamp(int64_t timeStamp) const noexcept;
+
+    /**
      * Decodes the next block of frames into the pong buffer. Once complete swaps the ping/pong buffers.
      * @param flushTillTime (Optional) All frames with decoder time stamps before this will be discarded.
      * @returns True if it succeeds, false if it fails.
@@ -361,10 +372,10 @@ private:
     [[nodiscard]] int32_t getCodecDelay() const noexcept;
 
     /**
-     * Gets the maximum possible frames that may occur between key frames.
-     * @returns The codec key frame distance.
+     * Gets the number of frames that are required in order to perform a seek as opposed to just forward decoding.
+     * @returns The seek threshold.
      */
-    [[nodiscard]] int32_t getCodecKeyFrameDistance() const noexcept;
+    [[nodiscard]] int32_t getSeekThreshold() const noexcept;
 
     /**
      * Return the maximum number of input frames needed by a codec before it can produce output.

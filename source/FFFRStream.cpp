@@ -35,7 +35,7 @@ extern "C" {
 }
 
 namespace Ffr {
-Stream::Stream(const std::string& fileName, uint32_t bufferLength,
+Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seekThreshold,
     const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost, Crop crop, Resolution scale,
     PixelFormat format, ConstructorLock) noexcept
 {
@@ -211,9 +211,10 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength,
     m_formatContext = move(tempFormat);
     m_index = index;
     m_codecContext = move(tempCodec);
+    m_seekThreshold = frameToTimeStamp2(seekThreshold == 0 ? getSeekThreshold() : seekThreshold);
 
     // Ensure ping/pong buffers are long enough to handle the maximum number of frames a video may require
-    uint32_t minFrames = std::max(static_cast<uint32_t>(getCodecKeyFrameDistance()), m_bufferLength);
+    uint32_t minFrames = std::max(static_cast<uint32_t>(m_seekThreshold), m_bufferLength);
 
     // Allocate ping and pong buffers
     m_bufferPing.reserve(static_cast<size_t>(minFrames) * 2);
@@ -228,12 +229,9 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength,
 bool Stream::initialise() noexcept
 {
     // Decode the first frame (must be done to ensure codec parameters are properly filled)
-    const auto backup = m_bufferLength;
-    m_bufferLength = 1;
     if (peekNextFrame() == nullptr) {
         return false;
     }
-    m_bufferLength = backup;
     // Check if the first element in the buffer does not match our start time
     const auto startTime = m_bufferPing.front()->getTimeStamp();
     if (startTime != 0) {
@@ -263,8 +261,8 @@ shared_ptr<Stream> Stream::getStream(const string& fileName, const DecoderOption
 
     // Create the new stream
     const bool outputHost = options.m_outputHost && (options.m_type != DecodeType::Software);
-    shared_ptr<Stream> stream = make_shared<Stream>(fileName, options.m_bufferLength, deviceContext, outputHost,
-        options.m_crop, options.m_scale, options.m_format, ConstructorLock());
+    shared_ptr<Stream> stream = make_shared<Stream>(fileName, options.m_bufferLength, options.m_seekThreshold,
+        deviceContext, outputHost, options.m_crop, options.m_scale, options.m_format, ConstructorLock());
     if (stream->m_codecContext.get() == nullptr) {
         // Stream creation failed
         return nullptr;
@@ -435,8 +433,9 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     // Check if we actually have any frames in the current buffer
     if (m_bufferPingHead < m_bufferPing.size()) {
         // Check if the frame is in the current buffer
+        const auto singleFrameDuration = frameToTime(1);
         if ((timeStamp >= m_bufferPing[m_bufferPingHead]->getTimeStamp()) &&
-            (timeStamp <= m_bufferPing.back()->getTimeStamp())) {
+            (timeStamp < m_bufferPing.back()->getTimeStamp() + singleFrameDuration)) {
             // Dump all frames before requested one
             while (true) {
                 // Get next frame
@@ -445,7 +444,7 @@ bool Stream::seek(const int64_t timeStamp) noexcept
                     return false;
                 }
                 // Check if we have found our requested time stamp or it is within the timestamp range of the next frame
-                if (timeStamp < (ret->getTimeStamp() + frameToTime(1))) {
+                if (timeStamp < (ret->getTimeStamp() + singleFrameDuration)) {
                     break;
                 }
                 // Remove frames from ping buffer
@@ -460,14 +459,10 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     const auto timeStamp2 = timeToTimeStamp2(timeStamp);
     if (timeStamp2 > m_lastDecodedTimeStamp) {
         // Forward decode if within some predefined range of existing point.
-        const auto timeStep = timeStampToFrame2(timeStamp2 - m_lastDecodedTimeStamp);
-        if (timeStep <= getCodecKeyFrameDistance()) {
+        const auto timeStep = timeStamp2 - m_lastDecodedTimeStamp;
+        if (timeStep <= m_seekThreshold) {
             // Loop through until the requested timestamp is found (or nearest timestamp rounded up if exact match
             // could not be found). Discard all frames occuring before timestamp
-
-            // Clean out current buffer
-            m_bufferPing.resize(0);
-            m_bufferPingHead = 0;
 
             // Decode the next block of frames
             return decodeNextBlock(timeStamp2);
@@ -479,16 +474,12 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     m_lastDecodedTimeStamp = -1;
     const auto localTimeStamp = timeToTimeStamp(timeStamp);
     const auto err = avformat_seek_file(m_formatContext.get(), m_index,
-        localTimeStamp - frameToTimeStampNoOffset(getCodecKeyFrameDistance()), localTimeStamp, localTimeStamp, 0);
+        localTimeStamp - timeStamp2ToTimeStamp(m_seekThreshold), localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
         log("Failed seeking to specified time stamp "s += to_string(timeStamp) += getFfmpegErrorString(err),
             LogLevel::Error);
         return false;
     }
-
-    // Clean out current buffer
-    m_bufferPing.resize(0);
-    m_bufferPingHead = 0;
 
     // Decode the next block of frames
     return decodeNextBlock(timeStamp2);
@@ -530,14 +521,10 @@ bool Stream::seekFrame(const int64_t frame) noexcept
     const auto timeStamp2 = frameToTimeStamp2(frame);
     if (frame > m_lastDecodedTimeStamp) {
         // Forward decode if within some predefined range of existing point.
-        const auto timeStep = timeStampToFrame2(timeStamp2 - m_lastDecodedTimeStamp);
-        if (timeStep <= getCodecKeyFrameDistance()) {
+        const auto timeStep = timeStamp2 - m_lastDecodedTimeStamp;
+        if (timeStep <= m_seekThreshold) {
             // Loop through until the requested timestamp is found (or nearest timestamp rounded up if exact match
             // could not be found). Discard all frames occuring before timestamp
-
-            // Clean out current buffer
-            m_bufferPing.resize(0);
-            m_bufferPingHead = 0;
 
             // Decode the next block of frames
             return decodeNextBlock(timeStamp2);
@@ -548,8 +535,8 @@ bool Stream::seekFrame(const int64_t frame) noexcept
     avcodec_flush_buffers(m_codecContext.get());
     m_lastDecodedTimeStamp = -1;
     const auto frameInternal = frame + timeStampToFrameNoOffset(m_startTimeStamp);
-    const auto err = avformat_seek_file(m_formatContext.get(), m_index, frameInternal - getCodecKeyFrameDistance(),
-        frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
+    const auto err = avformat_seek_file(m_formatContext.get(), m_index,
+        frameInternal - timeStampToFrame2(m_seekThreshold), frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
     if (err < 0) {
         m_frameSeekSupported = false;
         log("Failed to seek to specified frame "s += to_string(frame) += ": "s += getFfmpegErrorString(err) +=
@@ -560,12 +547,10 @@ bool Stream::seekFrame(const int64_t frame) noexcept
         return seek(frameToTime(frame));
     }
 
-    // Clean out current buffer
-    m_bufferPing.resize(0);
-    m_bufferPingHead = 0;
-
     // Decode the next block of frames
     return decodeNextBlock(timeStamp2);
+
+    // TODO: Check if seek failed by seeking to incorrect location
 }
 
 int64_t Stream::frameToTime(const int64_t frame) const noexcept
@@ -649,12 +634,18 @@ int64_t Stream::timeToFrame2(const int64_t time) const noexcept
     return av_rescale_q(time, av_make_q(1, AV_TIME_BASE), av_inv_q(m_codecContext->framerate));
 }
 
+int64_t Stream::timeStamp2ToTimeStamp(const int64_t timeStamp) const noexcept
+{
+    return av_rescale_q(timeStamp, m_codecContext->time_base, m_formatContext->streams[m_index]->time_base);
+}
+
 bool Stream::decodeNextBlock(const int64_t flushTillTime) noexcept
 {
     // TODO: If we are using async decode then this needs to just return if a decode is already running
 
-    // Reset the pong buffer
-    m_bufferPong.resize(0);
+    // Clean out current buffer and release any frames it may still hold
+    m_bufferPing.resize(0);
+    m_bufferPingHead = 0;
 
     // Decode the next buffer sequence
     AVPacket packet;
@@ -705,9 +696,6 @@ bool Stream::decodeNextBlock(const int64_t flushTillTime) noexcept
     }
     // Swap ping and pong buffer
     swap(m_bufferPing, m_bufferPong);
-    m_bufferPingHead = 0;
-    // Reset the pong buffer
-    m_bufferPong.resize(0);
 
     return true;
 }
@@ -777,6 +765,7 @@ bool Stream::decodeNextFrames(const int64_t flushTillTime) noexcept
 
         if (flushTillTime >= 0 && flushTillTime > m_lastDecodedTimeStamp) {
             // Dump this frame and continue
+            av_frame_unref(*m_tempFrame);
             continue;
         }
 
@@ -851,7 +840,7 @@ void Stream::popFrame() noexcept
         return;
     }
     // Release reference and pop frame
-    m_bufferPing[m_bufferPingHead++] = make_shared<Frame>();
+    m_bufferPing[m_bufferPingHead++].reset();
 }
 
 int32_t Stream::getCodecDelay() const noexcept
@@ -859,10 +848,9 @@ int32_t Stream::getCodecDelay() const noexcept
     return getCodecDelay(m_codecContext);
 }
 
-int32_t Stream::getCodecKeyFrameDistance() const noexcept
+int32_t Stream::getSeekThreshold() const noexcept
 {
-    // TODO: This is incorrect and needs to be fixed
-    return getCodecDelay() * 2;
+    return (m_codecContext->keyint_min * 5) + (getCodecDelay() * 2);
 }
 
 int32_t Stream::getCodecDelay(const CodecContextPtr& codec) noexcept
