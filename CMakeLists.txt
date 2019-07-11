@@ -3,17 +3,20 @@
 #
 cmake_minimum_required (VERSION 3.10.2)
 
+# Use vcpkg if available
+if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    file(TO_CMAKE_PATH "$ENV{VCPKG_ROOT}" ENV_VCPKG_ROOT)
+    set(CMAKE_TOOLCHAIN_FILE "${ENV_VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+    CACHE STRING "")
+endif()
+
 project(FfFrameReader
     VERSION 0.1
     DESCRIPTION "FFmpeg based library for reading frames from a video source"
     LANGUAGES CXX CUDA
 )
 
-# Use vcpkg if available
-if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-    CACHE STRING "")
-endif()
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -45,11 +48,14 @@ endif()
 # Shared/Dynamic or Static library?
 option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
 
-# Build test related commands?
+# Build test related programs?
 option(BUILD_TESTING "Create test programs" OFF)
 
-# Build with nppi commands? This requires cuda 10.1 or better
+# Build with nppi library? This requires cuda 10.1 or better
 option(BUILD_NPPI "Build using NVIDIA libnnpi format conversion" ON)
+
+# Build benchmarking programs?
+option(BUILD_BENCHMARKING "Create benchmark programs" OFF)
 
 # Default to a release build if desired configuration is not specified.
 if(NOT CMAKE_CONFIGURATION_TYPES)
@@ -122,15 +128,15 @@ if(NOT BIN_2_C)
 endif()
 
 add_custom_command(
-  OUTPUT "${FFFR_PTX_EMBEDDED}"
-  COMMAND ${CMAKE_COMMAND}
-    "-DBIN_TO_C_COMMAND=${BIN_2_C}"
-    "-DOBJECTS=$<TARGET_OBJECTS:FFFRPTX>"
-    "-DOUTPUT=${FFFR_PTX_EMBEDDED}"
-    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
-  VERBATIM
-  DEPENDS $<TARGET_OBJECTS:FFFRPTX>
-  COMMENT "Converting PTX files to a C header"
+    OUTPUT "${FFFR_PTX_EMBEDDED}"
+    COMMAND ${CMAKE_COMMAND}
+        "-DBIN_TO_C_COMMAND=${BIN_2_C}"
+        "-DOBJECTS=$<TARGET_OBJECTS:FFFRPTX>"
+        "-DOUTPUT=${FFFR_PTX_EMBEDDED}"
+        -P ${PROJECT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
+    VERBATIM
+    DEPENDS $<TARGET_OBJECTS:FFFRPTX>
+    COMMENT "Converting PTX files to a C header"
 )
 
 configure_file(include/config.h.in config.h @ONLY)
@@ -263,6 +269,37 @@ if(BUILD_TESTING)
     add_dependencies(FFFRTest FfFrameReader)
 
     gtest_discover_tests(FFFRTest
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test"
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/test"
     )
+endif()
+
+# Add becnhmarks
+if(BUILD_BENCHMARKING)
+    find_package(benchmark REQUIRED)
+
+    set(FFFR_BENCHMARK_SOURCES
+        benchmark/FFFRBenchmarkStream.cpp
+    )
+
+    add_executable(FFFRBenchmark ${FFFR_BENCHMARK_SOURCES})
+
+    target_include_directories(FFFRBenchmark PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_BINARY_DIR}
+        PRIVATE ${benchmark_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(
+        FFFRBenchmark
+        PRIVATE FfFrameReader
+        PRIVATE benchmark::benchmark
+        PRIVATE benchmark::benchmark_main
+    )
+
+    set_target_properties(
+        FFFRBenchmark PROPERTIES
+        EXCLUDE_FROM_ALL true
+    )
+
+    add_dependencies(FFFRBenchmark FfFrameReader)
 endif()
