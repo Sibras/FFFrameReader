@@ -20,7 +20,7 @@
 
 using namespace Ffr;
 
-constexpr uint32_t iterations = 25;
+constexpr uint32_t iterations = 15;
 
 class BenchStream : public benchmark::Fixture
 {
@@ -116,22 +116,15 @@ BENCHMARK_DEFINE_F(BenchStream, getNextFrame)(benchmark::State& state)
 //  1. The number of frames to move forward in each seek
 //  2. The buffer length
 //  3. Boolean, 1 if cuda decoding should be used
-BENCHMARK_REGISTER_F(BenchStream, seekSeries)
-    ->RangeMultiplier(2)
-    ->Ranges({{1, 256}, {1, 16}, {1, 1}})
-    ->Unit(benchmark::kMillisecond);
+static void customArguments(benchmark::internal::Benchmark* b)
+{
+    b->RangeMultiplier(2)->Ranges({{16, 256}, {1, 16}, {0, 1}})->Unit(benchmark::kMillisecond);
+}
 
-BENCHMARK_REGISTER_F(BenchStream, seek)
-    ->RangeMultiplier(2)
-    ->Ranges({{1, 256}, {1, 16}, {1, 1}})
-    ->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(BenchStream, seekSeries)->Apply(customArguments);
 
-BENCHMARK_REGISTER_F(BenchStream, getNextFrameSeries)
-    ->RangeMultiplier(2)
-    ->Ranges({{1, 1}, {1, 16}, {1, 1}})
-    ->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(BenchStream, seek)->Apply(customArguments);
 
-BENCHMARK_REGISTER_F(BenchStream, getNextFrame)
-    ->RangeMultiplier(2)
-    ->Ranges({{1, 1}, {1, 16}, {1, 1}})
-    ->Unit(benchmark::kMillisecond);
+BENCHMARK_REGISTER_F(BenchStream, getNextFrameSeries)->Apply(customArguments);
+
+BENCHMARK_REGISTER_F(BenchStream, getNextFrame)->Apply(customArguments);
