@@ -29,26 +29,26 @@ namespace Ffr {
  * @param errorCode The error code.
  * @returns The ffmpeg error string.
  */
-std::string getFfmpegErrorString(int errorCode) noexcept;
+FFFRAMEREADER_EXPORT std::string getFfmpegErrorString(int errorCode) noexcept;
 
 /**
  * Gets pixel format for internal ffmpeg format
  * @param format Describes the format to use.
  * @returns The pixel format.
  */
-PixelFormat getPixelFormat(AVPixelFormat format) noexcept;
+FFFRAMEREADER_EXPORT PixelFormat getPixelFormat(AVPixelFormat format) noexcept;
 
 /**
  * Gets ffmpeg pixel format.
  * @param format Describes the format to use.
  * @returns The pixel format.
  */
-AVPixelFormat getPixelFormat(PixelFormat format) noexcept;
+FFFRAMEREADER_EXPORT AVPixelFormat getPixelFormat(PixelFormat format) noexcept;
 
 /**
  * Gets a rational.
  * @param ratio The ratio.
  * @returns The rational.
  */
-Rational getRational(AVRational ratio);
+FFFRAMEREADER_EXPORT Rational getRational(AVRational ratio);
 } // namespace Ffr

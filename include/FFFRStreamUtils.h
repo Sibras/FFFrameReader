@@ -25,14 +25,15 @@ namespace Ffr {
 class StreamUtils
 {
 public:
-    static AVRational getSampleAspectRatio(const Stream* stream) noexcept;
+    FFFRAMEREADER_NO_EXPORT static AVRational getSampleAspectRatio(const Stream* stream) noexcept;
 
-    static AVPixelFormat getPixelFormat(const Stream* stream) noexcept;
+    FFFRAMEREADER_NO_EXPORT static AVPixelFormat getPixelFormat(const Stream* stream) noexcept;
 
-    static AVRational getFrameRate(const Stream* stream) noexcept;
+    FFFRAMEREADER_NO_EXPORT static AVRational getFrameRate(const Stream* stream) noexcept;
 
-    static AVRational getTimeBase(const Stream* stream) noexcept;
+    FFFRAMEREADER_NO_EXPORT static AVRational getTimeBase(const Stream* stream) noexcept;
 
-    static void rescale(FramePtr& frame, const AVRational& sourceTimeBase, const AVRational& destTimeBase) noexcept;
+    FFFRAMEREADER_NO_EXPORT static void rescale(
+        FramePtr& frame, const AVRational& sourceTimeBase, const AVRational& destTimeBase) noexcept;
 };
 } // namespace Ffr

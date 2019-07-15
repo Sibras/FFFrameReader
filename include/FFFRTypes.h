@@ -15,10 +15,11 @@
  */
 #pragma once
 
+#include "ffframereader_export.h"
+
 #include <any>
 #include <cstdint>
 #include <memory>
-
 struct AVFormatContext;
 struct AVCodecContext;
 struct AVFrame;
@@ -79,25 +80,25 @@ enum class PixelFormat : int32_t
 class DecoderOptions
 {
 public:
-    DecoderOptions() = default;
+    FFFRAMEREADER_EXPORT DecoderOptions() = default;
 
-    explicit DecoderOptions(DecodeType type) noexcept;
+    FFFRAMEREADER_EXPORT explicit DecoderOptions(DecodeType type) noexcept;
 
-    ~DecoderOptions() = default;
+    FFFRAMEREADER_EXPORT ~DecoderOptions() = default;
 
-    DecoderOptions(const DecoderOptions& other) = default;
+    FFFRAMEREADER_EXPORT DecoderOptions(const DecoderOptions& other) = default;
 
-    DecoderOptions(DecoderOptions&& other) = default;
+    FFFRAMEREADER_EXPORT DecoderOptions(DecoderOptions&& other) = default;
 
-    DecoderOptions& operator=(const DecoderOptions& other) = default;
+    FFFRAMEREADER_EXPORT DecoderOptions& operator=(const DecoderOptions& other) = default;
 
-    DecoderOptions& operator=(DecoderOptions&& other) = default;
+    FFFRAMEREADER_EXPORT DecoderOptions& operator=(DecoderOptions&& other) = default;
 
-    bool operator==(const DecoderOptions& other) const noexcept;
+    FFFRAMEREADER_EXPORT bool operator==(const DecoderOptions& other) const noexcept;
 
-    bool operator!=(const DecoderOptions& other) const noexcept;
+    FFFRAMEREADER_EXPORT bool operator!=(const DecoderOptions& other) const noexcept;
 
-    bool operator<(const DecoderOptions& other) const noexcept;
+    FFFRAMEREADER_EXPORT bool operator<(const DecoderOptions& other) const noexcept;
 
     DecodeType m_type = DecodeType::Software; /**< The type of decoding to use. */
     Crop m_crop = {0, 0, 0, 0};               /**< The output cropping or (0) if no crop should be performed. */
@@ -134,25 +135,25 @@ public:
         Placebo,
     };
 
-    EncoderOptions() = default;
+    FFFRAMEREADER_EXPORT EncoderOptions() = default;
 
-    explicit EncoderOptions(DecodeType type) noexcept;
+    FFFRAMEREADER_EXPORT explicit EncoderOptions(DecodeType type) noexcept;
 
-    ~EncoderOptions() = default;
+    FFFRAMEREADER_EXPORT ~EncoderOptions() = default;
 
-    EncoderOptions(const EncoderOptions& other) = default;
+    FFFRAMEREADER_EXPORT EncoderOptions(const EncoderOptions& other) = default;
 
-    EncoderOptions(EncoderOptions&& other) = default;
+    FFFRAMEREADER_EXPORT EncoderOptions(EncoderOptions&& other) = default;
 
-    EncoderOptions& operator=(const EncoderOptions& other) = default;
+    FFFRAMEREADER_EXPORT EncoderOptions& operator=(const EncoderOptions& other) = default;
 
-    EncoderOptions& operator=(EncoderOptions&& other) = default;
+    FFFRAMEREADER_EXPORT EncoderOptions& operator=(EncoderOptions&& other) = default;
 
-    bool operator==(const EncoderOptions& other) const noexcept;
+    FFFRAMEREADER_EXPORT bool operator==(const EncoderOptions& other) const noexcept;
 
-    bool operator!=(const EncoderOptions& other) const noexcept;
+    FFFRAMEREADER_EXPORT bool operator!=(const EncoderOptions& other) const noexcept;
 
-    bool operator<(const EncoderOptions& other) const noexcept;
+    FFFRAMEREADER_EXPORT bool operator<(const EncoderOptions& other) const noexcept;
 
     EncodeType m_type = EncodeType::h264; /**< The type of encoder to use. */
     uint8_t m_quality = 125;              /**< The quality of the output video. 0 is worst, 255 is best. */
@@ -168,13 +169,13 @@ class FormatContextPtr
     friend class StreamUtils;
     friend class Frame;
 
-    FormatContextPtr() = default;
+    FFFRAMEREADER_NO_EXPORT FormatContextPtr() = default;
 
-    explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
+    FFFRAMEREADER_NO_EXPORT explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
 
-    [[nodiscard]] AVFormatContext* get() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT AVFormatContext* get() const noexcept;
 
-    AVFormatContext* operator->() const noexcept;
+    FFFRAMEREADER_NO_EXPORT AVFormatContext* operator->() const noexcept;
 
     std::shared_ptr<AVFormatContext> m_formatContext = nullptr;
 };
@@ -187,13 +188,13 @@ class CodecContextPtr
     friend class StreamUtils;
     friend class Frame;
 
-    CodecContextPtr() = default;
+    FFFRAMEREADER_NO_EXPORT CodecContextPtr() = default;
 
-    explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
+    FFFRAMEREADER_NO_EXPORT explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
 
-    [[nodiscard]] AVCodecContext* get() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT AVCodecContext* get() const noexcept;
 
-    AVCodecContext* operator->() const noexcept;
+    FFFRAMEREADER_NO_EXPORT AVCodecContext* operator->() const noexcept;
 
     std::shared_ptr<AVCodecContext> m_codecContext = nullptr;
 };
@@ -209,28 +210,28 @@ class FramePtr
     friend class Fmc::MultiCrop;
 
 public:
-    ~FramePtr() noexcept;
+    FFFRAMEREADER_NO_EXPORT ~FramePtr() noexcept;
 
-    FramePtr(const FramePtr& other) noexcept = delete;
+    FFFRAMEREADER_NO_EXPORT FramePtr(const FramePtr& other) noexcept = delete;
 
 private:
-    FramePtr() noexcept = default;
+    FFFRAMEREADER_NO_EXPORT FramePtr() noexcept = default;
 
-    explicit FramePtr(AVFrame* frame) noexcept;
+    FFFRAMEREADER_NO_EXPORT explicit FramePtr(AVFrame* frame) noexcept;
 
-    FramePtr(FramePtr&& other) noexcept;
+    FFFRAMEREADER_NO_EXPORT FramePtr(FramePtr&& other) noexcept;
 
-    FramePtr& operator=(FramePtr& other) noexcept;
+    FFFRAMEREADER_NO_EXPORT FramePtr& operator=(FramePtr& other) noexcept;
 
-    FramePtr& operator=(FramePtr&& other) noexcept;
+    FFFRAMEREADER_NO_EXPORT FramePtr& operator=(FramePtr&& other) noexcept;
 
-    AVFrame*& operator*() noexcept;
+    FFFRAMEREADER_NO_EXPORT AVFrame*& operator*() noexcept;
 
-    const AVFrame* operator*() const noexcept;
+    FFFRAMEREADER_NO_EXPORT const AVFrame* operator*() const noexcept;
 
-    AVFrame*& operator->() noexcept;
+    FFFRAMEREADER_NO_EXPORT AVFrame*& operator->() noexcept;
 
-    const AVFrame* operator->() const noexcept;
+    FFFRAMEREADER_NO_EXPORT const AVFrame* operator->() const noexcept;
 
     AVFrame* m_frame = nullptr;
 };
@@ -239,13 +240,13 @@ class OutputFormatContextPtr
 {
     friend class Encoder;
 
-    OutputFormatContextPtr() = default;
+    FFFRAMEREADER_NO_EXPORT OutputFormatContextPtr() = default;
 
-    explicit OutputFormatContextPtr(AVFormatContext* formatContext) noexcept;
+    FFFRAMEREADER_NO_EXPORT explicit OutputFormatContextPtr(AVFormatContext* formatContext) noexcept;
 
-    [[nodiscard]] AVFormatContext* get() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT AVFormatContext* get() const noexcept;
 
-    AVFormatContext* operator->() const noexcept;
+    FFFRAMEREADER_NO_EXPORT AVFormatContext* operator->() const noexcept;
 
     std::shared_ptr<AVFormatContext> m_formatContext = nullptr;
 };

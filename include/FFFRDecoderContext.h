@@ -38,17 +38,17 @@ public:
      *  type specified in @m_type.
      * @param device  The device index for the desired hardware device.
      */
-    explicit DecoderContext(DecodeType type, const std::any& context, uint32_t device) noexcept;
+    FFFRAMEREADER_NO_EXPORT explicit DecoderContext(DecodeType type, const std::any& context, uint32_t device) noexcept;
 
-    ~DecoderContext() noexcept = default;
+    FFFRAMEREADER_NO_EXPORT ~DecoderContext() noexcept = default;
 
-    DecoderContext(const DecoderContext& other) = default;
+    FFFRAMEREADER_NO_EXPORT DecoderContext(const DecoderContext& other) = default;
 
-    DecoderContext(DecoderContext&& other) = default;
+    FFFRAMEREADER_NO_EXPORT DecoderContext(DecoderContext&& other) = default;
 
-    DecoderContext& operator=(const DecoderContext& other) = default;
+    FFFRAMEREADER_NO_EXPORT DecoderContext& operator=(const DecoderContext& other) = default;
 
-    DecoderContext& operator=(DecoderContext&& other) = default;
+    FFFRAMEREADER_NO_EXPORT DecoderContext& operator=(DecoderContext&& other) = default;
 
 private:
     class DeviceContextPtr
@@ -56,27 +56,27 @@ private:
         friend class DecoderContext;
         friend class Stream;
 
-        DeviceContextPtr() = default;
+        FFFRAMEREADER_NO_EXPORT DeviceContextPtr() = default;
 
-        explicit DeviceContextPtr(AVBufferRef* deviceContext) noexcept;
+        FFFRAMEREADER_NO_EXPORT explicit DeviceContextPtr(AVBufferRef* deviceContext) noexcept;
 
-        [[nodiscard]] AVBufferRef* get() const noexcept;
+        [[nodiscard]] FFFRAMEREADER_NO_EXPORT AVBufferRef* get() const noexcept;
 
-        AVBufferRef* operator->() const noexcept;
+        FFFRAMEREADER_NO_EXPORT AVBufferRef* operator->() const noexcept;
 
-        std::shared_ptr<AVBufferRef> m_deviceContext = nullptr;
+        FFFRAMEREADER_NO_EXPORT std::shared_ptr<AVBufferRef> m_deviceContext = nullptr;
     };
 
-    DeviceContextPtr m_deviceContext = DeviceContextPtr(nullptr);
+    FFFRAMEREADER_NO_EXPORT DeviceContextPtr m_deviceContext = DeviceContextPtr(nullptr);
 
     friend const DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept;
 
-    static enum AVHWDeviceType decodeTypeToFFmpeg(DecodeType type);
+    FFFRAMEREADER_NO_EXPORT static enum AVHWDeviceType decodeTypeToFFmpeg(DecodeType type);
 
     using FormatFunction = enum AVPixelFormat (*)(struct AVCodecContext*, const enum AVPixelFormat*);
 
-    [[nodiscard]] FormatFunction getFormatFunction() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT FormatFunction getFormatFunction() const noexcept;
 
-    [[nodiscard]] DecodeType getType() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT DecodeType getType() const noexcept;
 };
 } // namespace Ffr

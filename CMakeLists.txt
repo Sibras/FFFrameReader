@@ -28,9 +28,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Export all symbols from Windows dlls into corresponding lib file
+# Setup export symbol properties
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 if(MSVC)
-    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS OFF)
 endif()
 
 # Defines the CMAKE_INSTALL_LIBDIR, CMAKE_INSTALL_BINDIR and many other useful macros.
@@ -65,6 +67,12 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
     endif()
 endif()
 
+# Detect IPO support
+include(CheckIPOSupported)
+check_ipo_supported(RESULT BUILD_IPO OUTPUT IPO_ERROR)
+
+include(GenerateExportHeader)
+
 find_package(CUDA QUIET REQUIRED)
 
 # Add project source files
@@ -73,11 +81,15 @@ set(FFFR_SOURCES_CUDA
 )
 
 set(FFFR_PTX_EMBEDDED
-    ${CMAKE_CURRENT_BINARY_DIR}/FFFREmbeddedPTX.cpp
+    ${PROJECT_BINARY_DIR}/FFFREmbeddedPTX.cpp
 )
 
 set(FFFR_SOURCES_CONFIG
-    ${CMAKE_CURRENT_BINARY_DIR}/config.h
+    ${PROJECT_BINARY_DIR}/config.h
+)
+
+set(FFFR_SOURCES_EXPORT
+    ${PROJECT_BINARY_DIR}/ffframereader_export.h
 )
 
 set(FFFR_SOURCES
@@ -97,6 +109,7 @@ set(FFFR_SOURCES
     include/FFFRStreamUtils.h
     ${FFFR_PTX_EMBEDDED}
     ${FFFR_SOURCES_CONFIG}
+    ${FFFR_SOURCES_EXPORT}
 )
 
 set(FFFR_HEADERS
@@ -164,6 +177,14 @@ set_target_properties(FfFrameReader PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
+
+if(BUILD_IPO)
+set_target_properties(FfFrameReader PROPERTIES
+    INTERPROCEDURAL_OPTIMIZATION TRUE
+)
+endif()
+
+generate_export_header(FfFrameReader)
 
 add_dependencies(FfFrameReader FFFRPTX)
 
@@ -300,6 +321,12 @@ if(BUILD_BENCHMARKING)
         FFFRBenchmark PROPERTIES
         EXCLUDE_FROM_ALL true
     )
+
+    if(BUILD_IPO)
+    set_target_properties(FFFRBenchmark PROPERTIES
+        INTERPROCEDURAL_OPTIMIZATION TRUE
+    )
+    endif()
 
     add_dependencies(FFFRBenchmark FfFrameReader)
 endif()

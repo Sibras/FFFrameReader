@@ -15,6 +15,7 @@
  */
 #pragma once
 #include "FFFRTypes.h"
+#include "ffframereader_export.h"
 
 #include <cstdint>
 #include <mutex>
@@ -32,17 +33,17 @@ class Stream
     friend class StreamUtils;
 
 public:
-    Stream() = delete;
+    FFFRAMEREADER_NO_EXPORT Stream() = delete;
 
-    ~Stream() = default;
+    FFFRAMEREADER_EXPORT ~Stream() = default;
 
-    Stream(const Stream& other) = delete;
+    FFFRAMEREADER_NO_EXPORT Stream(const Stream& other) = delete;
 
-    Stream(Stream&& other) noexcept = delete;
+    FFFRAMEREADER_NO_EXPORT Stream(Stream&& other) noexcept = delete;
 
-    Stream& operator=(const Stream& other) = delete;
+    FFFRAMEREADER_NO_EXPORT Stream& operator=(const Stream& other) = delete;
 
-    Stream& operator=(Stream&& other) noexcept = delete;
+    FFFRAMEREADER_NO_EXPORT Stream& operator=(Stream&& other) noexcept = delete;
 
     /**
      * Gets a stream from a file.
@@ -50,7 +51,7 @@ public:
      * @param options  (Optional) Options for controlling decoding.
      * @returns The stream if succeeded, false otherwise.
      */
-    [[nodiscard]] static std::shared_ptr<Stream> getStream(
+    [[nodiscard]] FFFRAMEREADER_EXPORT static std::shared_ptr<Stream> getStream(
         const std::string& fileName, const DecoderOptions& options = DecoderOptions()) noexcept;
 
     class ConstructorLock
@@ -70,7 +71,7 @@ public:
      *  after cropping.
      * @param format         The required output pixel format.
      */
-    Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seekThreshold,
+    FFFRAMEREADER_NO_EXPORT Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seekThreshold,
         const std::shared_ptr<DecoderContext>& decoderContext, bool outputHost, Crop crop, Resolution scale,
         PixelFormat format, ConstructorLock) noexcept;
 
@@ -78,63 +79,63 @@ public:
      * Gets the width of the video stream.
      * @returns The width.
      */
-    [[nodiscard]] uint32_t getWidth() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT uint32_t getWidth() const noexcept;
 
     /**
      * Gets the height of the video stream.
      * @returns The height.
      */
-    [[nodiscard]] uint32_t getHeight() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT uint32_t getHeight() const noexcept;
 
     /**
      * Gets the display aspect ratio of the video stream.
      * @note This may differ from width/height if stream uses anamorphic pixels.
      * @returns The aspect ratio.
      */
-    [[nodiscard]] double getAspectRatio() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT double getAspectRatio() const noexcept;
 
     /**
      * Gets the pixel format of the video stream.
      * @returns The pixel format.
      */
-    [[nodiscard]] PixelFormat getPixelFormat() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT PixelFormat getPixelFormat() const noexcept;
 
     /**
      * Gets total frames in the video stream.
      * @returns The total frames.
      */
-    [[nodiscard]] int64_t getTotalFrames() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT int64_t getTotalFrames() const noexcept;
 
     /**
      * Gets the duration of the video stream in micro-seconds.
      * @returns The duration.
      */
-    [[nodiscard]] int64_t getDuration() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT int64_t getDuration() const noexcept;
 
     /**
      * Gets the frame rate (fps) of the video stream.
      * @note This will not be fully accurate when dealing with VFR video streams.
      * @returns The frame rate in frames per second.
      */
-    [[nodiscard]] double getFrameRate() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT double getFrameRate() const noexcept;
 
     /**
      * Gets the storage size of each decoded frame in the video stream.
      * @returns The frame size in bytes.
      */
-    [[nodiscard]] uint32_t getFrameSize() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT uint32_t getFrameSize() const noexcept;
 
     /**
      * Get the next frame in the stream without removing it from stream buffer.
      * @returns The next frame in current stream, or nullptr if an error occured or end of file reached.
      */
-    [[nodiscard]] std::shared_ptr<Frame> peekNextFrame() noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT std::shared_ptr<Frame> peekNextFrame() noexcept;
 
     /**
      * Gets the next frame in the stream and removes it from the buffer.
      * @returns The next frame in current stream, or nullptr if an error occured or end of file reached.
      */
-    [[nodiscard]] std::shared_ptr<Frame> getNextFrame() noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT std::shared_ptr<Frame> getNextFrame() noexcept;
 
     /**
      * Gets a sequence of frames offset from the current stream position using time stamps.
@@ -144,7 +145,8 @@ public:
      * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
      * retrieved before the error are returned.
      */
-    [[nodiscard]] std::vector<std::shared_ptr<Frame>> getNextFrames(const std::vector<int64_t>& frameSequence) noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT std::vector<std::shared_ptr<Frame>> getNextFrames(
+        const std::vector<int64_t>& frameSequence) noexcept;
 
     /**
      * Gets a sequence of frames offset from the current stream position using frame indices.
@@ -154,7 +156,7 @@ public:
      * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
      * retrieved before the error are returned.
      */
-    [[nodiscard]] std::vector<std::shared_ptr<Frame>> getNextFramesByIndex(
+    [[nodiscard]] FFFRAMEREADER_EXPORT std::vector<std::shared_ptr<Frame>> getNextFramesByIndex(
         const std::vector<int64_t>& frameSequence) noexcept;
 
     /**
@@ -165,7 +167,8 @@ public:
      * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
      * retrieved before the error are returned.
      */
-    [[nodiscard]] std::vector<std::shared_ptr<Frame>> getFrames(const std::vector<int64_t>& frameSequence) noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT std::vector<std::shared_ptr<Frame>> getFrames(
+        const std::vector<int64_t>& frameSequence) noexcept;
 
     /**
      * Gets a sequence of frames using frame indices.
@@ -175,14 +178,14 @@ public:
      * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
      * retrieved before the error are returned.
      */
-    [[nodiscard]] std::vector<std::shared_ptr<Frame>> getFramesByIndex(
+    [[nodiscard]] FFFRAMEREADER_EXPORT std::vector<std::shared_ptr<Frame>> getFramesByIndex(
         const std::vector<int64_t>& frameSequence) noexcept;
 
     /**
      * Query if the stream has reached end of input file.
      * @returns True if end of file, false if not.
      */
-    [[nodiscard]] bool isEndOfFile() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT bool isEndOfFile() const noexcept;
 
     /**
      * Seeks the stream to the given time stamp. If timestamp does not exactly match a frame then the timestamp rounded
@@ -190,14 +193,14 @@ public:
      * @param timeStamp The time stamp to seek to (in micro-seconds).
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool seek(int64_t timeStamp) noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT bool seek(int64_t timeStamp) noexcept;
 
     /**
      * Seeks the stream to the given frame number.
      * @param frame The zero-indexed frame number to seek to.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool seekFrame(int64_t frame) noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT bool seekFrame(int64_t frame) noexcept;
 
     /**
      * Convert a zero-based frame number to time value represented in microseconds (AV_TIME_BASE).
@@ -205,7 +208,7 @@ public:
      * @param frame The zero-based frame number
      * @return The converted time.
      */
-    [[nodiscard]] int64_t frameToTime(int64_t frame) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT int64_t frameToTime(int64_t frame) const noexcept;
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to a zero-based frame number.
@@ -213,7 +216,7 @@ public:
      * @param time The time in microseconds (AV_TIME_BASE).
      * @return The converted frame index.
      */
-    [[nodiscard]] int64_t timeToFrame(int64_t time) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT int64_t timeToFrame(int64_t time) const noexcept;
 
 private:
     std::recursive_mutex m_mutex;
@@ -242,7 +245,7 @@ private:
      * Initialises codec parameters needed for future operations.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool initialise() noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool initialise() noexcept;
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to the stream timebase using start time
@@ -250,28 +253,28 @@ private:
      * @param time The time in microseconds (AV_TIME_BASE).
      * @return The converted time stamp.
      */
-    [[nodiscard]] int64_t timeToTimeStamp(int64_t time) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t timeToTimeStamp(int64_t time) const noexcept;
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to the codec timebase.
      * @param time The time in microseconds (AV_TIME_BASE).
      * @return The converted time stamp.
      */
-    [[nodiscard]] int64_t timeToTimeStamp2(int64_t time) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t timeToTimeStamp2(int64_t time) const noexcept;
 
     /**
      * Convert a stream timebase to a time value represented in microseconds (AV_TIME_BASE) using start time correction.
      * @param timeStamp The time stamp represented in the streams internal time base.
      * @return The converted time.
      */
-    [[nodiscard]] int64_t timeStampToTime(int64_t timeStamp) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t timeStampToTime(int64_t timeStamp) const noexcept;
 
     /**
      * Convert a codec timebase to a time value represented in microseconds (AV_TIME_BASE).
      * @param timeStamp The time stamp represented in the codec internal time base.
      * @return The converted time.
      */
-    [[nodiscard]] int64_t timeStampToTime2(int64_t timeStamp) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t timeStampToTime2(int64_t timeStamp) const noexcept;
 
     /**
      * Convert a zero-based frame number to the stream timebase using start time correction using start time correction.
@@ -279,7 +282,7 @@ private:
      * @param frame The zero-based frame number
      * @return The converted time stamp.
      */
-    [[nodiscard]] int64_t frameToTimeStamp(int64_t frame) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t frameToTimeStamp(int64_t frame) const noexcept;
 
     /**
      * Convert a zero-based frame number to the stream timebase.
@@ -287,7 +290,7 @@ private:
      * @param frame The zero-based frame number
      * @return The converted time stamp.
      */
-    [[nodiscard]] int64_t frameToTimeStampNoOffset(int64_t frame) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t frameToTimeStampNoOffset(int64_t frame) const noexcept;
 
     /**
      * Convert a zero-based frame number to the codec timebase.
@@ -295,7 +298,7 @@ private:
      * @param frame The zero-based frame number
      * @return The converted time stamp.
      */
-    [[nodiscard]] int64_t frameToTimeStamp2(int64_t frame) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t frameToTimeStamp2(int64_t frame) const noexcept;
 
     /**
      * Convert stream based time stamp to an equivalent zero-based frame number using start time correction.
@@ -303,7 +306,7 @@ private:
      * @param timeStamp The time stamp represented in the streams internal time base.
      * @return The converted frame index.
      */
-    [[nodiscard]] int64_t timeStampToFrame(int64_t timeStamp) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t timeStampToFrame(int64_t timeStamp) const noexcept;
 
     /**
      * Convert stream based time stamp to an equivalent zero-based frame number.
@@ -311,7 +314,7 @@ private:
      * @param timeStamp The time stamp represented in the streams internal time base.
      * @return The converted frame index.
      */
-    [[nodiscard]] int64_t timeStampToFrameNoOffset(int64_t timeStamp) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t timeStampToFrameNoOffset(int64_t timeStamp) const noexcept;
 
     /**
      * Convert codec based time stamp to an equivalent zero-based frame number.
@@ -319,7 +322,7 @@ private:
      * @param timeStamp The time stamp represented in the codecs internal time base.
      * @return The converted frame index.
      */
-    [[nodiscard]] int64_t timeStampToFrame2(int64_t timeStamp) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t timeStampToFrame2(int64_t timeStamp) const noexcept;
 
     /**
      * Convert a zero-based codec frame number to time value represented in microseconds (AV_TIME_BASE).
@@ -327,7 +330,7 @@ private:
      * @param frame The zero-based frame number
      * @return The converted time.
      */
-    [[nodiscard]] int64_t frameToTime2(int64_t frame) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t frameToTime2(int64_t frame) const noexcept;
 
     /**
      * Convert a time value represented in microseconds (AV_TIME_BASE) to a zero-based codec frame number.
@@ -335,71 +338,71 @@ private:
      * @param time The time in microseconds (AV_TIME_BASE).
      * @return The converted frame index.
      */
-    [[nodiscard]] int64_t timeToFrame2(int64_t time) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t timeToFrame2(int64_t time) const noexcept;
 
     /**
      * Convert codec based time stamp to stream based time stamp.
      * @param timeStamp The time stamp represented in the codecs internal time base.
      * @return The converted frame index.
      */
-    [[nodiscard]] int64_t timeStamp2ToTimeStamp(int64_t timeStamp) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t timeStamp2ToTimeStamp(int64_t timeStamp) const noexcept;
 
     /**
      * Decodes the next block of frames into the pong buffer. Once complete swaps the ping/pong buffers.
      * @param flushTillTime (Optional) All frames with decoder time stamps before this will be discarded.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool decodeNextBlock(int64_t flushTillTime = -1) noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool decodeNextBlock(int64_t flushTillTime = -1) noexcept;
 
     /**
      * Decodes any frames currently pending in the decoder.
      * @param flushTillTime (Optional) All frames with decoder time stamps before this will be discarded.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool decodeNextFrames(int64_t flushTillTime = -1) noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool decodeNextFrames(int64_t flushTillTime = -1) noexcept;
 
     /**
      * Pops the next available frame from the buffer.
      * @note This requires that peekNextFrame() be called first to ensure there is a valid frame to pop.
      */
-    void popFrame() noexcept;
+    void FFFRAMEREADER_NO_EXPORT popFrame() noexcept;
 
     /**
      * Return the maximum number of input frames needed by this stream's codec before it can produce output.
      * @note We expect to have to wait this many frames to receive output; any more and a decode stall is detected.
      * @returns The codec delay.
      */
-    [[nodiscard]] int32_t getCodecDelay() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int32_t getCodecDelay() const noexcept;
 
     /**
      * Gets the number of frames that are required in order to perform a seek as opposed to just forward decoding.
      * @returns The seek threshold.
      */
-    [[nodiscard]] int32_t getSeekThreshold() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int32_t getSeekThreshold() const noexcept;
 
     /**
      * Return the maximum number of input frames needed by a codec before it can produce output.
      * @param codec The codec.
      * @returns The codec delay.
      */
-    [[nodiscard]] static int32_t getCodecDelay(const CodecContextPtr& codec) noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT static int32_t getCodecDelay(const CodecContextPtr& codec) noexcept;
 
     /**
      * Gets stream start time in the stream timebase.
      * @returns The stream start time.
      */
-    [[nodiscard]] int64_t getStreamStartTime() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t getStreamStartTime() const noexcept;
 
     /**
      * Gets total number of frames in a stream.
      * @returns The stream frames.
      */
-    [[nodiscard]] int64_t getStreamFrames() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t getStreamFrames() const noexcept;
 
     /**
      * Gets the duration of a stream represented in microseconds (AV_TIME_BASE).
      * @returns The duration.
      */
-    [[nodiscard]] int64_t getStreamDuration() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT int64_t getStreamDuration() const noexcept;
 };
 } // namespace Ffr

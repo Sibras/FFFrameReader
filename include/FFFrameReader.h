@@ -16,6 +16,7 @@
 #pragma once
 #include "FFFRFrame.h"
 #include "FFFRStream.h"
+#include "ffframereader_export.h"
 
 namespace Ffr {
 /** Values that represent log levels */
@@ -35,21 +36,21 @@ enum class LogLevel : int32_t
  * Sets log level for all functions within FfFrameReader.
  * @param level The level.
  */
-void setLogLevel(LogLevel level) noexcept;
+FFFRAMEREADER_EXPORT void setLogLevel(LogLevel level) noexcept;
 
 /**
  * Logs text to default output.
  * @param text  The text.
  * @param level (Optional) The logging level.
  */
-void log(const std::string& text, LogLevel level = LogLevel::Info) noexcept;
+FFFRAMEREADER_EXPORT void log(const std::string& text, LogLevel level = LogLevel::Info) noexcept;
 
 /**
  * Gets number of planes for an image of the specified pixel format
  * @param format Describes the pixel format.
  * @returns The number of planes (YUV420P has 3, RGB8 has 1 etc.) or negative value if invalid format.
  */
-int32_t getPixelFormatPlanes(PixelFormat format) noexcept;
+FFFRAMEREADER_EXPORT int32_t getPixelFormatPlanes(PixelFormat format) noexcept;
 
 /**
  * Gets image size for frame with specified properties
@@ -58,7 +59,7 @@ int32_t getPixelFormatPlanes(PixelFormat format) noexcept;
  * @param height The height.
  * @returns The image size (bytes) or negative value if error.
  */
-int32_t getImageSize(PixelFormat format, uint32_t width, uint32_t height) noexcept;
+FFFRAMEREADER_EXPORT int32_t getImageSize(PixelFormat format, uint32_t width, uint32_t height) noexcept;
 
 /**
  * Gets the size of an image line.
@@ -67,7 +68,7 @@ int32_t getImageSize(PixelFormat format, uint32_t width, uint32_t height) noexce
  * @param plane  The image plane.
  * @returns The image line step (bytes) or negative value if error.
  */
-int32_t getImageLineStep(PixelFormat format, uint32_t width, uint32_t plane) noexcept;
+FFFRAMEREADER_EXPORT int32_t getImageLineStep(PixelFormat format, uint32_t width, uint32_t plane) noexcept;
 
 /**
  * Gets the size of an plane.
@@ -77,7 +78,8 @@ int32_t getImageLineStep(PixelFormat format, uint32_t width, uint32_t plane) noe
  * @param plane  The image plane.
  * @returns The image plane step (bytes) or negative value if error.
  */
-int32_t getImagePlaneStep(PixelFormat format, uint32_t width, uint32_t height, uint32_t plane) noexcept;
+FFFRAMEREADER_EXPORT int32_t getImagePlaneStep(
+    PixelFormat format, uint32_t width, uint32_t height, uint32_t plane) noexcept;
 
 /**
  * Convert pixel format using cuda.
@@ -87,5 +89,6 @@ int32_t getImagePlaneStep(PixelFormat format, uint32_t width, uint32_t height, u
  * @param       outFormat The pixel format to convert to.
  * @returns True if it succeeds, false if it fails.
  */
-bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem, PixelFormat outFormat) noexcept;
+FFFRAMEREADER_EXPORT bool convertFormat(
+    const std::shared_ptr<Frame>& frame, uint8_t* outMem, PixelFormat outFormat) noexcept;
 } // namespace Ffr

@@ -23,17 +23,17 @@ class Encoder
     friend class Fmc::MultiCrop;
 
 public:
-    Encoder() = delete;
+    FFFRAMEREADER_EXPORT Encoder() = delete;
 
-    ~Encoder() = default;
+    FFFRAMEREADER_EXPORT ~Encoder() = default;
 
-    Encoder(const Encoder& other) = delete;
+    FFFRAMEREADER_NO_EXPORT Encoder(const Encoder& other) = delete;
 
-    Encoder(Encoder&& other) noexcept = delete;
+    FFFRAMEREADER_NO_EXPORT Encoder(Encoder&& other) noexcept = delete;
 
-    Encoder& operator=(const Encoder& other) = delete;
+    FFFRAMEREADER_NO_EXPORT Encoder& operator=(const Encoder& other) = delete;
 
-    Encoder& operator=(Encoder&& other) noexcept = delete;
+    FFFRAMEREADER_NO_EXPORT Encoder& operator=(Encoder&& other) noexcept = delete;
 
     /**
      * Gets a stream from a file.
@@ -42,8 +42,8 @@ public:
      * @param options  (Optional) Options for controlling encoding.
      * @returns The stream if succeeded, false otherwise.
      */
-    [[nodiscard]] static bool encodeStream(const std::string& fileName, const std::shared_ptr<Stream>& stream,
-        const EncoderOptions& options = EncoderOptions()) noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT static bool encodeStream(const std::string& fileName,
+        const std::shared_ptr<Stream>& stream, const EncoderOptions& options = EncoderOptions()) noexcept;
 
     class ConstructorLock
     {
@@ -64,15 +64,15 @@ public:
      * @param quality   The encode quality.
      * @param preset    The encode preset.
      */
-    Encoder(const std::string& fileName, uint32_t width, uint32_t height, Rational aspect, PixelFormat format,
-        Rational frameRate, int64_t duration, EncodeType codecType, uint8_t quality, EncoderOptions::Preset preset,
-        ConstructorLock) noexcept;
+    FFFRAMEREADER_NO_EXPORT Encoder(const std::string& fileName, uint32_t width, uint32_t height, Rational aspect,
+        PixelFormat format, Rational frameRate, int64_t duration, EncodeType codecType, uint8_t quality,
+        EncoderOptions::Preset preset, ConstructorLock) noexcept;
 
     /**
      * Query if this object is valid.
      * @returns True if the encoder is valid, false if not.
      */
-    [[nodiscard]] bool isEncoderValid() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_EXPORT bool isEncoderValid() const noexcept;
 
 private:
     OutputFormatContextPtr m_formatContext;
@@ -83,19 +83,19 @@ private:
      * @param stream The stream.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool encodeStream(const std::shared_ptr<Stream>& stream) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool encodeStream(const std::shared_ptr<Stream>& stream) const noexcept;
 
     /**
      * Encode frame.
      * @param frame The frame.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool encodeFrame(const std::shared_ptr<Frame>& frame) const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool encodeFrame(const std::shared_ptr<Frame>& frame) const noexcept;
 
     /**
      * Writes encoded frames to output.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] bool muxFrames() const noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool muxFrames() const noexcept;
 };
 } // namespace Ffr
