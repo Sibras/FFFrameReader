@@ -211,7 +211,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
     m_formatContext = move(tempFormat);
     m_index = index;
     m_codecContext = move(tempCodec);
-    m_seekThreshold = frameToTimeStamp2(seekThreshold == 0 ? getSeekThreshold() : seekThreshold);
+    m_seekThreshold = seekThreshold;
 
     // Ensure ping/pong buffers are long enough to handle the maximum number of frames a video may require
     uint32_t minFrames = std::max(static_cast<uint32_t>(m_seekThreshold), m_bufferLength);
@@ -244,6 +244,8 @@ bool Stream::initialise() noexcept
         }
         m_lastDecodedTimeStamp = timeToTimeStamp2(m_bufferPing.back()->getTimeStamp());
     }
+
+    m_seekThreshold = frameToTimeStamp2(m_seekThreshold == 0 ? getSeekThreshold() : m_seekThreshold);
     return true;
 }
 
@@ -851,7 +853,19 @@ int32_t Stream::getCodecDelay() const noexcept
 
 int32_t Stream::getSeekThreshold() const noexcept
 {
-    return (m_codecContext->keyint_min * 5) + (getCodecDelay() * 2);
+    // This value should be optimised based on the GOP length and decoding cost of ther input video
+    // Using the test files obtains the following ideal threshold values
+    // 192 for 0 r=4, b=2, d=0  gop=250
+    // 95 for 7 r=2, b=1, d=0  gop=24
+    // 40 for 8 r=2, b=1, d=0  gop=6
+    // 50 for 6 r=2, b=1, d=0  gop=12
+    // 20 for 4 r=1, b=0, d=0  gop=5
+    // = (219.1647g)/(34.49228 + g)
+    // Since we dont actually have access to the gop size we have to guess an estimate
+    const auto gop = static_cast<float>(m_codecContext->has_b_frames) +
+        1.1f * expf(1.298964f * static_cast<float>(m_codecContext->refs));
+    const auto frames = (219.1647f * gop) / (34.49228f + gop);
+    return static_cast<int32_t>(frames) + getCodecDelay();
 }
 
 int32_t Stream::getCodecDelay(const CodecContextPtr& codec) noexcept
