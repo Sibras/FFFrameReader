@@ -31,9 +31,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Setup export symbol properties
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
-if(MSVC)
-    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS OFF)
-endif()
 
 # Defines the CMAKE_INSTALL_LIBDIR, CMAKE_INSTALL_BINDIR and many other useful macros.
 include(GNUInstallDirs)
@@ -219,7 +216,7 @@ target_include_directories(FfFrameReader PRIVATE
     ${AVFILTER_INCLUDE_DIR}
     ${AVUTIL_INCLUDE_DIR}
     ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
-    ${CMAKE_CURRENT_BINARY_DIR}
+    ${PROJECT_BINARY_DIR}
 )
 target_link_libraries(FfFrameReader
     PRIVATE ${AVCODEC_LIBRARY}
@@ -270,7 +267,7 @@ if(BUILD_TESTING)
     target_include_directories(FFFRTest PRIVATE
         ${PROJECT_SOURCE_DIR}/include
         ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
-        ${CMAKE_CURRENT_BINARY_DIR}
+        ${PROJECT_BINARY_DIR}
     )
 
     target_link_libraries(
@@ -300,13 +297,14 @@ if(BUILD_BENCHMARKING)
 
     set(FFFR_BENCHMARK_SOURCES
         benchmark/FFFRBenchmarkStream.cpp
+        benchmark/FFFRBenchmarkConvert.cpp
     )
 
     add_executable(FFFRBenchmark ${FFFR_BENCHMARK_SOURCES})
 
     target_include_directories(FFFRBenchmark PRIVATE
         ${PROJECT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_BINARY_DIR}
+        ${PROJECT_BINARY_DIR}
         PRIVATE ${benchmark_INCLUDE_DIRS}
     )
 
