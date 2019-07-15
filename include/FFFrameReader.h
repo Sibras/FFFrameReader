@@ -91,4 +91,23 @@ FFFRAMEREADER_EXPORT int32_t getImagePlaneStep(
  */
 FFFRAMEREADER_EXPORT bool convertFormat(
     const std::shared_ptr<Frame>& frame, uint8_t* outMem, PixelFormat outFormat) noexcept;
+
+/**
+ * Convert pixel format using cuda asynchronously. This requires the user to manually synchronise the cuda context using
+ * @synchroniseConvert.
+ * @param       frame     The input frame.
+ * @param [out] outMem    Memory location to store output (must be allocated with enough size for output frame see
+ *  @getImageSize).
+ * @param       outFormat The pixel format to convert to.
+ * @returns True if it succeeds, false if it fails.
+ */
+FFFRAMEREADER_EXPORT bool convertFormatAsync(
+    const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept;
+
+/**
+ * Synchronises the internal cuda context.
+ * @param frame The last frame used for cuda operations.
+ * @returns True if it succeeds, false if it fails.
+ */
+FFFRAMEREADER_EXPORT bool synchroniseConvert(const std::shared_ptr<Frame>& frame);
 } // namespace Ffr

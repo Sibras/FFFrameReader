@@ -274,6 +274,10 @@ public:
     static bool convertFormat(
         const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
     {
+        if (frame == nullptr || outMem == nullptr) {
+            log("Invalid frame"s, LogLevel::Error);
+            return false;
+        }
         // This only supports cuda frames
         if (frame->getDataType() != DecodeType::Cuda) {
             log("Only CUDA frames are currently supported by convertFormat"s, LogLevel::Error);
@@ -463,12 +467,11 @@ public:
             default:
                 break;
         }
-        const auto err = cuCtxSynchronize();
         CUcontext dummy;
         if (cuCtxPopCurrent(&dummy) != CUDA_SUCCESS) {
             log("Failed to restore CUDA context", LogLevel::Error);
         }
-        if (ret != CUDA_SUCCESS || err != CUDA_SUCCESS) {
+        if (ret != CUDA_SUCCESS) {
             if (ret == CUDA_ERROR_UNKNOWN) {
                 log("Format conversion not currently supported", LogLevel::Error);
             } else if (ret == CUDA_ERROR_LAUNCH_FAILED) {
@@ -476,12 +479,32 @@ public:
             } else {
                 log("Format conversion failed: "s += to_string(ret), LogLevel::Error);
             }
-            if (err != CUDA_SUCCESS) {
-                const char* errorString;
-                cuGetErrorName(err, &errorString);
-                log("Format conversion failed: "s += errorString, LogLevel::Error);
-                return false;
-            }
+            return false;
+        }
+        return true;
+    }
+
+    static bool synchroniseConvert(const std::shared_ptr<Frame>& frame) noexcept
+    {
+        if (frame == nullptr) {
+            log("Invalid frame"s, LogLevel::Error);
+            return false;
+        }
+        auto* framesContext = reinterpret_cast<AVHWFramesContext*>(frame->m_frame->hw_frames_ctx->data);
+        auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(framesContext->device_ctx->hwctx);
+        if (cuCtxPushCurrent(cudaDevice->cuda_ctx) != CUDA_SUCCESS) {
+            log("Failed to set CUDA context"s, LogLevel::Error);
+            return false;
+        }
+        const auto err = cuCtxSynchronize();
+        CUcontext dummy;
+        if (cuCtxPopCurrent(&dummy) != CUDA_SUCCESS) {
+            log("Failed to restore CUDA context", LogLevel::Error);
+        }
+        if (err != CUDA_SUCCESS) {
+            const char* errorString;
+            cuGetErrorName(err, &errorString);
+            log("Format conversion failed: "s += errorString, LogLevel::Error);
             return false;
         }
         return true;
@@ -490,7 +513,18 @@ public:
 
 bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
 {
+    const bool ret = FFR::convertFormat(frame, outMem, outFormat);
+    return ret | FFR::synchroniseConvert(frame);
+}
+
+bool convertFormatAsync(const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
+{
     return FFR::convertFormat(frame, outMem, outFormat);
+}
+
+bool synchroniseConvert(const std::shared_ptr<Frame>& frame)
+{
+    return FFR::synchroniseConvert(frame);
 }
 
 mutex FFR::s_mutex;
