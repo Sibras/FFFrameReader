@@ -187,6 +187,7 @@ class CodecContextPtr
     friend class Encoder;
     friend class StreamUtils;
     friend class Frame;
+    friend class FFR;
 
     FFFRAMEREADER_NO_EXPORT CodecContextPtr() = default;
 

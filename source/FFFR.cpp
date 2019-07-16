@@ -24,6 +24,7 @@
 #include <string>
 
 extern "C" {
+#include <libavcodec/avcodec.h>
 #include <libavutil/frame.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_cuda.h>
@@ -271,6 +272,7 @@ private:
 #endif
 
 public:
+    template<bool Async>
     static bool convertFormat(
         const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
     {
@@ -467,30 +469,47 @@ public:
             default:
                 break;
         }
-        CUcontext dummy;
-        if (cuCtxPopCurrent(&dummy) != CUDA_SUCCESS) {
-            log("Failed to restore CUDA context", LogLevel::Error);
-        }
         if (ret != CUDA_SUCCESS) {
             if (ret == CUDA_ERROR_UNKNOWN) {
                 log("Format conversion not currently supported", LogLevel::Error);
             } else if (ret == CUDA_ERROR_LAUNCH_FAILED) {
                 log("CUDA kernel for format conversion failed", LogLevel::Error);
             } else {
-                log("Format conversion failed: "s += to_string(ret), LogLevel::Error);
+                const char* errorString;
+                cuGetErrorName(ret, &errorString);
+                log("Format conversion failed: "s += errorString, LogLevel::Error);
             }
-            return false;
         }
-        return true;
+        if constexpr (!Async) {
+            ret = cuCtxSynchronize();
+            if (ret != CUDA_SUCCESS) {
+                const char* errorString;
+                cuGetErrorName(ret, &errorString);
+                log("Format conversion failed: "s += errorString, LogLevel::Error);
+            }
+        }
+        CUcontext dummy;
+        if (cuCtxPopCurrent(&dummy) != CUDA_SUCCESS) {
+            log("Failed to restore CUDA context", LogLevel::Error);
+        }
+        return (ret == CUDA_SUCCESS);
     }
 
-    static bool synchroniseConvert(const std::shared_ptr<Frame>& frame) noexcept
+    static bool synchroniseConvert(const std::shared_ptr<Stream>& stream) noexcept
     {
-        if (frame == nullptr) {
-            log("Invalid frame"s, LogLevel::Error);
+        if (stream == nullptr) {
+            log("Invalid stream"s, LogLevel::Error);
             return false;
         }
-        auto* framesContext = reinterpret_cast<AVHWFramesContext*>(frame->m_frame->hw_frames_ctx->data);
+        auto* framesContext = reinterpret_cast<AVHWFramesContext*>(stream->m_codecContext->hw_frames_ctx->data);
+        if (framesContext == nullptr) {
+            log("Invalid stream, does not use a hardware context"s, LogLevel::Error);
+            return false;
+        }
+        if (framesContext->format != AV_PIX_FMT_CUDA) {
+            log("Only CUDA frames are currently supported by convertFormat"s, LogLevel::Error);
+            return false;
+        }
         auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(framesContext->device_ctx->hwctx);
         if (cuCtxPushCurrent(cudaDevice->cuda_ctx) != CUDA_SUCCESS) {
             log("Failed to set CUDA context"s, LogLevel::Error);
@@ -504,7 +523,7 @@ public:
         if (err != CUDA_SUCCESS) {
             const char* errorString;
             cuGetErrorName(err, &errorString);
-            log("Format conversion failed: "s += errorString, LogLevel::Error);
+            log("Hardware synchronisation failed: "s += errorString, LogLevel::Error);
             return false;
         }
         return true;
@@ -513,18 +532,17 @@ public:
 
 bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
 {
-    const bool ret = FFR::convertFormat(frame, outMem, outFormat);
-    return ret | FFR::synchroniseConvert(frame);
+    return FFR::convertFormat<false>(frame, outMem, outFormat);
 }
 
 bool convertFormatAsync(const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
 {
-    return FFR::convertFormat(frame, outMem, outFormat);
+    return FFR::convertFormat<true>(frame, outMem, outFormat);
 }
 
-bool synchroniseConvert(const std::shared_ptr<Frame>& frame)
+bool synchroniseConvert(const std::shared_ptr<Stream>& stream)
 {
-    return FFR::synchroniseConvert(frame);
+    return FFR::synchroniseConvert(stream);
 }
 
 mutex FFR::s_mutex;

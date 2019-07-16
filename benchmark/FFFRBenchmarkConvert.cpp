@@ -21,7 +21,7 @@
 
 using namespace Ffr;
 
-constexpr int32_t iterations = 15;
+constexpr int32_t iterations = 17;
 
 class BenchConvert : public benchmark::Fixture
 {
@@ -123,13 +123,13 @@ BENCHMARK_DEFINE_F(BenchConvert, seekConvertSeries)(benchmark::State& state)
                 lastFrame = retrieved.back();
             }
         }
+        if (!synchroniseConvert(lastFrame)) {
+            state.SkipWithError("CUDA convert failed");
+        }
         if (count != frames.size()) {
             if (!m_stream->isEndOfFile()) {
                 state.SkipWithError("Cannot perform required iterations on input stream");
             }
-        }
-        if (!synchroniseConvert(lastFrame)) {
-            state.SkipWithError("CUDA convert failed");
         }
     }
 }
