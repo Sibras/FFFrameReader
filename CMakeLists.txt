@@ -298,6 +298,7 @@ if(BUILD_BENCHMARKING)
     set(FFFR_BENCHMARK_SOURCES
         benchmark/FFFRBenchmarkStream.cpp
         benchmark/FFFRBenchmarkConvert.cpp
+        benchmark/FFFRBenchmarkRead.cpp
     )
 
     add_executable(FFFRBenchmark ${FFFR_BENCHMARK_SOURCES})
