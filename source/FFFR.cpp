@@ -272,9 +272,8 @@ private:
 #endif
 
 public:
-    template<bool Async>
     static bool convertFormat(
-        const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
+        const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat, bool asynch) noexcept
     {
         if (frame == nullptr || outMem == nullptr) {
             log("Invalid frame"s, LogLevel::Error);
@@ -480,7 +479,7 @@ public:
                 log("Format conversion failed: "s += errorString, LogLevel::Error);
             }
         }
-        if constexpr (!Async) {
+        if (!asynch) {
             ret = cuCtxSynchronize();
             if (ret != CUDA_SUCCESS) {
                 const char* errorString;
@@ -532,12 +531,12 @@ public:
 
 bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
 {
-    return FFR::convertFormat<false>(frame, outMem, outFormat);
+    return FFR::convertFormat(frame, outMem, outFormat, false);
 }
 
 bool convertFormatAsync(const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
 {
-    return FFR::convertFormat<true>(frame, outMem, outFormat);
+    return FFR::convertFormat(frame, outMem, outFormat, true);
 }
 
 bool synchroniseConvert(const std::shared_ptr<Stream>& stream)
