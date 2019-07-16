@@ -500,9 +500,18 @@ public:
             log("Invalid stream"s, LogLevel::Error);
             return false;
         }
-        auto* framesContext = reinterpret_cast<AVHWFramesContext*>(stream->m_codecContext->hw_frames_ctx->data);
-        auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(framesContext->device_ctx->hwctx);
-        if (cuCtxPushCurrent(cudaDevice->cuda_ctx) != CUDA_SUCCESS) {
+        CUcontext context = nullptr;
+        if (stream->m_codecContext->hw_frames_ctx == nullptr) {
+            // This means its the cuvid decoder which just uses the default context
+            CUdevice dev;
+            cuDeviceGet(&dev, 0);
+            cuDevicePrimaryCtxRetain(&context, dev);
+        } else {
+            auto* framesContext = reinterpret_cast<AVHWFramesContext*>(stream->m_codecContext->hw_frames_ctx->data);
+            auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(framesContext->device_ctx->hwctx);
+            context = cudaDevice->cuda_ctx;
+        }
+        if (cuCtxPushCurrent(context) != CUDA_SUCCESS) {
             log("Failed to set CUDA context"s, LogLevel::Error);
             return false;
         }
