@@ -110,6 +110,12 @@ TEST_P(DecodeTest1, getDecodeType)
     } else {
         ASSERT_EQ(frame1->getDataType(), Ffr::DecodeType::Software);
     }
+
+    if (GetParam().m_useNvdec) {
+        ASSERT_EQ(m_decoder.m_stream->getDecodeType(), Ffr::DecodeType::Cuda);
+    } else {
+        ASSERT_EQ(m_decoder.m_stream->getDecodeType(), Ffr::DecodeType::Software);
+    }
 }
 
 TEST_P(DecodeTest1, getPixelFormat)

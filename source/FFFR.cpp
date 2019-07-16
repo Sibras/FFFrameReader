@@ -496,19 +496,11 @@ public:
 
     static bool synchroniseConvert(const std::shared_ptr<Stream>& stream) noexcept
     {
-        if (stream == nullptr) {
+        if (stream == nullptr || stream->m_codecContext->pix_fmt != AV_PIX_FMT_CUDA || stream->m_outputHost) {
             log("Invalid stream"s, LogLevel::Error);
             return false;
         }
         auto* framesContext = reinterpret_cast<AVHWFramesContext*>(stream->m_codecContext->hw_frames_ctx->data);
-        if (framesContext == nullptr) {
-            log("Invalid stream, does not use a hardware context"s, LogLevel::Error);
-            return false;
-        }
-        if (framesContext->format != AV_PIX_FMT_CUDA) {
-            log("Only CUDA frames are currently supported by convertFormat"s, LogLevel::Error);
-            return false;
-        }
         auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(framesContext->device_ctx->hwctx);
         if (cuCtxPushCurrent(cudaDevice->cuda_ctx) != CUDA_SUCCESS) {
             log("Failed to set CUDA context"s, LogLevel::Error);

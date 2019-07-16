@@ -127,6 +127,12 @@ public:
     [[nodiscard]] FFFRAMEREADER_EXPORT uint32_t getFrameSize() const noexcept;
 
     /**
+     * Gets the type of decoding used.
+     * @returns The decode type.
+     */
+    [[nodiscard]] FFFRAMEREADER_EXPORT DecodeType getDecodeType() const noexcept;
+
+    /**
      * Get the next frame in the stream without removing it from stream buffer.
      * @returns The next frame in current stream, or nullptr if an error occured or end of file reached.
      */

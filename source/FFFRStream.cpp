@@ -328,6 +328,14 @@ uint32_t Stream::getFrameSize() const noexcept
     return av_image_get_buffer_size(StreamUtils::getPixelFormat(this), getWidth(), getHeight(), 32);
 }
 
+DecodeType Stream::getDecodeType() const noexcept
+{
+    if (m_codecContext->pix_fmt == AV_PIX_FMT_CUDA) {
+        return DecodeType::Cuda;
+    }
+    return DecodeType::Software;
+}
+
 shared_ptr<Frame> Stream::peekNextFrame() noexcept
 {
     lock_guard<recursive_mutex> lock(m_mutex);
