@@ -62,8 +62,8 @@ public:
 
         // Allocate new memory to store frame data
         cuCtxPushCurrent(m_context.get());
-        const auto outFrameSize = getImageSize(PixelFormat::RGB32FP, width, height);
-        cuMemAlloc(&m_cudaBuffer, outFrameSize);
+        m_imageSize = getImageSize(PixelFormat::RGB32FP, width, height);
+        cuMemAlloc(&m_cudaBuffer, m_imageSize * iterations);
         CUcontext dummy;
         cuCtxPopCurrent(&dummy);
 
@@ -87,6 +87,7 @@ public:
     int32_t m_blockSize = 0;
     std::shared_ptr<std::remove_pointer<CUcontext>::type> m_context = nullptr;
     CUdeviceptr m_cudaBuffer = reinterpret_cast<CUdeviceptr>(nullptr);
+    int32_t m_imageSize = 0;
 };
 
 BENCHMARK_DEFINE_F(BenchConvert, seekConvertSeries)(benchmark::State& state)
@@ -104,31 +105,25 @@ BENCHMARK_DEFINE_F(BenchConvert, seekConvertSeries)(benchmark::State& state)
     for (auto _ : state) {
         const auto blocks = std::div(static_cast<int32_t>(frames.size()), m_blockSize);
         const auto numBlocks = blocks.quot + (blocks.rem > 0 ? 1 : 0);
-        uint32_t count = 0;
-        std::shared_ptr<Frame> lastFrame = nullptr;
         for (int32_t i = 0; i < numBlocks; ++i) {
-            const auto start = frames.begin() + (i * m_blockSize);
+            const auto start = &frames.data()[i * m_blockSize];
             const auto last = (i + 1) * m_blockSize;
-            const auto end = frames.begin() +
-                (last <= static_cast<int32_t>(frames.size()) ? last : static_cast<int32_t>(frames.size()));
+            const auto end = &frames.data()[std::min(static_cast<int32_t>(frames.size()), last)];
             const std::vector<int64_t> frameSequence(start, end);
             const auto retrieved = m_stream->getFrames(frameSequence);
             for (auto& j : retrieved) {
-                if (!convertFormatAsync(j, reinterpret_cast<uint8_t*>(m_cudaBuffer), PixelFormat::RGB32FP)) {
+                if (!convertFormatAsync(
+                        j, &reinterpret_cast<uint8_t*>(m_cudaBuffer)[m_imageSize * i], PixelFormat::RGB32FP)) {
                     break;
                 }
-                ++count;
             }
-            if (i == numBlocks - 1) {
-                lastFrame = retrieved.back();
+            if (!synchroniseConvert(m_stream)) {
+                state.SkipWithError("CUDA convert failed");
             }
-        }
-        if (!synchroniseConvert(lastFrame)) {
-            state.SkipWithError("CUDA convert failed");
-        }
-        if (count != frames.size()) {
-            if (!m_stream->isEndOfFile()) {
-                state.SkipWithError("Cannot perform required iterations on input stream");
+            if (retrieved.size() != frameSequence.size()) {
+                if (!m_stream->isEndOfFile()) {
+                    state.SkipWithError("Cannot perform required iterations on input stream");
+                }
             }
         }
     }
