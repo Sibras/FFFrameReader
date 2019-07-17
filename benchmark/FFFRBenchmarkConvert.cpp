@@ -49,6 +49,7 @@ public:
         options.m_type = DecodeType::Cuda;
         options.m_outputHost = false;
         options.m_context = m_context.get();
+        options.m_noBufferFlush = state.range(3) == 1;
         m_stream = Stream::getStream(g_testData[0].m_fileName, options);
         if (m_stream == nullptr) {
             state.SkipWithError("Failed to create input stream");
@@ -160,14 +161,15 @@ BENCHMARK_DEFINE_F(BenchConvert, readConvert)(benchmark::State& state)
 //  1. The number of frames to move forward in each seek
 //  2. The buffer length
 //  3. The batch block size
+//  4. Boolean, 1 if no buffer flush should be set
 static void customArguments(benchmark::internal::Benchmark* b)
 {
-    b->RangeMultiplier(2)->Ranges({{1, 256}, {1, 16}, {1, 8}})->Unit(benchmark::kMillisecond);
+    b->RangeMultiplier(2)->Ranges({{1, 256}, {1, 16}, {1, 8}, {0, 1}})->Unit(benchmark::kMillisecond);
 }
-/*
+
 BENCHMARK_REGISTER_F(BenchConvert, seekConvert)->Apply(customArguments);
 
 BENCHMARK_REGISTER_F(BenchConvert, readConvert)
     ->RangeMultiplier(2)
     ->Ranges({{1, 1}, {1, 16}, {1, 8}})
-    ->Unit(benchmark::kMillisecond);*/
+    ->Unit(benchmark::kMillisecond);

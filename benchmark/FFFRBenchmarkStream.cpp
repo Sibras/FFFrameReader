@@ -20,7 +20,7 @@
 
 using namespace Ffr;
 
-constexpr uint32_t iterations = 15;
+constexpr uint32_t iterations = 4;
 
 class BenchStream : public benchmark::Fixture
 {
@@ -34,10 +34,10 @@ public:
             options.m_type = DecodeType::Cuda;
             options.m_outputHost = false;
         }
+        options.m_noBufferFlush = state.range(3) == 1;
         m_stream = Stream::getStream(g_testData[0].m_fileName, options);
         if (m_stream == nullptr) {
             state.SkipWithError("Failed to create input stream");
-            return;
         }
     }
 
@@ -95,9 +95,10 @@ BENCHMARK_DEFINE_F(BenchStream, seek)(benchmark::State& state)
 //  1. The number of frames to move forward in each seek
 //  2. The buffer length
 //  3. Boolean, 1 if cuda decoding should be used
+//  4. Boolean, 1 if no buffer flush should be set
 static void customArguments(benchmark::internal::Benchmark* b)
 {
-    b->RangeMultiplier(2)->Ranges({{1, 256}, {1, 16}, {0, 1}})->Unit(benchmark::kMillisecond);
+    b->RangeMultiplier(2)->Ranges({{2, 256}, {1, 16}, {0, 1}, {0, 1}})->Unit(benchmark::kMillisecond);
 }
 
 BENCHMARK_REGISTER_F(BenchStream, seekSeries)->Apply(customArguments);
