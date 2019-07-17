@@ -212,6 +212,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
     m_index = index;
     m_codecContext = move(tempCodec);
     m_seekThreshold = seekThreshold;
+    m_frameSeekSupported = m_formatContext->iformat->read_seek2 != nullptr;
 
     // Ensure ping/pong buffers are long enough to handle the maximum number of frames a video may require
     uint32_t minFrames = std::max(static_cast<uint32_t>(m_seekThreshold), m_bufferLength);
@@ -547,6 +548,9 @@ bool Stream::seekFrame(const int64_t frame) noexcept
         }
     }
 
+    if (!m_frameSeekSupported) {
+        return seek(frameToTime(frame));
+    }
     // Seek to desired timestamp
     avcodec_flush_buffers(m_codecContext.get());
     m_lastDecodedTimeStamp = -1;
@@ -555,19 +559,13 @@ bool Stream::seekFrame(const int64_t frame) noexcept
     const auto err = avformat_seek_file(m_formatContext.get(), m_index,
         frameInternal - timeStampToFrame2(m_seekThreshold), frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
     if (err < 0) {
-        m_frameSeekSupported = false;
-        log("Failed to seek to specified frame "s += to_string(frame) += ": "s += getFfmpegErrorString(err) +=
-            " (retrying using timestamp based seek)"s,
+        log("Failed to seek to specified frame "s += to_string(frame) += ": "s += getFfmpegErrorString(err),
             LogLevel::Error);
-
-        // Try and seek just using a timestamp
-        return seek(frameToTime(frame));
+        return false;
     }
 
     // Decode the next block of frames
     return decodeNextBlock(timeStamp2);
-
-    // TODO: Check if seek failed by seeking to incorrect location
 }
 
 int64_t Stream::frameToTime(const int64_t frame) const noexcept
