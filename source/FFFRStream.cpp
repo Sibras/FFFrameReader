@@ -229,9 +229,13 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
 bool Stream::initialise() noexcept
 {
     // Decode the first frame (must be done to ensure codec parameters are properly filled)
+    const auto backup = m_bufferLength;
+    m_bufferLength = 1;
     if (peekNextFrame() == nullptr) {
+        m_bufferLength = backup;
         return false;
     }
+    m_bufferLength = backup;
     // Check if the first element in the buffer does not match our start time
     const auto startTime = m_bufferPing.front()->getTimeStamp();
     if (startTime != 0) {
