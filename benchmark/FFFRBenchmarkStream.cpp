@@ -39,7 +39,6 @@ public:
             state.SkipWithError("Failed to create input stream");
             return;
         }
-        m_timeJump = m_stream->frameToTime(state.range(0));
     }
 
     void TearDown(const ::benchmark::State&)
@@ -48,20 +47,20 @@ public:
     }
 
     std::shared_ptr<Stream> m_stream = nullptr;
-    int64_t m_timeJump = 0;
 };
 
 BENCHMARK_DEFINE_F(BenchStream, seekSeries)(benchmark::State& state)
 {
-    // Seek to end of iteration area as this ensures all additional loops within the benchmark start with the stream
-    // in the same state
-    if (!m_stream->seek(m_timeJump * iterations)) {
+    if (state.range(0) * iterations >= m_stream->getTotalFrames()) {
         state.SkipWithError("Cannot perform required iterations on input stream");
     }
     for (auto _ : state) {
-        int64_t position = m_timeJump;
+        state.PauseTiming();
+        // Ignore the seek back to start after each loop
+        (void)m_stream->seek(0);
+        state.ResumeTiming();
         for (int64_t i = 0; i < iterations; ++i) {
-            if (!m_stream->seek(position)) {
+            if (!m_stream->seek(m_stream->frameToTime(state.range(0) * i))) {
                 state.SkipWithError("Failed to seek");
                 break;
             }
@@ -69,16 +68,18 @@ BENCHMARK_DEFINE_F(BenchStream, seekSeries)(benchmark::State& state)
                 state.SkipWithError("Failed to retrieve valid frame");
                 break;
             }
-            position += m_timeJump;
         }
     }
 }
 
 BENCHMARK_DEFINE_F(BenchStream, seek)(benchmark::State& state)
 {
-    int64_t position = m_timeJump;
+    if (state.range(0) * iterations >= m_stream->getTotalFrames()) {
+        state.SkipWithError("Cannot perform required iterations on input stream");
+    }
+    int64_t position = 1;
     for (auto _ : state) {
-        if (!m_stream->seek(position)) {
+        if (!m_stream->seek(m_stream->frameToTime(state.range(0) * position))) {
             state.SkipWithError("Failed to seek");
             break;
         }
@@ -86,29 +87,7 @@ BENCHMARK_DEFINE_F(BenchStream, seek)(benchmark::State& state)
             state.SkipWithError("Failed to retrieve valid frame");
             break;
         }
-        position += m_timeJump;
-    }
-}
-
-BENCHMARK_DEFINE_F(BenchStream, getNextFrameSeries)(benchmark::State& state)
-{
-    for (auto _ : state) {
-        for (int64_t i = 0; i < iterations; ++i) {
-            if (m_stream->getNextFrame() == nullptr) {
-                state.SkipWithError("Failed to retrieve valid frame");
-                break;
-            }
-        }
-    }
-}
-
-BENCHMARK_DEFINE_F(BenchStream, getNextFrame)(benchmark::State& state)
-{
-    for (auto _ : state) {
-        if (m_stream->getNextFrame() == nullptr) {
-            state.SkipWithError("Failed to retrieve valid frame");
-            break;
-        }
+        ++position;
     }
 }
 
@@ -118,13 +97,9 @@ BENCHMARK_DEFINE_F(BenchStream, getNextFrame)(benchmark::State& state)
 //  3. Boolean, 1 if cuda decoding should be used
 static void customArguments(benchmark::internal::Benchmark* b)
 {
-    b->RangeMultiplier(2)->Ranges({{16, 256}, {1, 16}, {0, 1}})->Unit(benchmark::kMillisecond);
+    b->RangeMultiplier(2)->Ranges({{1, 256}, {1, 16}, {0, 1}})->Unit(benchmark::kMillisecond);
 }
 
 BENCHMARK_REGISTER_F(BenchStream, seekSeries)->Apply(customArguments);
 
 BENCHMARK_REGISTER_F(BenchStream, seek)->Apply(customArguments);
-
-BENCHMARK_REGISTER_F(BenchStream, getNextFrameSeries)->Apply(customArguments);
-
-BENCHMARK_REGISTER_F(BenchStream, getNextFrame)->Apply(customArguments);

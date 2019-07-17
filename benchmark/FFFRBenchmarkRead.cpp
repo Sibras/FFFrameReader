@@ -51,6 +51,9 @@ public:
 
 BENCHMARK_DEFINE_F(BenchRead, read)(benchmark::State& state)
 {
+    if (iterations >= m_stream->getTotalFrames()) {
+        state.SkipWithError("Cannot perform required iterations on input stream");
+    }
     for (auto _ : state) {
         for (int64_t i = 0; i < iterations; ++i) {
             if (m_stream->getNextFrame() == nullptr) {
@@ -63,6 +66,9 @@ BENCHMARK_DEFINE_F(BenchRead, read)(benchmark::State& state)
 
 BENCHMARK_DEFINE_F(BenchRead, readBatch)(benchmark::State& state)
 {
+    if (iterations >= m_stream->getTotalFrames()) {
+        state.SkipWithError("Cannot perform required iterations on input stream");
+    }
     constexpr int32_t blockSize = 5;
     std::vector<int64_t> frames;
     for (int64_t i = 0; i < iterations; i++) {
