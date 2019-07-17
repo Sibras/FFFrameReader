@@ -443,9 +443,9 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     // Check if we actually have any frames in the current buffer
     if (m_bufferPingHead < m_bufferPing.size()) {
         // Check if the frame is in the current buffer
-        const auto singleFrameDuration = frameToTime(1);
-        if ((timeStamp >= m_bufferPing[m_bufferPingHead]->getTimeStamp()) &&
-            (timeStamp < m_bufferPing.back()->getTimeStamp() + singleFrameDuration)) {
+        const auto halfFrameDuration = frameToTime(1) / 2;
+        if ((timeStamp >= m_bufferPing[m_bufferPingHead]->getTimeStamp() - halfFrameDuration) &&
+            (timeStamp < m_bufferPing.back()->getTimeStamp() + halfFrameDuration)) {
             // Dump all frames before requested one
             while (true) {
                 // Get next frame
@@ -454,7 +454,7 @@ bool Stream::seek(const int64_t timeStamp) noexcept
                     return false;
                 }
                 // Check if we have found our requested time stamp or it is within the timestamp range of the next frame
-                if (timeStamp < (ret->getTimeStamp() + singleFrameDuration)) {
+                if (timeStamp < (ret->getTimeStamp() + halfFrameDuration)) {
                     break;
                 }
                 // Remove frames from ping buffer

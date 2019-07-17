@@ -196,7 +196,7 @@ public:
 
     /**
      * Seeks the stream to the given time stamp. If timestamp does not exactly match a frame then the timestamp rounded
-     * down to nearest frame is used instead.
+     * to the nearest frame is used instead.
      * @param timeStamp The time stamp to seek to (in micro-seconds).
      * @returns True if it succeeds, false if it fails.
      */
