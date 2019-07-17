@@ -23,11 +23,14 @@ using namespace Ffr;
 struct TestParamsSeek
 {
     uint32_t m_bufferLength;
+    bool m_noBufferFlush;
 };
 
 static std::vector<TestParamsSeek> g_testDataStream = {
-    {10},
-    {1},
+    {10, false},
+    {1, false},
+    {10, true},
+    {1, true},
 };
 
 class SeekTest1 : public ::testing::TestWithParam<std::tuple<TestParamsSeek, TestParams>>
@@ -40,6 +43,7 @@ protected:
         setLogLevel(LogLevel::Warning);
         DecoderOptions options;
         options.m_bufferLength = std::get<0>(GetParam()).m_bufferLength;
+        options.m_noBufferFlush = std::get<0>(GetParam()).m_noBufferFlush;
         m_stream = Stream::getStream(std::get<1>(GetParam()).m_fileName);
         ASSERT_NE(m_stream, nullptr);
     }

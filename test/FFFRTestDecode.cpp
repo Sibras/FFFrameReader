@@ -27,14 +27,20 @@ struct TestParamsDecode
     bool m_useNvdec;
     bool m_useContext;
     bool m_outputToHost;
+    bool m_noBufferFlush;
 };
 
 static std::vector<TestParamsDecode> g_testDataDecode = {
-    {0, false, false, true},
-    {0, true, false, false},
-    {0, true, false, true},
-    {0, true, true, false},
-    {0, true, true, true},
+    {0, false, false, true, false},
+    {0, true, false, false, false},
+    {0, true, false, true, false},
+    {0, true, true, false, false},
+    {0, true, true, true, false},
+    {0, false, false, true, true},
+    {0, true, false, false, true},
+    {0, true, false, true, true},
+    {0, true, true, false, true},
+    {0, true, true, true, true},
 };
 
 class TestDecoder
@@ -69,6 +75,7 @@ public:
             }
         }
         options.m_outputHost = params.m_outputToHost;
+        options.m_noBufferFlush = params.m_noBufferFlush;
         m_stream = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
         ASSERT_NE(m_stream, nullptr);
     }
