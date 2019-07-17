@@ -112,10 +112,12 @@ public:
                                               to decode instead of seeking. This should be optimised based on a sources
                                               key frame interval so that forward decoding is used when it provides faster seeks. A
                                               value of 0 uses automatic detection. */
-    std::any m_context;                       /**< Pointer to an existing context to be used for hardware
-                                               decoding. This must match the hardware type specified in @m_type. */
-    uint32_t m_device = 0;                    /**< The device index for the desired hardware device. */
-    bool m_outputHost = true; /**< True to output each frame to host CPU memory (only affects hardware decoding). */
+    bool m_noBufferFlush = false; /**< True to skip buffer flushing on seeks. This results in more decoding but can
+                                     improve seek performance for decoders that have an expensive flush */
+    std::any m_context;           /**< Pointer to an existing context to be used for hardware
+                                   decoding. This must match the hardware type specified in @m_type. */
+    uint32_t m_device = 0;        /**< The device index for the desired hardware device. */
+    bool m_outputHost = true;     /**< True to output each frame to host CPU memory (only affects hardware decoding). */
 };
 
 class EncoderOptions

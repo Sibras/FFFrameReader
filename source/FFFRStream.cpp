@@ -35,7 +35,7 @@ extern "C" {
 }
 
 namespace Ffr {
-Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seekThreshold,
+Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seekThreshold, bool noBufferFlush,
     const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost, Crop crop, Resolution scale,
     PixelFormat format, ConstructorLock) noexcept
 {
@@ -212,6 +212,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
     m_index = index;
     m_codecContext = move(tempCodec);
     m_seekThreshold = seekThreshold;
+    m_noBufferFlush = noBufferFlush;
     m_frameSeekSupported = m_formatContext->iformat->read_seek2 != nullptr;
 
     // Ensure ping/pong buffers are long enough to handle the maximum number of frames a video may require
@@ -269,8 +270,9 @@ shared_ptr<Stream> Stream::getStream(const string& fileName, const DecoderOption
 
     // Create the new stream
     const bool outputHost = options.m_outputHost && (options.m_type != DecodeType::Software);
-    shared_ptr<Stream> stream = make_shared<Stream>(fileName, options.m_bufferLength, options.m_seekThreshold,
-        deviceContext, outputHost, options.m_crop, options.m_scale, options.m_format, ConstructorLock());
+    shared_ptr<Stream> stream =
+        make_shared<Stream>(fileName, options.m_bufferLength, options.m_seekThreshold, options.m_noBufferFlush,
+            deviceContext, outputHost, options.m_crop, options.m_scale, options.m_format, ConstructorLock());
     if (stream->m_codecContext.get() == nullptr) {
         // Stream creation failed
         return nullptr;
@@ -694,9 +696,11 @@ bool Stream::decodeNextBlock(int64_t flushTillTime) noexcept
                     av_packet_unref(&packet);
                     continue;
                 }
-                avcodec_flush_buffers(m_codecContext.get());
+                if (!m_noBufferFlush) {
+                    avcodec_flush_buffers(m_codecContext.get());
+                    m_lastDecodedTimeStamp = -1;
+                }
                 m_lastValidTimeStamp = -1;
-                m_lastDecodedTimeStamp = -1;
             }
             m_lastPacketTimeStamp = packet.dts != AV_NOPTS_VALUE ? packet.dts : packet.pts;
             // Convert timebase
@@ -922,19 +926,20 @@ int32_t Stream::getCodecDelay() const noexcept
 
 int32_t Stream::getSeekThreshold() const noexcept
 {
-    // This value should be optimised based on the GOP length and decoding cost of ther input video
+    // This value should be optimised based on the GOP length and decoding cost of the input video
     // Using the test files obtains the following ideal threshold values
-    // 192 for 0 r=4, b=2, d=0  gop=250
-    // 95 for 7 r=2, b=1, d=0  gop=24
-    // 40 for 8 r=2, b=1, d=0  gop=6
-    // 50 for 6 r=2, b=1, d=0  gop=12
-    // 20 for 4 r=1, b=0, d=0  gop=5
+    // 64 for 0 r=4, b=2, d=0  gop=250
+    //  5 for 1 r=4, b=2, d=0  gop=5
+    //  6 for 4 r=1, b=0, d=0  gop=5
+    //  8 for 6 r=2, b=1, d=0  gop=12
+    // 10 for 7 r=2, b=1, d=0  gop=24
+    //  8 for 8 r=2, b=1, d=0  gop=6
     // = (219.1647g)/(34.49228 + g)
     // Since we dont actually have access to the gop size we have to guess an estimate
-    const auto gop = static_cast<float>(m_codecContext->has_b_frames) +
+    const auto gop = 2 * static_cast<float>(m_codecContext->has_b_frames) +
         1.1f * expf(1.298964f * static_cast<float>(m_codecContext->refs));
-    const auto frames = (219.1647f * gop) / (34.49228f + gop);
-    return static_cast<int32_t>(frames) + getCodecDelay();
+    const auto frames = -4.523664f + 10.42266f * expf(0.01506527f * gop);
+    return static_cast<int32_t>(frames);
 }
 
 int32_t Stream::getCodecDelay(const CodecContextPtr& codec) noexcept

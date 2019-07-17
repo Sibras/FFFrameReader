@@ -65,6 +65,7 @@ public:
      * @param fileName       Filename of the file to open.
      * @param bufferLength   Number of frames in the the decode buffer.
      * @param seekThreshold  Maximum number of frames for a forward seek to continue to decode instead of seeking.
+     * @param noBufferFlush  True to skip buffer flushing on seeks.
      * @param decoderContext Pointer to an existing context to be used for hardware decoding.
      * @param outputHost     True to output each frame to host CPU memory (only affects hardware decoding).
      * @param crop           The output cropping or (0) if no crop should be performed.
@@ -73,8 +74,8 @@ public:
      * @param format         The required output pixel format.
      */
     FFFRAMEREADER_NO_EXPORT Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seekThreshold,
-        const std::shared_ptr<DecoderContext>& decoderContext, bool outputHost, Crop crop, Resolution scale,
-        PixelFormat format, ConstructorLock) noexcept;
+        bool noBufferFlush, const std::shared_ptr<DecoderContext>& decoderContext, bool outputHost, Crop crop,
+        Resolution scale, PixelFormat format, ConstructorLock) noexcept;
 
     /**
      * Gets the width of the video stream.
@@ -231,9 +232,9 @@ private:
     uint32_t m_bufferLength = 0;                      /**< Length of the ping and pong buffers */
     std::vector<std::shared_ptr<Frame>> m_bufferPing; /**< The primary buffer used to store decoded frames */
     uint32_t m_bufferPingHead =
-        0; /**< The position in the ping buffer of the next available frame in the decoded stream. */
+        0; /**< The position in the ping buffer of the next available frame in the decoded stream */
     std::vector<std::shared_ptr<Frame>> m_bufferPong; /**< The secondary buffer used to store decoded frames */
-    std::shared_ptr<Filter> m_filterGraph = nullptr;  /**< The filter graph for optional transformations. */
+    std::shared_ptr<Filter> m_filterGraph = nullptr;  /**< The filter graph for optional transformations */
     bool m_outputHost = true; /**< True to output each frame to host CPU memory (only affects hardware decoding) */
     FramePtr m_tempFrame;     /**< The temporary frame used for decoding */
 
@@ -245,10 +246,11 @@ private:
     int64_t m_lastDecodedTimeStamp = -1; /**< The decoder time stamp of the last decoded frame */
     int64_t m_lastValidTimeStamp = -1;   /**< The decoder time stamp of the last valid stored frame */
     int64_t m_lastPacketTimeStamp = -1;  /**< The demuxer time stamp of the last retrieved packet */
-    bool m_frameSeekSupported = true;    /**< True if frame seek supported */
     int64_t m_totalFrames = 0;           /**< Stream video duration in frames */
     int64_t m_totalDuration = 0;         /**< Stream video duration in microseconds (AV_TIME_BASE) */
-    int64_t m_seekThreshold = 0; /**< Time stamp difference for determining if a forward seek should forward decode */
+    int64_t m_seekThreshold = 0;  /**< Time stamp difference for determining if a forward seek should forward decode */
+    bool m_noBufferFlush = false; /**< True to skip buffer flushing on seeks */
+    bool m_frameSeekSupported = true; /**< True if frame seek supported */
 
     /**
      * Initialises codec parameters needed for future operations.
