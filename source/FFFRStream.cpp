@@ -243,6 +243,7 @@ bool Stream::initialise() noexcept
             i->m_frameNum = timeToFrame2(i->m_timeStamp);
         }
         m_lastDecodedTimeStamp = timeToTimeStamp2(m_bufferPing.back()->getTimeStamp());
+        m_lastValidTimeStamp = m_lastDecodedTimeStamp;
     }
 
     m_seekThreshold = frameToTimeStamp2(m_seekThreshold == 0 ? getSeekThreshold() : m_seekThreshold);
@@ -482,6 +483,7 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     // Seek to desired timestamp
     avcodec_flush_buffers(m_codecContext.get());
     m_lastDecodedTimeStamp = -1;
+    m_lastValidTimeStamp = -1;
     const auto localTimeStamp = timeToTimeStamp(timeStamp);
     const auto err = avformat_seek_file(m_formatContext.get(), m_index,
         localTimeStamp - timeStamp2ToTimeStamp(m_seekThreshold), localTimeStamp, localTimeStamp, 0);
@@ -544,6 +546,7 @@ bool Stream::seekFrame(const int64_t frame) noexcept
     // Seek to desired timestamp
     avcodec_flush_buffers(m_codecContext.get());
     m_lastDecodedTimeStamp = -1;
+    m_lastValidTimeStamp = -1;
     const auto frameInternal = frame + timeStampToFrameNoOffset(m_startTimeStamp);
     const auto err = avformat_seek_file(m_formatContext.get(), m_index,
         frameInternal - timeStampToFrame2(m_seekThreshold), frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
@@ -649,7 +652,7 @@ int64_t Stream::timeStamp2ToTimeStamp(const int64_t timeStamp) const noexcept
     return av_rescale_q(timeStamp, m_codecContext->time_base, m_formatContext->streams[m_index]->time_base);
 }
 
-bool Stream::decodeNextBlock(const int64_t flushTillTime) noexcept
+bool Stream::decodeNextBlock(int64_t flushTillTime) noexcept
 {
     // TODO: If we are using async decode then this needs to just return if a decode is already running
 
@@ -664,6 +667,7 @@ bool Stream::decodeNextBlock(const int64_t flushTillTime) noexcept
     do {
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
         auto ret = av_read_frame(m_formatContext.get(), &packet);
+        bool sentPacket = false;
         if (ret < 0) {
             if (ret != AVERROR_EOF) {
                 av_packet_unref(&packet);
@@ -673,20 +677,34 @@ bool Stream::decodeNextBlock(const int64_t flushTillTime) noexcept
             eof = true;
             // Send flush packet to decoder
             avcodec_send_packet(m_codecContext.get(), nullptr);
+            sentPacket = true;
         } else if (m_index == packet.stream_index) {
             // Convert timebase
             av_packet_rescale_ts(&packet, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
             ret = avcodec_send_packet(m_codecContext.get(), &packet);
-            if (ret < 0) {
-                log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
-                return false;
+            while (ret < 0) {
+                if (ret == AVERROR_EOF) {
+                    avcodec_flush_buffers(m_codecContext.get());
+                    ret = avcodec_send_packet(m_codecContext.get(), &packet);
+                } else if (ret == AVERROR(EAGAIN)) {
+                    if (!decodeNextFrames(flushTillTime)) {
+                        return false;
+                    }
+                    ret = avcodec_send_packet(m_codecContext.get(), &packet);
+                } else {
+                    log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                    return false;
+                }
             }
+            sentPacket = true;
         }
         av_packet_unref(&packet);
 
-        // Decode any pending frames
-        if (!decodeNextFrames(flushTillTime)) {
-            return false;
+        if (sentPacket) {
+            // Decode any pending frames
+            if (!decodeNextFrames(flushTillTime)) {
+                return false;
+            }
         }
 
         // TODO: The maximum number of frames that are needed to get a valid frame is calculated using getCodecDelay().
@@ -710,7 +728,7 @@ bool Stream::decodeNextBlock(const int64_t flushTillTime) noexcept
     return true;
 }
 
-bool Stream::decodeNextFrames(const int64_t flushTillTime) noexcept
+bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
 {
     // Loop through and retrieve all decoded frames
     do {
@@ -770,30 +788,53 @@ bool Stream::decodeNextFrames(const int64_t flushTillTime) noexcept
         }
 
         // Store last decoded time stamp
-        const auto previousDecodedTimeStamp = m_lastDecodedTimeStamp;
+        auto previousDecodedTimeStamp = m_lastDecodedTimeStamp;
         m_lastDecodedTimeStamp = offsetTimeStamp;
 
-        if (flushTillTime >= 0 && flushTillTime > m_lastDecodedTimeStamp) {
+        if (flushTillTime >= 0) {
+            const auto singleFrame = frameToTimeStamp2(1);
+            const auto doubleTime =
+                offsetTimeStamp * 2; // Use double in cases where singleFrame cannot be halved without losses
+            const auto doubleFlush = flushTillTime * 2;
+            if (doubleFlush <= (doubleTime - singleFrame) || doubleFlush > (doubleTime + singleFrame)) {
+                if (previousDecodedTimeStamp < flushTillTime && offsetTimeStamp > flushTillTime) {
+                    // This requires a duplicate frame
+                    previousDecodedTimeStamp = flushTillTime - singleFrame;
+                } else {
+                    // Dump this frame and continue
+                    av_frame_unref(*m_tempFrame);
+                    continue;
+                }
+            } else {
+                // Prevent duplicating frames if this is the first valid frame that is being used after a flush
+                previousDecodedTimeStamp = -1;
+            }
+            flushTillTime = -1;
+        } else if (offsetTimeStamp < previousDecodedTimeStamp ||
+            (m_lastValidTimeStamp != -1 && offsetTimeStamp <= m_lastValidTimeStamp)) {
             // Dump this frame and continue
             av_frame_unref(*m_tempFrame);
             continue;
         }
 
+        m_lastValidTimeStamp = offsetTimeStamp;
         auto timeStamp = timeStampToTime2(offsetTimeStamp);
         auto frameNum = timeStampToFrame2(offsetTimeStamp);
 
         // Check if we have skipped a frame
-        const auto previous = timeStampToFrame2(previousDecodedTimeStamp);
-        if (frameNum != previous + 1 && previousDecodedTimeStamp != -1) {
-            // Fill in missing frames by duplicating the old one
-            auto fillFrameNum = previous;
-            int64_t fillTimeStamp;
-            for (auto i = previous + 1; i < frameNum; i++) {
-                ++fillFrameNum;
-                fillTimeStamp = frameToTime2(fillFrameNum);
-                FramePtr frameClone(av_frame_clone(*m_tempFrame));
-                m_bufferPong.emplace_back(
-                    make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum, m_formatContext, m_codecContext));
+        if (previousDecodedTimeStamp != -1) {
+            const auto previous = timeStampToFrame2(previousDecodedTimeStamp);
+            if (frameNum != previous + 1) {
+                // Fill in missing frames by duplicating the old one
+                auto fillFrameNum = previous;
+                int64_t fillTimeStamp;
+                for (auto i = previous + 1; i < frameNum; i++) {
+                    ++fillFrameNum;
+                    fillTimeStamp = frameToTime2(fillFrameNum);
+                    FramePtr frameClone(av_frame_clone(*m_tempFrame));
+                    m_bufferPong.emplace_back(
+                        make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum, m_formatContext, m_codecContext));
+                }
             }
         }
 

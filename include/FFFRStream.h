@@ -243,6 +243,7 @@ private:
 
     int64_t m_startTimeStamp = 0;        /**< PTS of the first frame in the stream time base */
     int64_t m_lastDecodedTimeStamp = -1; /**< The decoder time stamp of the last decoded frame */
+    int64_t m_lastValidTimeStamp = -1;   /**< The decoder time stamp of the last valid stored frame */
     bool m_frameSeekSupported = true;    /**< True if frame seek supported */
     int64_t m_totalFrames = 0;           /**< Stream video duration in frames */
     int64_t m_totalDuration = 0;         /**< Stream video duration in microseconds (AV_TIME_BASE) */
@@ -363,10 +364,10 @@ private:
 
     /**
      * Decodes any frames currently pending in the decoder.
-     * @param flushTillTime (Optional) All frames with decoder time stamps before this will be discarded.
+     * @param flushTillTime All frames with decoder time stamps before this will be discarded.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool decodeNextFrames(int64_t flushTillTime = -1) noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool decodeNextFrames(int64_t& flushTillTime) noexcept;
 
     /**
      * Pops the next available frame from the buffer.
