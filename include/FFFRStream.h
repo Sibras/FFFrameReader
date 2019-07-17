@@ -244,6 +244,7 @@ private:
     int64_t m_startTimeStamp = 0;        /**< PTS of the first frame in the stream time base */
     int64_t m_lastDecodedTimeStamp = -1; /**< The decoder time stamp of the last decoded frame */
     int64_t m_lastValidTimeStamp = -1;   /**< The decoder time stamp of the last valid stored frame */
+    int64_t m_lastPacketTimeStamp = -1;  /**< The demuxer time stamp of the last retrieved packet */
     bool m_frameSeekSupported = true;    /**< True if frame seek supported */
     int64_t m_totalFrames = 0;           /**< Stream video duration in frames */
     int64_t m_totalDuration = 0;         /**< Stream video duration in microseconds (AV_TIME_BASE) */

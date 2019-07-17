@@ -486,9 +486,6 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     }
 
     // Seek to desired timestamp
-    avcodec_flush_buffers(m_codecContext.get());
-    m_lastDecodedTimeStamp = -1;
-    m_lastValidTimeStamp = -1;
     const auto localTimeStamp = timeToTimeStamp(timeStamp);
     const auto err = avformat_seek_file(m_formatContext.get(), m_index,
         localTimeStamp - timeStamp2ToTimeStamp(m_seekThreshold), localTimeStamp, localTimeStamp, 0);
@@ -552,9 +549,6 @@ bool Stream::seekFrame(const int64_t frame) noexcept
         return seek(frameToTime(frame));
     }
     // Seek to desired timestamp
-    avcodec_flush_buffers(m_codecContext.get());
-    m_lastDecodedTimeStamp = -1;
-    m_lastValidTimeStamp = -1;
     const auto frameInternal = frame + timeStampToFrameNoOffset(m_startTimeStamp);
     const auto err = avformat_seek_file(m_formatContext.get(), m_index,
         frameInternal - timeStampToFrame2(m_seekThreshold), frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
@@ -666,6 +660,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime) noexcept
     AVPacket packet;
     av_init_packet(&packet);
     bool eof = false;
+    bool seeking = flushTillTime != -1;
     do {
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
         auto ret = av_read_frame(m_formatContext.get(), &packet);
@@ -681,6 +676,29 @@ bool Stream::decodeNextBlock(int64_t flushTillTime) noexcept
             avcodec_send_packet(m_codecContext.get(), nullptr);
             sentPacket = true;
         } else if (m_index == packet.stream_index) {
+            if (seeking) {
+                seeking = false;
+                // Check if a seek went backwards when it should have gone forward
+                auto packetTimeStamp = packet.dts != AV_NOPTS_VALUE ? packet.dts : packet.pts;
+                if (flushTillTime > m_lastDecodedTimeStamp && m_lastPacketTimeStamp > packetTimeStamp) {
+                    while (m_lastPacketTimeStamp > packetTimeStamp || m_index != packet.stream_index) {
+                        av_packet_unref(&packet);
+                        ret = av_read_frame(m_formatContext.get(), &packet);
+                        if (ret < 0) {
+                            av_packet_unref(&packet);
+                            log("Failed to retrieve new frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                            return false;
+                        }
+                        packetTimeStamp = packet.dts != AV_NOPTS_VALUE ? packet.dts : packet.pts;
+                    }
+                    av_packet_unref(&packet);
+                    continue;
+                }
+                avcodec_flush_buffers(m_codecContext.get());
+                m_lastValidTimeStamp = -1;
+                m_lastDecodedTimeStamp = -1;
+            }
+            m_lastPacketTimeStamp = packet.dts != AV_NOPTS_VALUE ? packet.dts : packet.pts;
             // Convert timebase
             av_packet_rescale_ts(&packet, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
             ret = avcodec_send_packet(m_codecContext.get(), &packet);
