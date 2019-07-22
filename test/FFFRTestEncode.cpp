@@ -29,24 +29,25 @@ struct TestParamsEncode
     uint8_t m_quality;
     EncoderOptions::Preset m_preset;
     bool m_useFiltering;
+    bool m_useGOP;
 };
 
 static std::vector<TestParamsEncode> g_testDataEncode = {
-    {1, "test01.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast, false},
-    {1, "test02.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast, false},
-    {1, "test03.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false},
-    {1, "test04.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false},
-    {1, "test05.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true},
-    {2, "test06.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast, false},
-    {2, "test07.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast, false},
-    {2, "test08.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false},
-    {2, "test09.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false},
-    {2, "test10.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true},
-    {3, "test11.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast, false},
-    {3, "test12.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast, false},
-    {3, "test13.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false},
-    {3, "test14.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false},
-    {3, "test15.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true},
+    {1, "test01.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast, false, false},
+    {1, "test02.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast, false, false},
+    {1, "test03.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false, false},
+    {1, "test04.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false, false},
+    {1, "test05.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true, true},
+    {2, "test06.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast, false, false},
+    {2, "test07.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast, false, false},
+    {2, "test08.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false, false},
+    {2, "test09.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false, false},
+    {2, "test10.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, true, true},
+    {3, "test11.mp4", EncodeType::h264, 125, EncoderOptions::Preset::Ultrafast, false, false},
+    {3, "test12.mp4", EncodeType::h265, 125, EncoderOptions::Preset::Ultrafast, false, false},
+    {3, "test13.mp4", EncodeType::h264, 55, EncoderOptions::Preset::Veryfast, false, false},
+    {3, "test14.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, false, false},
+    {3, "test15.mp4", EncodeType::h265, 55, EncoderOptions::Preset::Veryfast, true, true},
 };
 
 class TestEncoder
@@ -97,6 +98,9 @@ TEST_P(EncodeTest1, encodeStream)
     options2.m_type = GetParam().m_encodeType;
     options2.m_quality = GetParam().m_quality;
     options2.m_preset = GetParam().m_preset;
+    if (GetParam().m_useGOP) {
+        options2.m_gopSize = 3;
+    }
 
     // Just run an encode and see if output is correct manually
     ASSERT_TRUE(Encoder::encodeStream(GetParam().m_fileName, m_decoder.m_stream, options2));

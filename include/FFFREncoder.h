@@ -60,13 +60,14 @@ public:
      * @param format      Describes the format to use.
      * @param frameRate   The frame rate.
      * @param duration    The duration of the output encode.
-     * @param codecType Type of the codec to encode with.
-     * @param quality   The encode quality.
-     * @param preset    The encode preset.
+     * @param codecType   Type of the codec to encode with.
+     * @param quality     The encode quality.
+     * @param preset      The encode preset.
+     * @param gopSize     Size of the gop.
      */
     FFFRAMEREADER_NO_EXPORT Encoder(const std::string& fileName, uint32_t width, uint32_t height, Rational aspect,
         PixelFormat format, Rational frameRate, int64_t duration, EncodeType codecType, uint8_t quality,
-        EncoderOptions::Preset preset, ConstructorLock) noexcept;
+        EncoderOptions::Preset preset, uint32_t gopSize, ConstructorLock) noexcept;
 
     /**
      * Query if this object is valid.

@@ -94,7 +94,7 @@ bool Encoder::encodeStream(
         getRational(StreamUtils::getFrameRate(stream.get())),
         stream->getDuration() -
             (stream->m_lastDecodedTimeStamp >= 0 ? stream->timeStampToTime(stream->m_lastDecodedTimeStamp) : 0),
-        options.m_type, options.m_quality, options.m_preset, ConstructorLock());
+        options.m_type, options.m_quality, options.m_preset, options.m_gopSize, ConstructorLock());
     if (!encoder->isEncoderValid()) {
         // Encoder creation failed
         return false;
@@ -104,7 +104,7 @@ bool Encoder::encodeStream(
 
 Encoder::Encoder(const std::string& fileName, const uint32_t width, const uint32_t height, const Rational aspect,
     const PixelFormat format, const Rational frameRate, const int64_t duration, const EncodeType codecType,
-    const uint8_t quality, const EncoderOptions::Preset preset, ConstructorLock) noexcept
+    const uint8_t quality, const EncoderOptions::Preset preset, const uint32_t gopSize, ConstructorLock) noexcept
 {
     AVFormatContext* formatPtr = nullptr;
     auto ret = avformat_alloc_output_context2(&formatPtr, nullptr, nullptr, fileName.c_str());
@@ -154,12 +154,31 @@ Encoder::Encoder(const std::string& fileName, const uint32_t width, const uint32
     av_dict_set(&opts, "crf", to_string(encoderCRF).c_str(), 0);
     av_dict_set(&opts, "preset", getPresetString(preset).c_str(), 0);
 
+    // Setup gop size
+    if (gopSize != 0) {
+        tempCodec->gop_size = gopSize;
+        tempCodec->keyint_min = gopSize;
+        string codecOpts;
+        if (codecType == EncodeType::h264) {
+            codecOpts = "x264opts";
+        } else if (codecType == EncodeType::h265) {
+            codecOpts = "x265-params";
+        }
+        if (!codecOpts.empty()) {
+            const string keyInt = to_string(gopSize);
+            const string settings = ("keyint="s += keyInt) += ":min-keyint="s += keyInt;
+            av_dict_set(&opts, codecOpts.c_str(), settings.c_str(), 0);
+        }
+    }
+
     // Open the encoder
     ret = avcodec_open2(tempCodec.get(), encoder, &opts);
     if (ret < 0) {
         log("Failed opening video encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
         return;
     }
+    char* buffer;
+    av_dict_get_string(opts, &buffer, '-', ':');
     ret = avcodec_parameters_from_context(outStream->codecpar, tempCodec.get());
     if (ret < 0) {
         log("Failed copying parameters to encoder context: "s += getFfmpegErrorString(ret), LogLevel::Error);
