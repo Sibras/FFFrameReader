@@ -23,7 +23,7 @@ class Encoder
     friend class Fmc::MultiCrop;
 
 public:
-    FFFRAMEREADER_EXPORT Encoder() = delete;
+    FFFRAMEREADER_NO_EXPORT Encoder() = delete;
 
     FFFRAMEREADER_EXPORT ~Encoder() = default;
 

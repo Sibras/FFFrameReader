@@ -230,10 +230,7 @@ bool Encoder::encodeStream(const std::shared_ptr<Stream>& stream) const noexcept
             if (!stream->isEndOfFile()) {
                 return false;
             }
-            if (!encodeFrame(frame)) {
-                return false;
-            }
-            return true;
+            return encodeFrame(frame);
         }
         if (!encodeFrame(frame)) {
             return false;
