@@ -45,16 +45,16 @@ if(MSVC)
 endif()
 
 # Shared/Dynamic or Static library?
-option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
+option(FFFR_BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
 
 # Build test related programs?
-option(BUILD_TESTING "Create test programs" OFF)
+option(FFFR_BUILD_TESTING "Create test programs" OFF)
 
 # Build with nppi library? This requires cuda 10.1 or better
-option(BUILD_NPPI "Build using NVIDIA libnnpi format conversion" ON)
+option(FFFR_BUILD_NPPI "Build using NVIDIA libnnpi format conversion" ON)
 
 # Build benchmarking programs?
-option(BUILD_BENCHMARKING "Create benchmark programs" OFF)
+option(FFFR_BUILD_BENCHMARKING "Create benchmark programs" OFF)
 
 # Default to a release build if desired configuration is not specified.
 if(NOT CMAKE_CONFIGURATION_TYPES)
@@ -152,7 +152,7 @@ add_custom_command(
 configure_file(include/config.h.in config.h @ONLY)
 
 # Add source to this project's executable.
-if(BUILD_SHARED_LIBS)
+if(FFFR_BUILD_SHARED_LIBS)
     add_library(FfFrameReader
         SHARED
         ${FFFR_SOURCES}
@@ -171,8 +171,6 @@ set_target_properties(FfFrameReader PROPERTIES
     SOVERSION 0
     VERSION ${PROJECT_VERSION}
     PUBLIC_HEADER "${FFFR_HEADERS}"
-    CUDA_SEPARABLE_COMPILATION ON
-    CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
 
 if(BUILD_IPO)
@@ -204,10 +202,6 @@ find_library(AVFILTER_LIBRARY NAMES avfilter)
 
 find_path(AVUTIL_INCLUDE_DIR NAMES libavutil/avutil.h)
 find_library(AVUTIL_LIBRARY NAMES avutil)
-
-find_library(SWSCALE_LIBRARY NAMES swscale)
-find_library(POSTPROC_LIBRARY NAMES postproc)
-find_library(SWRESAMPLE_LIBRARY NAMES swresample)
 
 target_include_directories(FfFrameReader PRIVATE
     ${PROJECT_SOURCE_DIR}/include
@@ -245,7 +239,7 @@ install(TARGETS FfFrameReader
 )
 
 # Add tests
-if(BUILD_TESTING)
+if(FFFR_BUILD_TESTING)
     enable_testing()
     find_package(GTest REQUIRED)
     include(GoogleTest)
@@ -292,7 +286,7 @@ if(BUILD_TESTING)
 endif()
 
 # Add becnhmarks
-if(BUILD_BENCHMARKING)
+if(FFFR_BUILD_BENCHMARKING)
     find_package(benchmark REQUIRED)
 
     set(FFFR_BENCHMARK_SOURCES

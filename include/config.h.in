@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#cmakedefine01 BUILD_SHARED_LIBS
+#cmakedefine01 FFFR_BUILD_SHARED_LIBS
 
-#cmakedefine01 BUILD_TESTING
+#cmakedefine01 FFFR_BUILD_TESTING
 
-#cmakedefine01 BUILD_NPPI
+#cmakedefine01 FFFR_BUILD_NPPI
