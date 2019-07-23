@@ -276,6 +276,7 @@ if(FFFR_BUILD_TESTING)
     set_target_properties(
         FFFRTest PROPERTIES
         EXCLUDE_FROM_ALL true
+        VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/test"
     )
 
     add_dependencies(FFFRTest FfFrameReader)
@@ -285,7 +286,7 @@ if(FFFR_BUILD_TESTING)
     )
 endif()
 
-# Add becnhmarks
+# Add benchmarks
 if(FFFR_BUILD_BENCHMARKING)
     find_package(benchmark REQUIRED)
 
@@ -313,13 +314,53 @@ if(FFFR_BUILD_BENCHMARKING)
     set_target_properties(
         FFFRBenchmark PROPERTIES
         EXCLUDE_FROM_ALL true
+        VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/test"
     )
 
     if(BUILD_IPO)
-    set_target_properties(FFFRBenchmark PROPERTIES
-        INTERPROCEDURAL_OPTIMIZATION TRUE
+        set_target_properties(FFFRBenchmark PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION TRUE
     )
     endif()
 
     add_dependencies(FFFRBenchmark FfFrameReader)
+endif()
+
+# Download video files used for testing and benchmarking
+if(FFFR_BUILD_TESTING OR FFFR_BUILD_BENCHMARKING)
+    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/test/data/bbb_sunflower_1080p_30fps_normal.mp4")
+        file(DOWNLOAD http://distribution.bbb3d.renderfarming.net/video/mp4/bbb_sunflower_1080p_30fps_normal.mp4
+            "${PROJECT_SOURCE_DIR}/test/data/bbb_sunflower_1080p_30fps_normal.mp4"
+            INACTIVITY_TIMEOUT 15
+            SHOW_PROGRESS
+        )
+    endif()
+    
+    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/test/data/tvl_missing_pts.avi")
+        file(DOWNLOAD https://cloudstor.aarnet.edu.au/plus/s/MFGSPUiEyHMi8cB/download
+            "${PROJECT_SOURCE_DIR}/test/data/tvl_missing_pts.avi"
+            INACTIVITY_TIMEOUT 15
+            SHOW_PROGRESS
+            TLS_VERIFY ON
+        )
+    endif()
+    
+    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/test/data/board_game-h264.mkv")
+        file(DOWNLOAD https://github.com/anibali/tvl/raw/master/data/board_game-h264.mkv
+            "${PROJECT_SOURCE_DIR}/test/data/board_game-h264.mkv"
+            INACTIVITY_TIMEOUT 15
+            SHOW_PROGRESS
+            TLS_VERIFY ON
+        )
+    endif()
+    
+    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/test/data/board_game-h264-cropped.mkv")
+        file(DOWNLOAD https://github.com/anibali/tvl/raw/master/data/board_game-h264-cropped.mkv
+            "${PROJECT_SOURCE_DIR}/test/data/board_game-h264-cropped.mkv"
+            INACTIVITY_TIMEOUT 15
+            SHOW_PROGRESS
+            TLS_VERIFY ON
+        )
+    endif()
+    
 endif()
