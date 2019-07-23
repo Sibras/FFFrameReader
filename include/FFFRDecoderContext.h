@@ -64,10 +64,10 @@ private:
 
         FFFRAMEREADER_NO_EXPORT AVBufferRef* operator->() const noexcept;
 
-        FFFRAMEREADER_NO_EXPORT std::shared_ptr<AVBufferRef> m_deviceContext = nullptr;
+        std::shared_ptr<AVBufferRef> m_deviceContext = nullptr;
     };
 
-    FFFRAMEREADER_NO_EXPORT DeviceContextPtr m_deviceContext = DeviceContextPtr(nullptr);
+    DeviceContextPtr m_deviceContext = DeviceContextPtr(nullptr);
 
     friend const DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept;
 
