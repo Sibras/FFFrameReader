@@ -152,7 +152,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
             return;
         }
         // Enable extra hardware frames to ensure we don't run out of buffers
-        const auto extraFrames = std::max(getCodecDelay(tempCodec), static_cast<int32_t>(bufferLength));
+        const auto extraFrames = std::max(std::max(getCodecDelay(tempCodec), static_cast<int32_t>(bufferLength)), 10);
         tempCodec->extra_hw_frames = extraFrames;
         if (decoderContext->getType() == DecodeType::Cuda && (cropRequired || scaleRequired)) {
             // Use internal cuvid filtering capabilities
