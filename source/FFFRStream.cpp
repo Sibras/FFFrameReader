@@ -437,7 +437,7 @@ vector<std::shared_ptr<Frame>> Stream::getFramesByIndex(const vector<int64_t>& f
 
 bool Stream::isEndOfFile() const noexcept
 {
-    return timeStampToFrame2(m_lastDecodedTimeStamp) + 1 == getTotalFrames();
+    return timeStampToFrame2(m_lastDecodedTimeStamp) + 1 >= getTotalFrames();
 }
 
 bool Stream::seek(const int64_t timeStamp) noexcept
