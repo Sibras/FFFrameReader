@@ -361,9 +361,11 @@ private:
     /**
      * Decodes the next block of frames into the pong buffer. Once complete swaps the ping/pong buffers.
      * @param flushTillTime (Optional) All frames with decoder time stamps before this will be discarded.
+     * @param seeking       (Optional) True if called directly after seeking.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool decodeNextBlock(int64_t flushTillTime = -1) noexcept;
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool decodeNextBlock(
+        int64_t flushTillTime = -1, bool seeking = false) noexcept;
 
     /**
      * Decodes any frames currently pending in the decoder.

@@ -498,7 +498,7 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     }
 
     // Decode the next block of frames
-    return decodeNextBlock(timeStamp2);
+    return decodeNextBlock(timeStamp2, true);
 }
 
 bool Stream::seekFrame(const int64_t frame) noexcept
@@ -561,7 +561,7 @@ bool Stream::seekFrame(const int64_t frame) noexcept
     }
 
     // Decode the next block of frames
-    return decodeNextBlock(timeStamp2);
+    return decodeNextBlock(timeStamp2, true);
 }
 
 int64_t Stream::frameToTime(const int64_t frame) const noexcept
@@ -650,7 +650,7 @@ int64_t Stream::timeStamp2ToTimeStamp(const int64_t timeStamp) const noexcept
     return av_rescale_q(timeStamp, m_codecContext->time_base, m_formatContext->streams[m_index]->time_base);
 }
 
-bool Stream::decodeNextBlock(int64_t flushTillTime) noexcept
+bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
 {
     // TODO: If we are using async decode then this needs to just return if a decode is already running
 
@@ -662,7 +662,6 @@ bool Stream::decodeNextBlock(int64_t flushTillTime) noexcept
     AVPacket packet;
     av_init_packet(&packet);
     bool eof = false;
-    bool seeking = flushTillTime != -1;
     do {
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
         auto ret = av_read_frame(m_formatContext.get(), &packet);
