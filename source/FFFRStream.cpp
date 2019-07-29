@@ -894,56 +894,71 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
                     ++fillFrameNum;
                     fillTimeStamp = frameToTime2(fillFrameNum);
                     FramePtr frameClone(av_frame_clone(*m_tempFrame));
-                    m_bufferPong.emplace_back(
-                        make_shared<Frame>(frameClone, fillTimeStamp, fillFrameNum, m_formatContext, m_codecContext));
+                    // Perform any required filtering
+                    if (!processFrame(frameClone)) {
+                        return false;
+                    }
+                    if (frameClone->height != 0) {
+                        m_bufferPong.emplace_back(make_shared<Frame>(
+                            frameClone, fillTimeStamp, fillFrameNum, m_formatContext, m_codecContext));
+                    }
                 }
             }
         }
 
         // Perform any required filtering
-        if (m_filterGraph != nullptr) {
-            // Update internal timestamps to ensure they are valid
-            m_tempFrame->best_effort_timestamp = offsetTimeStamp;
-            m_tempFrame->pts = m_tempFrame->best_effort_timestamp;
-            StreamUtils::rescale(
-                m_tempFrame, m_codecContext->time_base, av_buffersink_get_time_base(m_filterGraph->m_sink));
-            if (!m_filterGraph->sendFrame(m_tempFrame)) {
-                av_frame_unref(*m_tempFrame);
-                return false;
-            }
-            if (!m_filterGraph->receiveFrame(m_tempFrame)) {
-                av_frame_unref(*m_tempFrame);
-                return false;
-            }
-            // Check if we actually got a new frame or we need to continue
-            if (m_tempFrame->height == 0) {
-                continue;
-            }
+        if (!processFrame(m_tempFrame)) {
+            return false;
         }
 
-        // Check type of memory pointer requested and perform a memory move
-        if (m_outputHost) {
-            // TODO: need some sort of buffer pool
-            FramePtr frame2(av_frame_alloc());
-            if (*frame2 == nullptr) {
-                av_frame_unref(*m_tempFrame);
-                log("Failed to allocate new host frame"s, LogLevel::Error);
-                return false;
-            }
-            const auto ret2 = av_hwframe_transfer_data(*frame2, *m_tempFrame, 0);
-            av_frame_unref(*m_tempFrame);
-            if (ret2 < 0) {
-                av_frame_unref(*frame2);
-                log("Failed to copy frame to host: "s += getFfmpegErrorString(ret), LogLevel::Error);
-                return false;
-            }
-            m_tempFrame = move(frame2);
+        if (m_tempFrame->height != 0) {
+            // Add the new frame to the pong buffer
+            m_bufferPong.emplace_back(
+                make_shared<Frame>(m_tempFrame, timeStamp, frameNum, m_formatContext, m_codecContext));
         }
-
-        // Add the new frame to the pong buffer
-        m_bufferPong.emplace_back(
-            make_shared<Frame>(m_tempFrame, timeStamp, frameNum, m_formatContext, m_codecContext));
     } while (m_bufferPong.size() < m_bufferLength);
+    return true;
+}
+
+bool Stream::processFrame(FramePtr& frame) const noexcept
+{
+    if (m_filterGraph != nullptr) {
+        // Update internal timestamps to ensure they are valid
+        frame->best_effort_timestamp = m_lastValidTimeStamp;
+        frame->pts = frame->best_effort_timestamp;
+        StreamUtils::rescale(frame, m_codecContext->time_base, av_buffersink_get_time_base(m_filterGraph->m_sink));
+        if (!m_filterGraph->sendFrame(frame)) {
+            av_frame_unref(*frame);
+            return false;
+        }
+        if (!m_filterGraph->receiveFrame(frame)) {
+            av_frame_unref(*frame);
+            return false;
+        }
+        // Check if we actually got a new frame or we need to continue
+        if (frame->height == 0) {
+            return true;
+        }
+    }
+
+    // Check type of memory pointer requested and perform a memory move
+    if (m_outputHost) {
+        // TODO: need some sort of buffer pool
+        FramePtr frame2(av_frame_alloc());
+        if (*frame2 == nullptr) {
+            av_frame_unref(*frame);
+            log("Failed to allocate new host frame"s, LogLevel::Error);
+            return false;
+        }
+        const auto ret2 = av_hwframe_transfer_data(*frame2, *frame, 0);
+        av_frame_unref(*frame);
+        if (ret2 < 0) {
+            av_frame_unref(*frame2);
+            log("Failed to copy frame to host: "s += getFfmpegErrorString(ret2), LogLevel::Error);
+            return false;
+        }
+        frame = move(frame2);
+    }
     return true;
 }
 

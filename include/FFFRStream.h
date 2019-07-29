@@ -379,6 +379,13 @@ private:
     [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool decodeNextFrames(int64_t& flushTillTime) noexcept;
 
     /**
+     * Process a frame with any required additional filtering/conversion.
+     * @param [in,out] frame The frame.
+     * @returns True if it succeeds, false if it fails.
+     */
+    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool processFrame(FramePtr& frame) const noexcept;
+
+    /**
      * Pops the next available frame from the buffer.
      * @note This requires that peekNextFrame() be called first to ensure there is a valid frame to pop.
      */
