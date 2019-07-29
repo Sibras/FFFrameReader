@@ -106,8 +106,7 @@ public:
                                     performed after cropping. */
     PixelFormat m_format = PixelFormat::Auto; /**< The required output pixel format (auto to keep format the same). */
     uint32_t m_bufferLength = 10;             /**< Number of frames in the the decode buffer.
-                                              This should be optimised based on reading/seeking pattern so as to minimise frame
-                                              storage requirements but also maximise decode throughput. */
+                                              This also controls the maximum number of frames that can be allocated at a time. */
     uint32_t m_seekThreshold = 0;             /**< Maximum number of frames for a forward seek to continue
                                               to decode instead of seeking. This should be optimised based on a sources
                                               key frame interval so that forward decoding is used when it provides faster seeks. A

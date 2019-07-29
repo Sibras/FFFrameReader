@@ -152,8 +152,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
             return;
         }
         // Enable extra hardware frames to ensure we don't run out of buffers
-        const auto extraFrames = std::max(std::max(getCodecDelay(tempCodec), static_cast<int32_t>(bufferLength)), 10);
-        tempCodec->extra_hw_frames = extraFrames;
+        tempCodec->extra_hw_frames = static_cast<int32_t>(bufferLength + 1);
         if (decoderContext->getType() == DecodeType::Cuda && (cropRequired || scaleRequired)) {
             // Use internal cuvid filtering capabilities
             if (scaleRequired) {
@@ -167,7 +166,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
                 av_dict_set(&opts, "crop", cropString.c_str(), 0);
                 cropRequired = false;
             }
-            const uint32_t surfaces = std::max(extraFrames, 25);
+            const uint32_t surfaces = std::max(getCodecDelay(tempCodec), tempCodec->extra_hw_frames) + 3;
             const string surfacesString = to_string(surfaces);
             av_dict_set(&opts, "surfaces", surfacesString.c_str(), 0);
         }
@@ -403,9 +402,28 @@ vector<std::shared_ptr<Frame>> Stream::getFrames(const vector<int64_t>& frameSeq
 {
     lock_guard<recursive_mutex> lock(m_mutex);
     vector<shared_ptr<Frame>> ret;
-    for (const auto& i : frameSequence) {
+    const auto bufferBackup = m_bufferLength;
+    for (auto i = frameSequence.cbegin(); i < frameSequence.cend(); ++i) {
+        // Max number of frames that can be reliable held at any point in time is equal to buffer length
+        if (ret.size() >= bufferBackup) {
+            break;
+        }
+        if (m_bufferPingHead >= m_bufferPing.size()) {
+            // Set buffer length based on remaining frames
+            int64_t maxFound = *i;
+            for (auto j = i + 1; j < frameSequence.cend(); ++j) {
+                const auto range = timeToFrame(*j - *i);
+                if (range < m_seekThreshold &&
+                    range < static_cast<int64_t>(bufferBackup) - static_cast<int64_t>(ret.size())) {
+                    maxFound = *j;
+                } else {
+                    break;
+                }
+            }
+            m_bufferLength = std::max(static_cast<uint32_t>(timeToFrame(maxFound - *i)), uint32_t{1});
+        }
         // Use seek function as that will determine if seek or just a forward decode is needed
-        if (!seek(i)) {
+        if (!seek(*i)) {
             break;
         }
         auto frame = getNextFrame();
@@ -414,6 +432,7 @@ vector<std::shared_ptr<Frame>> Stream::getFrames(const vector<int64_t>& frameSeq
         }
         ret.emplace_back(move(frame));
     }
+    m_bufferLength = bufferBackup;
     return ret;
 }
 
@@ -421,9 +440,28 @@ vector<std::shared_ptr<Frame>> Stream::getFramesByIndex(const vector<int64_t>& f
 {
     lock_guard<recursive_mutex> lock(m_mutex);
     vector<shared_ptr<Frame>> ret;
-    for (const auto& i : frameSequence) {
+    const auto bufferBackup = m_bufferLength;
+    for (auto i = frameSequence.cbegin(); i < frameSequence.cend(); ++i) {
+        // Max number of frames that can be reliable held at any point in time is equal to buffer length
+        if (ret.size() >= bufferBackup) {
+            break;
+        }
+        if (m_bufferPingHead >= m_bufferPing.size()) {
+            // Set buffer length based on remaining frames
+            int64_t maxFound = *i;
+            for (auto j = i + 1; j < frameSequence.cend(); ++j) {
+                const auto range = *j - *i;
+                if (range < m_seekThreshold &&
+                    range < static_cast<int64_t>(bufferBackup) - static_cast<int64_t>(ret.size())) {
+                    maxFound = *j;
+                } else {
+                    break;
+                }
+            }
+            m_bufferLength = std::max(static_cast<uint32_t>(timeToFrame(maxFound - *i)), uint32_t{1});
+        }
         // Use seek function as that will determine if seek or just a forward decode is needed
-        if (!seekFrame(i)) {
+        if (!seekFrame(*i)) {
             break;
         }
         auto frame = getNextFrame();
@@ -432,6 +470,7 @@ vector<std::shared_ptr<Frame>> Stream::getFramesByIndex(const vector<int64_t>& f
         }
         ret.emplace_back(move(frame));
     }
+    m_bufferLength = bufferBackup;
     return ret;
 }
 

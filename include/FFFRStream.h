@@ -151,7 +151,8 @@ public:
      *  retrieve. e.g. A sequence value of {0, 3000, 6000} will get the next frame as well as the the frame 3000us
      *  after this and then the frame 3000us after that.
      * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
-     * retrieved before the error are returned.
+     * retrieved before the error are returned. It is only guaranteed that at most @DecoderOptions::m_bufferLength
+     * frames can be returned from a single call to this function.
      */
     [[nodiscard]] FFFRAMEREADER_EXPORT std::vector<std::shared_ptr<Frame>> getNextFrames(
         const std::vector<int64_t>& frameSequence) noexcept;
@@ -162,7 +163,8 @@ public:
      *  retrieve. e.g. A sequence value of {0, 3, 6} will get the next frame as well as the 3rd frame after this and
      *  then the third frame after that.
      * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
-     * retrieved before the error are returned.
+     * retrieved before the error are returned. It is only guaranteed that at most @DecoderOptions::m_bufferLength
+     * frames can be returned from a single call to this function.
      */
     [[nodiscard]] FFFRAMEREADER_EXPORT std::vector<std::shared_ptr<Frame>> getNextFramesByIndex(
         const std::vector<int64_t>& frameSequence) noexcept;
@@ -173,7 +175,8 @@ public:
      *  retrieve. e.g. A sequence value of {0, 3000, 6000} will get the first frame as well as the the frame 3000us
      *  after this and then the frame 3000us after that.
      * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
-     * retrieved before the error are returned.
+     * retrieved before the error are returned. It is only guaranteed that at most @DecoderOptions::m_bufferLength
+     * frames can be returned from a single call to this function.
      */
     [[nodiscard]] FFFRAMEREADER_EXPORT std::vector<std::shared_ptr<Frame>> getFrames(
         const std::vector<int64_t>& frameSequence) noexcept;
@@ -184,7 +187,8 @@ public:
      *  retrieve. e.g. A sequence value of {0, 3, 6} will get the first frame as well as the 3rd frame and then the
      *  third frame after that.
      * @returns A list of frames corresponding to the input sequence, if an error occurred then only the frames
-     * retrieved before the error are returned.
+     * retrieved before the error are returned. It is only guaranteed that at most @DecoderOptions::m_bufferLength
+     * frames can be returned from a single call to this function.
      */
     [[nodiscard]] FFFRAMEREADER_EXPORT std::vector<std::shared_ptr<Frame>> getFramesByIndex(
         const std::vector<int64_t>& frameSequence) noexcept;

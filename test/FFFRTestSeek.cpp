@@ -44,7 +44,7 @@ protected:
         DecoderOptions options;
         options.m_bufferLength = std::get<0>(GetParam()).m_bufferLength;
         options.m_noBufferFlush = std::get<0>(GetParam()).m_noBufferFlush;
-        m_stream = Stream::getStream(std::get<1>(GetParam()).m_fileName);
+        m_stream = Stream::getStream(std::get<1>(GetParam()).m_fileName, options);
         ASSERT_NE(m_stream, nullptr);
     }
 
@@ -193,7 +193,7 @@ TEST_P(SeekTest1, getNextFramesSeek)
         timesList1.emplace_back(time2);
     }
     const auto frames1 = m_stream->getNextFrames(timesList1);
-    ASSERT_EQ(frames1.size(), timesList1.size());
+    ASSERT_EQ(frames1.size(), std::min(timesList1.size(), static_cast<size_t>(std::get<0>(GetParam()).m_bufferLength)));
     // Check that the returned frames are correct
     auto j = 0;
     for (auto& i : frames1) {
@@ -213,7 +213,7 @@ TEST_P(SeekTest1, getNextFrames)
         timesList1.emplace_back(time2);
     }
     const auto frames1 = m_stream->getNextFrames(timesList1);
-    ASSERT_EQ(frames1.size(), timesList1.size());
+    ASSERT_EQ(frames1.size(), std::min(timesList1.size(), static_cast<size_t>(std::get<0>(GetParam()).m_bufferLength)));
     // Check that the returned frames are correct
     auto j = 0;
     for (auto& i : frames1) {
@@ -232,7 +232,8 @@ TEST_P(SeekTest1, getNextFrameByIndexSeek)
     // Now get frame sequence offset from current
     const std::vector<int64_t> framesList1 = {0, 1, 5, 7, 8};
     const auto frames1 = m_stream->getNextFramesByIndex(framesList1);
-    ASSERT_EQ(frames1.size(), framesList1.size());
+    ASSERT_EQ(
+        frames1.size(), std::min(framesList1.size(), static_cast<size_t>(std::get<0>(GetParam()).m_bufferLength)));
     // Check that the returned frames are correct
     auto j = 0;
     for (auto& i : frames1) {
@@ -246,7 +247,8 @@ TEST_P(SeekTest1, getNextFramesByIndex)
     // Ensure that value in list is greater than buffer size
     const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
     const auto frames1 = m_stream->getNextFramesByIndex(framesList1);
-    ASSERT_EQ(frames1.size(), framesList1.size());
+    ASSERT_EQ(
+        frames1.size(), std::min(framesList1.size(), static_cast<size_t>(std::get<0>(GetParam()).m_bufferLength)));
     // Check that the returned frames are correct
     auto j = 0;
     for (auto& i : frames1) {
@@ -268,7 +270,7 @@ TEST_P(SeekTest1, getFrames)
         timesList1.emplace_back(time2);
     }
     const auto frames1 = m_stream->getFrames(timesList1);
-    ASSERT_EQ(frames1.size(), timesList1.size());
+    ASSERT_EQ(frames1.size(), std::min(timesList1.size(), static_cast<size_t>(std::get<0>(GetParam()).m_bufferLength)));
     // Check that the returned frames are correct
     auto j = 0;
     for (auto& i : frames1) {
@@ -285,7 +287,8 @@ TEST_P(SeekTest1, getFramesByIndex)
     // Ensure that value in list is greater than buffer size
     const std::vector<int64_t> framesList1 = {3, 5, 7, 8, 12, 23};
     const auto frames1 = m_stream->getFramesByIndex(framesList1);
-    ASSERT_EQ(frames1.size(), framesList1.size());
+    ASSERT_EQ(
+        frames1.size(), std::min(framesList1.size(), static_cast<size_t>(std::get<0>(GetParam()).m_bufferLength)));
     // Check that the returned frames are correct
     auto j = 0;
     for (auto& i : frames1) {
