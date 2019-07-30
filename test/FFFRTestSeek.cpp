@@ -46,6 +46,7 @@ protected:
         options.m_noBufferFlush = std::get<0>(GetParam()).m_noBufferFlush;
         m_stream = Stream::getStream(std::get<1>(GetParam()).m_fileName, options);
         ASSERT_NE(m_stream, nullptr);
+        ASSERT_EQ(m_stream->getMaxFrames(), std::get<0>(GetParam()).m_bufferLength);
     }
 
     void TearDown() override

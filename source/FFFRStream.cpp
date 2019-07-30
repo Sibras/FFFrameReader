@@ -374,6 +374,12 @@ shared_ptr<Frame> Stream::getNextFrame() noexcept
     return ret;
 }
 
+uint32_t Stream::getMaxFrames() noexcept
+{
+    lock_guard<recursive_mutex> lock(m_mutex); // Lock in case buffer length is being modified by other function calls
+    return m_bufferLength;
+}
+
 vector<std::shared_ptr<Frame>> Stream::getNextFrames(const vector<int64_t>& frameSequence) noexcept
 {
     lock_guard<recursive_mutex> lock(m_mutex);
