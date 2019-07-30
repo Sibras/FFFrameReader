@@ -759,7 +759,13 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                         return false;
                     }
                     ret = avcodec_send_packet(m_codecContext.get(), &packet);
+                    if (ret == AVERROR(EAGAIN)) {
+                        av_packet_unref(&packet);
+                        log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                        return false;
+                    }
                 } else {
+                    av_packet_unref(&packet);
                     log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
                     return false;
                 }
