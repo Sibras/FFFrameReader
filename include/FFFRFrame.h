@@ -15,7 +15,6 @@
  */
 #pragma once
 #include "FFFRTypes.h"
-#include "ffframereader_export.h"
 
 #include <cstdint>
 
@@ -57,13 +56,13 @@ public:
      * Gets global time stamp for frame.
      * @returns The time stamp.
      */
-    [[nodiscard]] FFFRAMEREADER_EXPORT int64_t getTimeStamp() const noexcept;
+    FFFRAMEREADER_EXPORT int64_t getTimeStamp() const noexcept;
 
     /**
      * Gets picture sequence frame number.
      * @returns The frame number.
      */
-    [[nodiscard]] FFFRAMEREADER_EXPORT int64_t getFrameNumber() const noexcept;
+    FFFRAMEREADER_EXPORT int64_t getFrameNumber() const noexcept;
 
     /**
      * Gets frame data pointer for a specified image plane. The memory address of these frames will be in a memory space
@@ -72,45 +71,45 @@ public:
      * @param plane The image plane to get. Should be less than @getNumberFrames.
      * @returns The internal frame data and line size, nullptr if specified frame does not exist.
      */
-    [[nodiscard]] FFFRAMEREADER_EXPORT std::pair<uint8_t* const, int32_t> getFrameData(uint32_t plane) const noexcept;
+    FFFRAMEREADER_EXPORT std::pair<uint8_t* const, int32_t> getFrameData(uint32_t plane) const noexcept;
 
     /**
      * Gets the frame width.
      * @returns The width.
      */
-    [[nodiscard]] FFFRAMEREADER_EXPORT uint32_t getWidth() const noexcept;
+    FFFRAMEREADER_EXPORT uint32_t getWidth() const noexcept;
 
     /**
      * Gets the frame height.
      * @returns The height.
      */
-    [[nodiscard]] FFFRAMEREADER_EXPORT uint32_t getHeight() const noexcept;
+    FFFRAMEREADER_EXPORT uint32_t getHeight() const noexcept;
 
     /**
      * Gets the display aspect ratio of the video stream.
      * @note This may differ from width/height if stream uses anamorphic pixels.
      * @returns The aspect ratio.
      */
-    [[nodiscard]] FFFRAMEREADER_EXPORT double getAspectRatio() const noexcept;
+    FFFRAMEREADER_EXPORT double getAspectRatio() const noexcept;
 
     /**
      * Gets the pixel format of the frame data.
      * @note This is used to determine the format of the data returned by @getFrameData.
      * @returns The pixel format.
      */
-    [[nodiscard]] FFFRAMEREADER_EXPORT PixelFormat getPixelFormat() const noexcept;
+    FFFRAMEREADER_EXPORT PixelFormat getPixelFormat() const noexcept;
 
     /**
      * Gets number of planes for an image of the specified pixel format
      * @returns The number of planes (YUV420P has 3, RGB8 has 1 etc.) or negative value if invalid format.
      */
-    [[nodiscard]] FFFRAMEREADER_EXPORT int32_t getNumberPlanes() const noexcept;
+    FFFRAMEREADER_EXPORT int32_t getNumberPlanes() const noexcept;
 
     /**
      * Gets the type of memory used to store the image.
      * @returns The data type.
      */
-    [[nodiscard]] FFFRAMEREADER_EXPORT DecodeType getDataType() const noexcept;
+    FFFRAMEREADER_EXPORT DecodeType getDataType() const noexcept;
 
 private:
     FramePtr m_frame;

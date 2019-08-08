@@ -86,7 +86,7 @@ set(FFFR_SOURCES_CONFIG
 )
 
 set(FFFR_SOURCES_EXPORT
-    ${PROJECT_BINARY_DIR}/ffframereader_export.h
+    ${PROJECT_BINARY_DIR}/FFFRExports.h
 )
 
 set(FFFR_SOURCES
@@ -179,7 +179,9 @@ set_target_properties(FfFrameReader PROPERTIES
 )
 endif()
 
-generate_export_header(FfFrameReader)
+generate_export_header(FfFrameReader
+    EXPORT_FILE_NAME ${FFFR_SOURCES_EXPORT}
+)
 
 add_dependencies(FfFrameReader FFFRPTX)
 

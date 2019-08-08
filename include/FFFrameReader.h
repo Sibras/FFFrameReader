@@ -16,7 +16,6 @@
 #pragma once
 #include "FFFRFrame.h"
 #include "FFFRStream.h"
-#include "ffframereader_export.h"
 
 namespace Ffr {
 /** Values that represent log levels */

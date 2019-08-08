@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include "ffframereader_export.h"
+#include "FFFRExports.h"
 
 #include <any>
 #include <cstdint>
@@ -175,7 +175,7 @@ class FormatContextPtr
 
     FFFRAMEREADER_NO_EXPORT explicit FormatContextPtr(AVFormatContext* formatContext) noexcept;
 
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT AVFormatContext* get() const noexcept;
+    FFFRAMEREADER_NO_EXPORT AVFormatContext* get() const noexcept;
 
     FFFRAMEREADER_NO_EXPORT AVFormatContext* operator->() const noexcept;
 
@@ -195,7 +195,7 @@ class CodecContextPtr
 
     FFFRAMEREADER_NO_EXPORT explicit CodecContextPtr(AVCodecContext* codecContext) noexcept;
 
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT AVCodecContext* get() const noexcept;
+    FFFRAMEREADER_NO_EXPORT AVCodecContext* get() const noexcept;
 
     FFFRAMEREADER_NO_EXPORT AVCodecContext* operator->() const noexcept;
 
@@ -247,7 +247,7 @@ class OutputFormatContextPtr
 
     FFFRAMEREADER_NO_EXPORT explicit OutputFormatContextPtr(AVFormatContext* formatContext) noexcept;
 
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT AVFormatContext* get() const noexcept;
+    FFFRAMEREADER_NO_EXPORT AVFormatContext* get() const noexcept;
 
     FFFRAMEREADER_NO_EXPORT AVFormatContext* operator->() const noexcept;
 

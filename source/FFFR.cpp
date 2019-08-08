@@ -164,7 +164,7 @@ private:
             }
         }
 
-        [[nodiscard]] bool isValid() const
+        bool isValid() const
         {
             return m_context != nullptr;
         }

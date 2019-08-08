@@ -60,7 +60,7 @@ private:
 
         FFFRAMEREADER_NO_EXPORT explicit DeviceContextPtr(AVBufferRef* deviceContext) noexcept;
 
-        [[nodiscard]] FFFRAMEREADER_NO_EXPORT AVBufferRef* get() const noexcept;
+        FFFRAMEREADER_NO_EXPORT AVBufferRef* get() const noexcept;
 
         FFFRAMEREADER_NO_EXPORT AVBufferRef* operator->() const noexcept;
 
@@ -75,8 +75,8 @@ private:
 
     using FormatFunction = enum AVPixelFormat (*)(struct AVCodecContext*, const enum AVPixelFormat*);
 
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT FormatFunction getFormatFunction() const noexcept;
+    FFFRAMEREADER_NO_EXPORT FormatFunction getFormatFunction() const noexcept;
 
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT DecodeType getType() const noexcept;
+    FFFRAMEREADER_NO_EXPORT DecodeType getType() const noexcept;
 };
 } // namespace Ffr

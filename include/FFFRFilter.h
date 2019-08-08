@@ -37,7 +37,7 @@ class Filter
 
         FFFRAMEREADER_NO_EXPORT explicit FilterGraphPtr(AVFilterGraph* filterGraph) noexcept;
 
-        [[nodiscard]] FFFRAMEREADER_NO_EXPORT AVFilterGraph* get() const noexcept;
+        FFFRAMEREADER_NO_EXPORT AVFilterGraph* get() const noexcept;
 
         FFFRAMEREADER_NO_EXPORT AVFilterGraph* operator->() const noexcept;
 
@@ -75,52 +75,52 @@ public:
      * @param [in,out] frame The input frame.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool sendFrame(FramePtr& frame) const noexcept;
+    FFFRAMEREADER_NO_EXPORT bool sendFrame(FramePtr& frame) const noexcept;
 
     /**
      * Receive frame from filter graph
      * @param [in,out] frame The frame.
      * @returns True if it succeeds, false if it fails.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT bool receiveFrame(FramePtr& frame) const noexcept;
+    FFFRAMEREADER_NO_EXPORT bool receiveFrame(FramePtr& frame) const noexcept;
 
     /**
      * Gets the width of output frames.
      * @returns The width.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT uint32_t getWidth() const noexcept;
+    FFFRAMEREADER_NO_EXPORT uint32_t getWidth() const noexcept;
 
     /**
      * Gets the height of output frames.
      * @returns The height.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT uint32_t getHeight() const noexcept;
+    FFFRAMEREADER_NO_EXPORT uint32_t getHeight() const noexcept;
 
     /**
      * Gets the display aspect ratio of output frames.
      * @note This may differ from width/height if stream uses anamorphic pixels.
      * @returns The aspect ratio.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT double getAspectRatio() const noexcept;
+    FFFRAMEREADER_NO_EXPORT double getAspectRatio() const noexcept;
 
     /**
      * Gets pixel format of output frames.
      * @returns The pixel format.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT PixelFormat getPixelFormat() const noexcept;
+    FFFRAMEREADER_NO_EXPORT PixelFormat getPixelFormat() const noexcept;
 
     /**
      * Gets the frame rate (fps) of the output frames.
      * @note This will not be fully accurate when dealing with VFR video streams.
      * @returns The frame rate in frames per second.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT double getFrameRate() const noexcept;
+    FFFRAMEREADER_NO_EXPORT double getFrameRate() const noexcept;
 
     /**
      * Gets the storage size of each decoded frame in the output.
      * @returns The frame size in bytes.
      */
-    [[nodiscard]] FFFRAMEREADER_NO_EXPORT uint32_t getFrameSize() const noexcept;
+    FFFRAMEREADER_NO_EXPORT uint32_t getFrameSize() const noexcept;
 
 private:
     FilterGraphPtr m_filterGraph;        /**< The filter graph. */
