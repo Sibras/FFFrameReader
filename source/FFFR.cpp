@@ -18,7 +18,7 @@
 #include "config.h"
 
 #include <map>
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
 #    include <nppi_color_conversion.h>
 #endif
 #include <string>
@@ -171,7 +171,7 @@ private:
     };
 
     static mutex s_mutex;
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
     static map<CUcontext, pair<NppStreamContext, shared_ptr<KernelContext>>> s_contextProperties;
 #else
     static map<CUcontext, shared_ptr<KernelContext>> s_contextProperties;
@@ -184,7 +184,7 @@ private:
             return true;
         }
 
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
         // Create Npp context
         NppStreamContext nppContext = {};
         nppContext.hStream = stream;
@@ -211,7 +211,7 @@ private:
         }
 
         // Add new properties to internal list
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
         s_contextProperties[context] = make_pair(nppContext, move(kernelProperties));
 #else
         s_contextProperties[context] = move(kernelProperties);
@@ -252,7 +252,7 @@ private:
             blockY, 1, context->m_kernelNV12ToRGB32FPMem, context->m_stream, args, nullptr);
     }
 
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
     static CUresult cudaNppStatusToError(const NppStatus err)
     {
         if (err == NPP_SUCCESS) {
@@ -291,7 +291,7 @@ public:
             return false;
         }
         const auto stream = cudaDevice->stream;
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
         NppStreamContext nppContext;
 
         NppiSize roi;
@@ -305,7 +305,7 @@ public:
                 return false;
             }
             // Get required data
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
             nppContext = s_contextProperties[cudaDevice->cuda_ctx].first;
             kernelProps = s_contextProperties[cudaDevice->cuda_ctx].second;
 #else
@@ -321,7 +321,7 @@ public:
         const auto data1 = frame->getFrameData(0);
         CUresult ret = CUDA_ERROR_UNKNOWN;
         switch (frame->getPixelFormat()) {
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
             case PixelFormat::YUV420P: {
                 const auto data2 = frame->getFrameData(1);
                 const auto data3 = frame->getFrameData(2);
@@ -389,7 +389,7 @@ public:
                 const auto data2 = frame->getFrameData(1);
                 uint8_t* inMem[2] = {data1.first, data2.first};
                 switch (outFormat) {
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
                     case PixelFormat::RGB8: {
                         ret = cudaNppStatusToError(
                             nppiNV12ToRGB_8u_P2C3R_Ctx(inMem, data1.second, outPlanes[0], outStep[0], roi, nppContext));
@@ -416,7 +416,7 @@ public:
                 }
                 break;
             }
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
             case PixelFormat::RGB8: {
                 switch (outFormat) {
                     case PixelFormat::YUV444P: {
@@ -546,7 +546,7 @@ bool synchroniseConvert(const std::shared_ptr<Stream>& stream)
 }
 
 mutex FFR::s_mutex;
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
 map<CUcontext, pair<NppStreamContext, shared_ptr<FFR::KernelContext>>> FFR::s_contextProperties;
 #else
 map<CUcontext, shared_ptr<FFR::KernelContext>> FFR::s_contextProperties;

@@ -39,13 +39,13 @@ struct TestParamsConvert
 };
 
 static std::vector<TestParamsConvert> g_testDataConvert = {
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
     {1, PixelFormat::RGB8, "test-convert-1"},
     {1, PixelFormat::YUV420P, "test-convert-2"},
 #endif
     {1, PixelFormat::RGB8P, "test-convert-3"},
     {1, PixelFormat::RGB32FP, "test-convert-4"},
-#if BUILD_NPPI
+#if FFFR_BUILD_NPPI
     {3, PixelFormat::RGB8, "test-convert-5"},
     {3, PixelFormat::YUV420P, "test-convert-6"},
 #endif
@@ -77,6 +77,7 @@ public:
         DecoderOptions options;
         options.m_type = DecodeType::Cuda;
         options.m_outputHost = false;
+        options.m_bufferLength = 1;
         options.m_context = m_context.get();
         m_stream = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
         ASSERT_NE(m_stream, nullptr);
