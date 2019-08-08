@@ -82,7 +82,7 @@ set(FFFR_PTX_EMBEDDED
 )
 
 set(FFFR_SOURCES_CONFIG
-    ${PROJECT_BINARY_DIR}/config.h
+    ${PROJECT_BINARY_DIR}/FFFRConfig.h
 )
 
 set(FFFR_SOURCES_EXPORT
@@ -149,7 +149,7 @@ add_custom_command(
     COMMENT "Converting PTX files to a C header"
 )
 
-configure_file(include/config.h.in config.h @ONLY)
+configure_file(include/FFFRConfig.h.in ${FFFR_SOURCES_CONFIG} @ONLY)
 
 # Add source to this project's executable.
 if(FFFR_BUILD_SHARED_LIBS)
