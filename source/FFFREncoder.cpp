@@ -93,7 +93,7 @@ bool Encoder::encodeStream(
         getRational(StreamUtils::getSampleAspectRatio(stream.get())), stream->getPixelFormat(),
         getRational(StreamUtils::getFrameRate(stream.get())),
         stream->getDuration() -
-            (stream->m_lastDecodedTimeStamp >= 0 ? stream->timeStampToTime(stream->m_lastDecodedTimeStamp) : 0),
+            (stream->m_lastDecodedTimeStamp >= 0 ? stream->timeStampToTime2(stream->m_lastDecodedTimeStamp) : 0),
         options.m_type, options.m_quality, options.m_preset, options.m_gopSize, ConstructorLock());
     if (!encoder->isEncoderValid()) {
         // Encoder creation failed
