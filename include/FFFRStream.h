@@ -49,7 +49,7 @@ public:
      * Gets a stream from a file.
      * @param fileName Filename of the file to open.
      * @param options  (Optional) Options for controlling decoding.
-     * @returns The stream if succeeded, false otherwise.
+     * @returns The stream if succeeded, nullptr otherwise.
      */
     FFFRAMEREADER_EXPORT static std::shared_ptr<Stream> getStream(
         const std::string& fileName, const DecoderOptions& options = DecoderOptions()) noexcept;
