@@ -955,7 +955,6 @@ bool Stream::processFrame(FramePtr& frame) const noexcept
 
     // Check type of memory pointer requested and perform a memory move
     if (m_outputHost) {
-        // TODO: need some sort of buffer pool
         FramePtr frame2(av_frame_alloc());
         if (*frame2 == nullptr) {
             av_frame_unref(*frame);
