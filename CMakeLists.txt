@@ -102,7 +102,6 @@ set(FFFR_SOURCES
     include/FFFRDecoderContext.h
     include/FFFRFilter.h
     include/FFFRUtility.h
-    include/FFFRTypes.h
     include/FFFRStreamUtils.h
     ${FFFR_PTX_EMBEDDED}
     ${FFFR_SOURCES_CONFIG}
@@ -114,6 +113,7 @@ set(FFFR_HEADERS
     include/FFFRStream.h
     include/FFFRFrame.h
     include/FFFREncoder.h
+    include/FFFRTypes.h
 )
 
 # Add cuda ptx generation
