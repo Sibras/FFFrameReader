@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "FFFRConfig.h"
 #include "FFFRTestData.h"
 #include "FFFRUtility.h"
 #include "FFFrameReader.h"
-#include "config.h"
 
 #include <cuda.h>
 #include <fstream>
