@@ -98,8 +98,6 @@ public:
 
     FFFRAMEREADER_EXPORT bool operator!=(const DecoderOptions& other) const noexcept;
 
-    FFFRAMEREADER_EXPORT bool operator<(const DecoderOptions& other) const noexcept;
-
     DecodeType m_type = DecodeType::Software; /**< The type of decoding to use. */
     Crop m_crop = {0, 0, 0, 0};               /**< The output cropping or (0) if no crop should be performed. */
     Resolution m_scale = {0, 0}; /**< The output resolution or (0, 0) if no scaling should be performed. Scaling is
@@ -138,8 +136,6 @@ public:
 
     FFFRAMEREADER_EXPORT EncoderOptions() = default;
 
-    FFFRAMEREADER_EXPORT explicit EncoderOptions(DecodeType type) noexcept;
-
     FFFRAMEREADER_EXPORT ~EncoderOptions() = default;
 
     FFFRAMEREADER_EXPORT EncoderOptions(const EncoderOptions& other) = default;
@@ -153,8 +149,6 @@ public:
     FFFRAMEREADER_EXPORT bool operator==(const EncoderOptions& other) const noexcept;
 
     FFFRAMEREADER_EXPORT bool operator!=(const EncoderOptions& other) const noexcept;
-
-    FFFRAMEREADER_EXPORT bool operator<(const EncoderOptions& other) const noexcept;
 
     EncodeType m_type = EncodeType::h264; /**< The type of encoder to use. */
     uint8_t m_quality = 125;              /**< The quality of the output video. 0 is worst, 255 is best. */

@@ -29,17 +29,16 @@ DecoderOptions::DecoderOptions(const DecodeType type) noexcept
 
 bool DecoderOptions::operator==(const DecoderOptions& other) const noexcept
 {
-    const bool ret = this->m_type == other.m_type && this->m_bufferLength == other.m_bufferLength &&
-        this->m_device == other.m_device;
+    const bool ret = m_type == other.m_type && m_bufferLength == other.m_bufferLength && m_device == other.m_device;
     if (!ret) {
         return ret;
     }
-    if (this->m_type == DecodeType::Software) {
+    if (m_type == DecodeType::Software) {
         return true;
     }
     try {
-        if (this->m_type == DecodeType::Cuda) {
-            return any_cast<CUcontext>(this->m_context) == any_cast<CUcontext>(other.m_context);
+        if (m_type == DecodeType::Cuda) {
+            return any_cast<CUcontext>(m_context) == any_cast<CUcontext>(other.m_context);
         }
     } catch (...) {
         return false;
@@ -52,33 +51,15 @@ bool DecoderOptions::operator!=(const DecoderOptions& other) const noexcept
     return !(*this == other);
 }
 
-bool DecoderOptions::operator<(const DecoderOptions& other) const noexcept
+bool EncoderOptions::operator==(const EncoderOptions& other) const noexcept
 {
-    if (this->m_type < other.m_type) {
-        return true;
-    }
-    if (other.m_type < this->m_type) {
-        return false;
-    }
-    if (this->m_bufferLength < other.m_bufferLength) {
-        return true;
-    }
-    if (other.m_bufferLength < this->m_bufferLength) {
-        return false;
-    }
-    try {
-        if (this->m_type == DecodeType::Cuda) {
-            if (any_cast<CUcontext>(this->m_context) < any_cast<CUcontext>(other.m_context)) {
-                return true;
-            }
-            if (any_cast<CUcontext>(other.m_context) < any_cast<CUcontext>(this->m_context)) {
-                return false;
-            }
-        }
-    } catch (...) {
-        return false;
-    }
-    return this->m_device < other.m_device;
+    return m_type == other.m_type && m_quality == other.m_quality && m_preset == other.m_preset &&
+        m_gopSize == other.m_gopSize;
+}
+
+bool EncoderOptions::operator!=(const EncoderOptions& other) const noexcept
+{
+    return !(*this == other);
 }
 
 FormatContextPtr::FormatContextPtr(AVFormatContext* formatContext) noexcept
