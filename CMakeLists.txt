@@ -1,7 +1,4 @@
-﻿# CMakeList.txt : CMake project for FFFR, include source and define
-# project specific logic here.
-#
-cmake_minimum_required (VERSION 3.10.2)
+﻿cmake_minimum_required (VERSION 3.10.2)
 
 # Use vcpkg if available
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -10,39 +7,13 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     CACHE STRING "")
 endif()
 
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+
 project(FfFrameReader
     VERSION 0.1
     DESCRIPTION "FFmpeg based library for reading frames from a video source"
     LANGUAGES CXX CUDA
 )
-
-set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Build position independent code.
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# Disable C and C++ compiler specific extensions.
-set(CMAKE_C_EXTENSIONS OFF)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Setup export symbol properties
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
-
-# Defines the CMAKE_INSTALL_LIBDIR, CMAKE_INSTALL_BINDIR and many other useful macros.
-include(GNUInstallDirs)
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}")
-
-# Differentiate between release/debug builds
-if(MSVC)
-    set(CMAKE_DEBUG_POSTFIX "d")
-endif()
 
 # Shared/Dynamic or Static library?
 option(FFFR_BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
@@ -63,12 +34,6 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
         set_property(CACHE CMAKE_BUILD_TYPE PROPERTY VALUE "Release")
     endif()
 endif()
-
-# Detect IPO support
-include(CheckIPOSupported)
-check_ipo_supported(RESULT BUILD_IPO OUTPUT IPO_ERROR)
-
-include(GenerateExportHeader)
 
 find_package(CUDA QUIET REQUIRED)
 
@@ -166,19 +131,33 @@ else()
     )
 endif()
 
+target_compile_features(FfFrameReader
+    PUBLIC cxx_std_17
+)
+
+include(GNUInstallDirs)
 set_target_properties(FfFrameReader PROPERTIES
     FRAMEWORK ON
     SOVERSION 0
     VERSION ${PROJECT_VERSION}
-    PUBLIC_HEADER "${FFFR_HEADERS}"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}"
 )
 
+# Detect IPO support
+include(CheckIPOSupported)
+check_ipo_supported(RESULT BUILD_IPO OUTPUT IPO_ERROR)
 if(BUILD_IPO)
 set_target_properties(FfFrameReader PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION TRUE
 )
 endif()
 
+# Setup export symbol properties
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+include(GenerateExportHeader)
 generate_export_header(FfFrameReader
     EXPORT_FILE_NAME ${FFFR_SOURCES_EXPORT}
 )
@@ -205,14 +184,14 @@ find_library(AVFILTER_LIBRARY NAMES avfilter)
 find_path(AVUTIL_INCLUDE_DIR NAMES libavutil/avutil.h)
 find_library(AVUTIL_LIBRARY NAMES avutil)
 
-target_include_directories(FfFrameReader PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${AVCODEC_INCLUDE_DIR}
-    ${AVFORMAT_INCLUDE_DIR}
-    ${AVFILTER_INCLUDE_DIR}
-    ${AVUTIL_INCLUDE_DIR}
-    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
-    ${PROJECT_BINARY_DIR}
+target_include_directories(FfFrameReader
+    PUBLIC ${PROJECT_SOURCE_DIR}/include
+    PRIVATE ${AVCODEC_INCLUDE_DIR}
+    PRIVATE ${AVFORMAT_INCLUDE_DIR}
+    PRIVATE ${AVFILTER_INCLUDE_DIR}
+    PRIVATE ${AVUTIL_INCLUDE_DIR}
+    PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+    PUBLIC ${PROJECT_BINARY_DIR}
 )
 target_link_libraries(FfFrameReader
     PRIVATE ${AVCODEC_LIBRARY}
@@ -234,10 +213,10 @@ endif()
 
 # Install targets.
 install(TARGETS FfFrameReader
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    PUBLIC_HEADER DESTINATION include
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 # Add tests
@@ -246,7 +225,7 @@ if(FFFR_BUILD_TESTING)
     find_package(GTest REQUIRED)
     include(GoogleTest)
 
-    set(FFFR_TEST_SOURCES
+    add_executable(FFFRTest 
         test/FFFRTestStream.cpp
         test/FFFRTestSeek.cpp
         test/FFFRTestDecode.cpp
@@ -258,16 +237,11 @@ if(FFFR_BUILD_TESTING)
         test/FFFRTestData.h
     )
 
-    add_executable(FFFRTest ${FFFR_TEST_SOURCES})
-
     target_include_directories(FFFRTest PRIVATE
-        ${PROJECT_SOURCE_DIR}/include
         ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
-        ${PROJECT_BINARY_DIR}
     )
 
-    target_link_libraries(
-        FFFRTest
+    target_link_libraries(FFFRTest
         PRIVATE FfFrameReader
         PRIVATE GTest::GTest
         PRIVATE GTest::Main
@@ -275,8 +249,7 @@ if(FFFR_BUILD_TESTING)
         PRIVATE ${AVUTIL_LIBRARY}
     )
 
-    set_target_properties(
-        FFFRTest PROPERTIES
+    set_target_properties(FFFRTest PROPERTIES
         EXCLUDE_FROM_ALL true
         VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/test"
     )
@@ -292,29 +265,23 @@ endif()
 if(FFFR_BUILD_BENCHMARKING)
     find_package(benchmark REQUIRED)
 
-    set(FFFR_BENCHMARK_SOURCES
+    add_executable(FFFRBenchmark 
         benchmark/FFFRBenchmarkStream.cpp
         benchmark/FFFRBenchmarkConvert.cpp
         benchmark/FFFRBenchmarkRead.cpp
     )
 
-    add_executable(FFFRBenchmark ${FFFR_BENCHMARK_SOURCES})
-
     target_include_directories(FFFRBenchmark PRIVATE
-        ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_BINARY_DIR}
         PRIVATE ${benchmark_INCLUDE_DIRS}
     )
 
-    target_link_libraries(
-        FFFRBenchmark
+    target_link_libraries(FFFRBenchmark
         PRIVATE FfFrameReader
         PRIVATE benchmark::benchmark
         PRIVATE benchmark::benchmark_main
     )
 
-    set_target_properties(
-        FFFRBenchmark PROPERTIES
+    set_target_properties(FFFRBenchmark PROPERTIES
         EXCLUDE_FROM_ALL true
         VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/test"
     )
