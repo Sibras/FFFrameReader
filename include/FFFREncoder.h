@@ -63,11 +63,12 @@ public:
      * @param codecType   Type of the codec to encode with.
      * @param quality     The encode quality.
      * @param preset      The encode preset.
+     * @param numThreads  Number of threads to use.
      * @param gopSize     Size of the gop.
      */
     FFFRAMEREADER_NO_EXPORT Encoder(const std::string& fileName, uint32_t width, uint32_t height, Rational aspect,
         PixelFormat format, Rational frameRate, int64_t duration, EncodeType codecType, uint8_t quality,
-        EncoderOptions::Preset preset, uint32_t gopSize, ConstructorLock) noexcept;
+        EncoderOptions::Preset preset, uint32_t numThreads, uint32_t gopSize, ConstructorLock) noexcept;
 
     /**
      * Query if this object is valid.

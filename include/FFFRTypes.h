@@ -154,6 +154,7 @@ public:
     uint8_t m_quality = 125;              /**< The quality of the output video. 0 is worst, 255 is best. */
     Preset m_preset = Preset::Medium; /**< The preset compression level to use. Higher values result in smaller files
                              but increased encoding time. */
+    uint32_t m_numThreads = 0;        /**< Requested number of threads to use for encoding (0 for default) */
     uint32_t m_gopSize = 0;           /**< Requested output gop size (0 for default) */
 };
 
