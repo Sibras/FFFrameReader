@@ -184,6 +184,7 @@ class CodecContextPtr
     friend class StreamUtils;
     friend class Frame;
     friend class FFR;
+    friend class Fmc::MultiCrop;
 
     FFFRAMEREADER_NO_EXPORT CodecContextPtr() = default;
 
