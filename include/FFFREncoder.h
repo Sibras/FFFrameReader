@@ -36,7 +36,7 @@ public:
     FFFRAMEREADER_NO_EXPORT Encoder& operator=(Encoder&& other) noexcept = delete;
 
     /**
-     * Gets a stream from a file.
+     * Encodes a stream to a file.
      * @param fileName File name of the file to write to.
      * @param stream   The stream to encode.
      * @param options  (Optional) Options for controlling encoding.

@@ -27,6 +27,9 @@ option(FFFR_BUILD_NPPI "Build using NVIDIA libnnpi format conversion" ON)
 # Build benchmarking programs?
 option(FFFR_BUILD_BENCHMARKING "Create benchmark programs" OFF)
 
+# Build python bindings?
+option(FFFR_BUILD_PYTHON_BINDING "Create python bindings" OFF)
+
 # Default to a release build if desired configuration is not specified.
 if(NOT CMAKE_CONFIGURATION_TYPES)
     if(NOT CMAKE_BUILD_TYPE)
@@ -331,5 +334,35 @@ if(FFFR_BUILD_TESTING OR FFFR_BUILD_BENCHMARKING)
             TLS_VERIFY ON
         )
     endif()
+endif()
+
+# Add python bindings
+if(FFFR_BUILD_PYTHON_BINDING)
+    find_package(pybind11 REQUIRED)
     
+    pybind11_add_module(pyFrameReader python/FFFRPybind11.cpp)
+
+    configure_file(python/__init__.py.in "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/pyFrameReader/__init__.py")
+
+    configure_file(python/setup.py.in "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/setup.py")
+
+    set_target_properties(pyFrameReader PROPERTIES
+        FRAMEWORK ON
+        SOVERSION 0
+        VERSION ${PROJECT_VERSION}
+        PREFIX ""
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/pyFrameReader"
+    )
+
+    foreach(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
+        string(TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG)
+        set_target_properties(pyFrameReader PROPERTIES
+            LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/pyFrameReader")
+    endforeach()
+
+    target_link_libraries(pyFrameReader
+        PRIVATE FfFrameReader
+    )
+
+    add_dependencies(pyFrameReader FfFrameReader)
 endif()
