@@ -238,17 +238,19 @@ bool Stream::initialise() noexcept
     }
     m_bufferLength = backup;
     // Check if the first element in the buffer does not match our start time
-    const auto startTime = m_bufferPing.front()->getTimeStamp();
+    const auto startTime = m_bufferPing.front()->m_frame->best_effort_timestamp;
     if (startTime != 0) {
-        m_startTimeStamp = 0;
-        m_startTimeStamp = timeToTimeStamp(startTime);
         // Loop through all current frames and fix the time stamps
         for (auto& i : m_bufferPing) {
-            i->m_timeStamp -= startTime;
-            i->m_frameNum = timeToFrame2(i->m_timeStamp);
+            i->m_frame->best_effort_timestamp -= startTime;
+            i->m_frame->pts -= startTime;
+            i->m_timeStamp = timeStampToTime2(i->m_frame->best_effort_timestamp);
+            i->m_frameNum = timeStampToFrame2(i->m_frame->best_effort_timestamp);
         }
-        m_lastDecodedTimeStamp = timeToTimeStamp2(m_bufferPing.back()->getTimeStamp());
+        m_lastDecodedTimeStamp = m_bufferPing.back()->m_frame->best_effort_timestamp;
         m_lastValidTimeStamp = m_lastDecodedTimeStamp;
+        m_startTimeStamp = timeStamp2ToTimeStamp(startTime);
+        m_startTimeStamp2 = startTime;
     }
 
     m_seekThreshold = frameToTimeStamp2(m_seekThreshold == 0 ? getSeekThreshold() : m_seekThreshold);
@@ -854,11 +856,9 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
         if (offsetTimeStamp == AV_NOPTS_VALUE) {
             // Try and just rebuild it from the previous frame
             offsetTimeStamp = m_lastDecodedTimeStamp + frameToTimeStamp2(1);
-        } else if (m_startTimeStamp != 0) {
+        } else if (m_startTimeStamp2 != 0) {
             // Remove the start time from calculations
-            // TODO: precalculate this
-            offsetTimeStamp -=
-                av_rescale_q(m_startTimeStamp, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
+            offsetTimeStamp -= m_startTimeStamp2;
         }
 
         // Store last decoded time stamp
@@ -934,10 +934,11 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
 
 bool Stream::processFrame(FramePtr& frame) const noexcept
 {
+    // Update internal timestamps to ensure they are valid
+    frame->best_effort_timestamp = m_lastValidTimeStamp;
+    frame->pts = frame->best_effort_timestamp;
+
     if (m_filterGraph != nullptr) {
-        // Update internal timestamps to ensure they are valid
-        frame->best_effort_timestamp = m_lastValidTimeStamp;
-        frame->pts = frame->best_effort_timestamp;
         StreamUtils::rescale(frame, m_codecContext->time_base, av_buffersink_get_time_base(m_filterGraph->m_sink));
         if (!m_filterGraph->sendFrame(frame)) {
             av_frame_unref(*frame);
@@ -969,6 +970,9 @@ bool Stream::processFrame(FramePtr& frame) const noexcept
             return false;
         }
         frame = move(frame2);
+        // Ensure proper timestamps after copy
+        frame->best_effort_timestamp = m_lastValidTimeStamp;
+        frame->pts = frame->best_effort_timestamp;
     }
     return true;
 }

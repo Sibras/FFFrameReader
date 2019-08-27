@@ -183,8 +183,6 @@ Encoder::Encoder(const std::string& fileName, const uint32_t width, const uint32
         log("Failed opening video encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
         return;
     }
-    char* buffer;
-    av_dict_get_string(opts, &buffer, '-', ':');
     ret = avcodec_parameters_from_context(outStream->codecpar, tempCodec.get());
     if (ret < 0) {
         log("Failed copying parameters to encoder context: "s += getFfmpegErrorString(ret), LogLevel::Error);
@@ -236,20 +234,20 @@ bool Encoder::encodeStream(const std::shared_ptr<Stream>& stream) const noexcept
             if (!stream->isEndOfFile()) {
                 return false;
             }
-            return encodeFrame(frame);
+            return encodeFrame(frame, stream);
         }
-        if (!encodeFrame(frame)) {
+        if (!encodeFrame(frame, stream)) {
             return false;
         }
     }
 }
 
-bool Encoder::encodeFrame(const std::shared_ptr<Frame>& frame) const noexcept
+bool Encoder::encodeFrame(const std::shared_ptr<Frame>& frame, const std::shared_ptr<Stream>& stream) const noexcept
 {
     if (frame != nullptr) {
         // Send frame to encoder
-        frame->m_frame->best_effort_timestamp =
-            av_rescale_q(frame->getTimeStamp(), av_make_q(1, AV_TIME_BASE), m_codecContext->time_base);
+        frame->m_frame->best_effort_timestamp = av_rescale_q(
+            frame->m_frame->best_effort_timestamp, stream->m_codecContext->time_base, m_codecContext->time_base);
         frame->m_frame->pts = frame->m_frame->best_effort_timestamp;
         const auto ret = avcodec_send_frame(m_codecContext.get(), *frame->m_frame);
         if (ret < 0) {
@@ -301,6 +299,7 @@ bool Encoder::muxFrames() const noexcept
         packet.stream_index = 0;
         packet.duration = av_rescale_q(1, av_inv_q(m_codecContext->framerate), m_codecContext->time_base);
         av_packet_rescale_ts(&packet, m_codecContext->time_base, m_formatContext->streams[0]->time_base);
+        packet.pos = -1;
 
         // Mux encoded frame
         ret = av_interleaved_write_frame(m_formatContext.get(), &packet);

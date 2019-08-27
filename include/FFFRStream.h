@@ -253,6 +253,7 @@ private:
     CodecContextPtr m_codecContext;
 
     int64_t m_startTimeStamp = 0;        /**< PTS of the first frame in the stream time base */
+    int64_t m_startTimeStamp2 = 0;       /**< PTS of the first frame in the codec time base */
     int64_t m_lastDecodedTimeStamp = -1; /**< The decoder time stamp of the last decoded frame */
     int64_t m_lastValidTimeStamp = -1;   /**< The decoder time stamp of the last valid stored frame */
     int64_t m_lastPacketTimeStamp = -1;  /**< The demuxer time stamp of the last retrieved packet */

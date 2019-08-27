@@ -90,9 +90,11 @@ private:
     /**
      * Encode frame.
      * @param frame The frame.
+     * @param stream The stream.
      * @returns True if it succeeds, false if it fails.
      */
-    FFFRAMEREADER_NO_EXPORT bool encodeFrame(const std::shared_ptr<Frame>& frame) const noexcept;
+    FFFRAMEREADER_NO_EXPORT bool encodeFrame(
+        const std::shared_ptr<Frame>& frame, const std::shared_ptr<Stream>& stream) const noexcept;
 
     /**
      * Writes encoded frames to output.
