@@ -20,6 +20,7 @@
 extern "C" {
 #include <libavutil/error.h>
 }
+
 using namespace std;
 
 namespace Ffr {

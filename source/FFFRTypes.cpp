@@ -17,8 +17,9 @@
 
 extern "C" {
 #include <libavformat/avformat.h>
-#include <libavutil/hwcontext_cuda.h>
 }
+
+using CUcontext = struct CUctx_st*;
 
 using namespace std;
 

@@ -19,6 +19,10 @@
 #include <string>
 #include <utility>
 
+#define CUDA_VERSION PrventNeedingCudaSDK
+using CUcontext = struct CUctx_st*;
+using CUstream = struct CUstream_st*;
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavutil/hwcontext_cuda.h>
