@@ -12,7 +12,7 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 project(FfFrameReader
     VERSION 0.1
     DESCRIPTION "FFmpeg based library for reading frames from a video source"
-    LANGUAGES CXX CUDA
+    LANGUAGES CXX
 )
 
 # Shared/Dynamic or Static library?
@@ -21,8 +21,13 @@ option(FFFR_BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" O
 # Build test related programs?
 option(FFFR_BUILD_TESTING "Create test programs" OFF)
 
-# Build with nppi library? This requires cuda 10.1 or better
-option(FFFR_BUILD_NPPI "Build using NVIDIA libnnpi format conversion" ON)
+# Build with cuda
+option(FFFR_BUILD_CUDA "Build using NVIDIA cuda support" ON)
+
+if(FFFR_BUILD_CUDA)
+    # Build with nppi library? This requires cuda 10.1 or better
+    option(FFFR_BUILD_NPPI "Build using NVIDIA libnnpi format conversion" ON)
+endif()
 
 # Build benchmarking programs?
 option(FFFR_BUILD_BENCHMARKING "Create benchmark programs" OFF)
@@ -37,8 +42,6 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
         set_property(CACHE CMAKE_BUILD_TYPE PROPERTY VALUE "Release")
     endif()
 endif()
-
-find_package(CUDA QUIET REQUIRED)
 
 # Add project source files
 set(FFFR_SOURCES_CUDA
@@ -84,38 +87,46 @@ set(FFFR_HEADERS
     include/FFFRTypes.h
 )
 
-# Add cuda ptx generation
-add_library(FFFRPTX OBJECT ${FFFR_SOURCES_CUDA})
-set_target_properties(FFFRPTX PROPERTIES
-    CUDA_PTX_COMPILATION ON
-    LINKER_LANGUAGE CUDA
-)
+if(FFFR_BUILD_CUDA)
+    enable_language(CUDA)
+    find_package(CUDA QUIET REQUIRED)
 
-# Use bin2c found in cuda toolkit to embed ptx into final executable
-get_filename_component(CUDA_COMPILER_DIR "${CMAKE_CUDA_COMPILER}" DIRECTORY)
-find_program(BIN_2_C
-  NAMES bin2c
-  PATHS ${CUDA_COMPILER_DIR}
-  )
-if(NOT BIN_2_C)
-  message(FATAL_ERROR
-    "bin2c not found:\n"
-    "  CMAKE_CUDA_COMPILER='${CMAKE_CUDA_COMPILER}'\n"
-    "  CUDA_COMPILER_DIR='${CUDA_COMPILER_DIR}'\n"
+    # Add cuda ptx generation
+    add_library(FFFRPTX OBJECT ${FFFR_SOURCES_CUDA})
+    set_target_properties(FFFRPTX PROPERTIES
+        CUDA_PTX_COMPILATION ON
+        LINKER_LANGUAGE CUDA
     )
-endif()
 
-add_custom_command(
-    OUTPUT "${FFFR_PTX_EMBEDDED}"
-    COMMAND ${CMAKE_COMMAND}
-        "-DBIN_TO_C_COMMAND=${BIN_2_C}"
-        "-DOBJECTS=$<TARGET_OBJECTS:FFFRPTX>"
-        "-DOUTPUT=${FFFR_PTX_EMBEDDED}"
-        -P ${PROJECT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
-    VERBATIM
-    DEPENDS $<TARGET_OBJECTS:FFFRPTX>
-    COMMENT "Converting PTX files to a C header"
-)
+    # Use bin2c found in cuda toolkit to embed ptx into final executable
+    get_filename_component(CUDA_COMPILER_DIR "${CMAKE_CUDA_COMPILER}" DIRECTORY)
+    find_program(BIN_2_C
+      NAMES bin2c
+      PATHS ${CUDA_COMPILER_DIR}
+      )
+    if(NOT BIN_2_C)
+      message(FATAL_ERROR
+        "bin2c not found:\n"
+        "  CMAKE_CUDA_COMPILER='${CMAKE_CUDA_COMPILER}'\n"
+        "  CUDA_COMPILER_DIR='${CUDA_COMPILER_DIR}'\n"
+        )
+    endif()
+
+    add_custom_command(
+        OUTPUT "${FFFR_PTX_EMBEDDED}"
+        COMMAND ${CMAKE_COMMAND}
+            "-DBIN_TO_C_COMMAND=${BIN_2_C}"
+            "-DOBJECTS=$<TARGET_OBJECTS:FFFRPTX>"
+            "-DOUTPUT=${FFFR_PTX_EMBEDDED}"
+            -P ${PROJECT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
+        VERBATIM
+        DEPENDS $<TARGET_OBJECTS:FFFRPTX>
+        COMMENT "Converting PTX files to a C header"
+    )
+else()
+    # Just make a nothing file
+    configure_file(include/FFFRConfig.h.in ${FFFR_PTX_EMBEDDED} @ONLY)
+endif()
 
 configure_file(include/FFFRConfig.h.in ${FFFR_SOURCES_CONFIG} @ONLY)
 
@@ -165,13 +176,8 @@ generate_export_header(FfFrameReader
     EXPORT_FILE_NAME ${FFFR_SOURCES_EXPORT}
 )
 
-add_dependencies(FfFrameReader FFFRPTX)
-
-# Enable all compile warnings
-if(MSVC)
-  target_compile_options(FfFrameReader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /WX /experimental:external /external:anglebrackets /external:W3>)
-else()
-  target_compile_options(FfFrameReader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -pedantic -Werror>)
+if(FFFR_BUILD_CUDA)
+    add_dependencies(FfFrameReader FFFRPTX)
 endif()
 
 # Find the required FFmpeg libraries
@@ -256,6 +262,13 @@ if(FFFR_BUILD_TESTING)
         EXCLUDE_FROM_ALL true
         VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/test"
     )
+
+    # Enable all compile warnings
+    if(MSVC)
+      target_compile_options(FfFrameReader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /WX /experimental:external /external:anglebrackets /external:W3>)
+    else()
+      target_compile_options(FfFrameReader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -pedantic -Werror>)
+    endif()
 
     add_dependencies(FFFRTest FfFrameReader)
 

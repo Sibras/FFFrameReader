@@ -13,7 +13,7 @@
             "intelliSenseMode": "windows-msvc-x64",
             "variables": [
                 {
-                    "name": "BUILD_TESTING",
+                    "name": "FFFR_BUILD_TESTING",
                     "value": "true",
                     "type": "BOOL"
                 }

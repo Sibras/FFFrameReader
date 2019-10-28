@@ -19,7 +19,7 @@
 #include <string>
 #include <utility>
 
-#define CUDA_VERSION PrventNeedingCudaSDK
+#define CUDA_VERSION PreventNeedingCudaSDK
 using CUcontext = struct CUctx_st*;
 using CUstream = struct CUstream_st*;
 

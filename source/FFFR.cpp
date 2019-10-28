@@ -25,9 +25,11 @@
 
 extern "C" {
 #include <libavcodec/avcodec.h>
-#include <libavutil/frame.h>
-#include <libavutil/hwcontext.h>
-#include <libavutil/hwcontext_cuda.h>
+#if FFFR_BUILD_CUDA
+#    include <libavutil/frame.h>
+#    include <libavutil/hwcontext.h>
+#    include <libavutil/hwcontext_cuda.h>
+#endif
 #include <libavutil/imgutils.h>
 #include <libavutil/log.h>
 #include <libavutil/pixdesc.h>
@@ -76,6 +78,7 @@ int32_t getImagePlaneStep(
     return static_cast<int32_t>(ret);
 }
 
+#if FFFR_BUILD_CUDA
 class FFR
 {
 private:
@@ -171,11 +174,11 @@ private:
     };
 
     static mutex s_mutex;
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
     static map<CUcontext, pair<NppStreamContext, shared_ptr<KernelContext>>> s_contextProperties;
-#else
+#    else
     static map<CUcontext, shared_ptr<KernelContext>> s_contextProperties;
-#endif
+#    endif
 
     static bool setupContext(const CUcontext context, const CUstream stream)
     {
@@ -184,7 +187,7 @@ private:
             return true;
         }
 
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
         // Create Npp context
         NppStreamContext nppContext = {};
         nppContext.hStream = stream;
@@ -202,7 +205,7 @@ private:
             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, nppContext.nCudaDeviceId);
         cuDeviceGetAttribute(&nppContext.nCudaDevAttrComputeCapabilityMinor,
             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, nppContext.nCudaDeviceId);
-#endif
+#    endif
 
         // Create custom context properties
         auto kernelProperties = make_shared<KernelContext>(context, stream);
@@ -211,11 +214,11 @@ private:
         }
 
         // Add new properties to internal list
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
         s_contextProperties[context] = make_pair(nppContext, move(kernelProperties));
-#else
+#    else
         s_contextProperties[context] = move(kernelProperties);
-#endif
+#    endif
         return true;
     }
 
@@ -252,7 +255,7 @@ private:
             blockY, 1, context->m_kernelNV12ToRGB32FPMem, context->m_stream, args, nullptr);
     }
 
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
     static CUresult cudaNppStatusToError(const NppStatus err)
     {
         if (err == NPP_SUCCESS) {
@@ -269,7 +272,7 @@ private:
         }
         return CUDA_ERROR_UNKNOWN;
     }
-#endif
+#    endif
 
 public:
     static bool convertFormat(
@@ -291,13 +294,13 @@ public:
             return false;
         }
         const auto stream = cudaDevice->stream;
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
         NppStreamContext nppContext;
 
         NppiSize roi;
         roi.width = frame->getWidth();
         roi.height = frame->getHeight();
-#endif
+#    endif
         shared_ptr<KernelContext> kernelProps;
         {
             lock_guard<mutex> lock(s_mutex);
@@ -305,12 +308,12 @@ public:
                 return false;
             }
             // Get required data
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
             nppContext = s_contextProperties[cudaDevice->cuda_ctx].first;
             kernelProps = s_contextProperties[cudaDevice->cuda_ctx].second;
-#else
+#    else
             kernelProps = s_contextProperties[cudaDevice->cuda_ctx];
-#endif
+#    endif
         }
 
         uint8_t* outPlanes[4];
@@ -321,7 +324,7 @@ public:
         const auto data1 = frame->getFrameData(0);
         CUresult ret = CUDA_ERROR_UNKNOWN;
         switch (frame->getPixelFormat()) {
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
             case PixelFormat::YUV420P: {
                 const auto data2 = frame->getFrameData(1);
                 const auto data3 = frame->getFrameData(2);
@@ -384,12 +387,12 @@ public:
                 }
                 break;
             }
-#endif
+#    endif
             case PixelFormat::NV12: {
                 const auto data2 = frame->getFrameData(1);
                 uint8_t* inMem[2] = {data1.first, data2.first};
                 switch (outFormat) {
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
                     case PixelFormat::RGB8: {
                         ret = cudaNppStatusToError(
                             nppiNV12ToRGB_8u_P2C3R_Ctx(inMem, data1.second, outPlanes[0], outStep[0], roi, nppContext));
@@ -400,7 +403,7 @@ public:
                             nppiNV12ToYUV420_8u_P2P3R_Ctx(inMem, data1.second, outPlanes, outStep, roi, nppContext));
                         break;
                     }
-#endif
+#    endif
                     case PixelFormat::RGB8P: {
                         ret = convertNV12ToRGB8P(inMem, data1.second, frame->getWidth(), frame->getHeight(), outPlanes,
                             outStep[0], kernelProps.get());
@@ -416,7 +419,7 @@ public:
                 }
                 break;
             }
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
             case PixelFormat::RGB8: {
                 switch (outFormat) {
                     case PixelFormat::YUV444P: {
@@ -464,7 +467,7 @@ public:
                 }
                 break;
             }
-#endif
+#    endif
             default:
                 break;
         }
@@ -529,26 +532,47 @@ public:
         return true;
     }
 };
+#endif
 
 bool convertFormat(const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
 {
+#if FFFR_BUILD_CUDA
     return FFR::convertFormat(frame, outMem, outFormat, false);
+#else
+    (void)(frame);
+    (void)(outMem);
+    (void)(outFormat);
+    return false;
+#endif
 }
 
 bool convertFormatAsync(const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat) noexcept
 {
+#if FFFR_BUILD_CUDA
     return FFR::convertFormat(frame, outMem, outFormat, true);
+#else
+    (void)(frame);
+    (void)(outMem);
+    (void)(outFormat);
+    return false;
+#endif
 }
 
 bool synchroniseConvert(const std::shared_ptr<Stream>& stream)
 {
+#if FFFR_BUILD_CUDA
     return FFR::synchroniseConvert(stream);
-}
-
-mutex FFR::s_mutex;
-#if FFFR_BUILD_NPPI
-map<CUcontext, pair<NppStreamContext, shared_ptr<FFR::KernelContext>>> FFR::s_contextProperties;
 #else
+    (void)(stream);
+    return false;
+#endif
+}
+#if FFFR_BUILD_CUDA
+mutex FFR::s_mutex;
+#    if FFFR_BUILD_NPPI
+map<CUcontext, pair<NppStreamContext, shared_ptr<FFR::KernelContext>>> FFR::s_contextProperties;
+#    else
 map<CUcontext, shared_ptr<FFR::KernelContext>> FFR::s_contextProperties;
+#    endif
 #endif
 } // namespace Ffr
