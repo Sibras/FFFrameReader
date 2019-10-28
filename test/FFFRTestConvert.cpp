@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 #include "FFFRConfig.h"
-#include "FFFRTestData.h"
-#include "FFFRUtility.h"
-#include "FFFrameReader.h"
+#if FFFR_BUILD_CUDA
+#    include "FFFRTestData.h"
+#    include "FFFRUtility.h"
+#    include "FFFrameReader.h"
 
-#include <cuda.h>
-#include <fstream>
-#include <gtest/gtest.h>
+#    include <cuda.h>
+#    include <fstream>
+#    include <gtest/gtest.h>
 
 extern "C" {
-#include <libavutil/imgutils.h>
+#    include <libavutil/imgutils.h>
 }
 
 using namespace Ffr;
@@ -39,16 +40,16 @@ struct TestParamsConvert
 };
 
 static std::vector<TestParamsConvert> g_testDataConvert = {
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
     {1, PixelFormat::RGB8, "test-convert-1"},
     {1, PixelFormat::YUV420P, "test-convert-2"},
-#endif
+#    endif
     {1, PixelFormat::RGB8P, "test-convert-3"},
     {1, PixelFormat::RGB32FP, "test-convert-4"},
-#if FFFR_BUILD_NPPI
+#    if FFFR_BUILD_NPPI
     {3, PixelFormat::RGB8, "test-convert-5"},
     {3, PixelFormat::YUV420P, "test-convert-6"},
-#endif
+#    endif
     {3, PixelFormat::RGB8P, "test-convert-7"},
     {3, PixelFormat::RGB32FP, "test-convert-8"},
 };
@@ -181,3 +182,4 @@ TEST_P(ConvertTest1, convert)
 }
 
 INSTANTIATE_TEST_SUITE_P(ConvertTestData, ConvertTest1, ::testing::ValuesIn(g_testDataConvert));
+#endif

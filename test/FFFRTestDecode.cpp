@@ -16,7 +16,9 @@
 #include "FFFRTestData.h"
 #include "FFFrameReader.h"
 
-#include <cuda.h>
+#if FFFR_BUILD_CUDA
+#    include <cuda.h>
+#endif
 #include <gtest/gtest.h>
 
 using namespace Ffr;
@@ -32,15 +34,23 @@ struct TestParamsDecode
 
 static std::vector<TestParamsDecode> g_testDataDecode = {
     {0, false, false, true, false},
+    {1, false, false, true, false},
+    {2, false, false, true, false},
+#if FFFR_BUILD_CUDA
     {0, true, false, false, false},
     {0, true, false, true, false},
     {0, true, true, false, false},
     {0, true, true, true, false},
+#endif
     {0, false, false, true, true},
+    {1, false, false, true, true},
+    {2, false, false, true, true},
+#if FFFR_BUILD_CUDA
     {0, true, false, false, true},
     {0, true, false, true, true},
     {0, true, true, false, true},
     {0, true, true, true, true},
+#endif
 };
 
 class TestDecoder
@@ -51,14 +61,17 @@ public:
     ~TestDecoder()
     {
         m_stream.reset();
+#if FFFR_BUILD_CUDA
         if (m_cudaContext != nullptr) {
             cuCtxDestroy(m_cudaContext);
         }
+#endif
     }
 
     void SetUp(const TestParamsDecode& params)
     {
         DecoderOptions options;
+#if FFFR_BUILD_CUDA
         if (params.m_useNvdec) {
             options.m_type = DecodeType::Cuda;
             if (params.m_useContext) {
@@ -74,6 +87,7 @@ public:
                 options.m_context = m_cudaContext;
             }
         }
+#endif
         options.m_outputHost = params.m_outputToHost;
         options.m_noBufferFlush = params.m_noBufferFlush;
         m_stream = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
@@ -86,7 +100,9 @@ public:
     }
 
     std::shared_ptr<Stream> m_stream = nullptr;
+#if FFFR_BUILD_CUDA
     CUcontext m_cudaContext = nullptr;
+#endif
 };
 
 class DecodeTest1 : public ::testing::TestWithParam<TestParamsDecode>
