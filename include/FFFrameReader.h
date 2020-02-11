@@ -108,5 +108,5 @@ FFFRAMEREADER_EXPORT bool convertFormatAsync(
  * @param stream The last stream used for cuda operations.
  * @returns True if it succeeds, false if it fails.
  */
-FFFRAMEREADER_EXPORT bool synchroniseConvert(const std::shared_ptr<Stream>& stream);
+FFFRAMEREADER_EXPORT bool synchroniseConvert(const std::shared_ptr<Stream>& stream) noexcept;
 } // namespace Ffr

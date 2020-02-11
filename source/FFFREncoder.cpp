@@ -46,7 +46,7 @@ AVCodecID getCodecID(const EncodeType encoder) noexcept
     }
 }
 
-string getPresetString(const EncoderOptions::Preset preset)
+string getPresetString(const EncoderOptions::Preset preset) noexcept
 {
     switch (preset) {
         case EncoderOptions::Preset::Ultrafast: {
@@ -112,24 +112,24 @@ Encoder::Encoder(const std::string& fileName, const uint32_t width, const uint32
     auto ret = avformat_alloc_output_context2(&formatPtr, nullptr, nullptr, fileName.c_str());
     OutputFormatContextPtr tempFormat(formatPtr);
     if (ret < 0) {
-        log("Failed to open output stream "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to open output stream ", getFfmpegErrorString(ret));
         return;
     }
     const auto outStream = avformat_new_stream(tempFormat.get(), nullptr);
     if (outStream == nullptr) {
-        log("Failed to create an output stream", LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to create an output stream");
         return;
     }
 
     // Find the required encoder
-    const auto encoder = avcodec_find_encoder(getCodecID(codecType));
+    const AVCodec* const encoder = avcodec_find_encoder(getCodecID(codecType));
     if (!encoder) {
-        log("Requested encoder is not supported", LogLevel::Error);
+        logInternal(LogLevel::Error, "Requested encoder is not supported");
         return;
     }
     CodecContextPtr tempCodec(avcodec_alloc_context3(encoder));
     if (tempCodec.get() == nullptr) {
-        log("Failed allocating encoder context", LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed allocating encoder context");
         return;
     }
 
@@ -180,12 +180,12 @@ Encoder::Encoder(const std::string& fileName, const uint32_t width, const uint32
     // Open the encoder
     ret = avcodec_open2(tempCodec.get(), encoder, &opts);
     if (ret < 0) {
-        log("Failed opening video encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed opening video encoder: ", getFfmpegErrorString(ret));
         return;
     }
     ret = avcodec_parameters_from_context(outStream->codecpar, tempCodec.get());
     if (ret < 0) {
-        log("Failed copying parameters to encoder context: "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed copying parameters to encoder context: ", getFfmpegErrorString(ret));
         return;
     }
 
@@ -198,7 +198,7 @@ Encoder::Encoder(const std::string& fileName, const uint32_t width, const uint32
     if (!(tempFormat->oformat->flags & AVFMT_NOFILE)) {
         ret = avio_open(&tempFormat->pb, fileName.c_str(), AVIO_FLAG_WRITE);
         if (ret < 0) {
-            log(("Failed to open output file: "s += fileName) += ", "s += getFfmpegErrorString(ret), LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to open output file: ", fileName, ", ", getFfmpegErrorString(ret));
             return;
         }
     }
@@ -206,8 +206,7 @@ Encoder::Encoder(const std::string& fileName, const uint32_t width, const uint32
     // Init the muxer and write out file header
     ret = avformat_write_header(tempFormat.get(), nullptr);
     if (ret < 0) {
-        log(("Failed writing header to output file: "s += fileName) += ", "s += getFfmpegErrorString(ret),
-            LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed writing header to output file: ", fileName, ", ", getFfmpegErrorString(ret));
         return;
     }
 
@@ -251,7 +250,7 @@ bool Encoder::encodeFrame(const std::shared_ptr<Frame>& frame, const std::shared
         frame->m_frame->pts = frame->m_frame->best_effort_timestamp;
         const auto ret = avcodec_send_frame(m_codecContext.get(), *frame->m_frame);
         if (ret < 0) {
-            log("Failed to send packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to send packet to encoder: ", getFfmpegErrorString(ret));
             return false;
         }
         if (!muxFrames()) {
@@ -261,7 +260,7 @@ bool Encoder::encodeFrame(const std::shared_ptr<Frame>& frame, const std::shared
         // Send a flush frame
         auto ret = avcodec_send_frame(m_codecContext.get(), nullptr);
         if (ret < 0) {
-            log("Failed to send flush packet to encoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to send flush packet to encoder: ", getFfmpegErrorString(ret));
             return false;
         }
         if (!muxFrames()) {
@@ -270,7 +269,7 @@ bool Encoder::encodeFrame(const std::shared_ptr<Frame>& frame, const std::shared
         av_interleaved_write_frame(m_formatContext.get(), nullptr);
         ret = av_write_trailer(m_formatContext.get());
         if (ret < 0) {
-            log("Failed to write file trailer: "s += getFfmpegErrorString(ret), LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to write file trailer: ", getFfmpegErrorString(ret));
             return false;
         }
     }
@@ -291,7 +290,7 @@ bool Encoder::muxFrames() const noexcept
             break;
         } else if (ret < 0) {
             av_packet_unref(&packet);
-            log("Failed to receive encoded frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to receive encoded frame: ", getFfmpegErrorString(ret));
             return false;
         }
 
@@ -305,7 +304,7 @@ bool Encoder::muxFrames() const noexcept
         ret = av_interleaved_write_frame(m_formatContext.get(), &packet);
         if (ret < 0) {
             av_packet_unref(&packet);
-            log("Failed to write encoded frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to write encoded frame: ", getFfmpegErrorString(ret));
             return false;
         }
 

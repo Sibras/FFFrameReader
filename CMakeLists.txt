@@ -148,6 +148,12 @@ endif()
 target_compile_features(FfFrameReader
     PUBLIC cxx_std_17
 )
+#Disable exceptions and rtti as they are not used
+if(MSVC)
+    target_compile_options(FfFrameReader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/GR- /EHs-c- /wd4530>)
+else()
+    target_compile_options(FfFrameReader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti-fno-exceptions>)
+endif()
 
 include(GNUInstallDirs)
 set_target_properties(FfFrameReader PROPERTIES

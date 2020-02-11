@@ -106,7 +106,7 @@ private:
         CUcontext m_context = nullptr;
         CUstream m_stream = nullptr;
 
-        explicit KernelContext(const CUcontext context, const CUstream stream)
+        explicit KernelContext(const CUcontext context, const CUstream stream) noexcept
         {
             // Ensure that the primary context is retained until the module is unloaded
             CUcontext temp;
@@ -119,7 +119,7 @@ private:
             if (err != CUDA_SUCCESS) {
                 const char* errorString;
                 cuGetErrorName(err, &errorString);
-                log("Failed loading cuda module: "s += errorString, LogLevel::Error);
+                logInternal(LogLevel::Error, "Failed loading cuda module: ", errorString);
                 return;
             }
 
@@ -127,7 +127,7 @@ private:
             if (err != CUDA_SUCCESS) {
                 const char* errorString;
                 cuGetErrorName(err, &errorString);
-                log("Failed to retrieve CUDA kernel: "s += errorString, LogLevel::Error);
+                logInternal(LogLevel::Error, "Failed to retrieve CUDA kernel: ", errorString);
                 return;
             }
 
@@ -135,7 +135,7 @@ private:
             if (err != CUDA_SUCCESS) {
                 const char* errorString;
                 cuGetErrorName(err, &errorString);
-                log("Failed to retrieve CUDA kernel: "s += errorString, LogLevel::Error);
+                logInternal(LogLevel::Error, "Failed to retrieve CUDA kernel: ", errorString);
                 return;
             }
 
@@ -146,7 +146,7 @@ private:
             m_stream = stream;
         }
 
-        ~KernelContext()
+        ~KernelContext() noexcept
         {
             if (m_context != nullptr) {
                 // We cant guarantee the context hasnt been destroyed unless it is the primary context
@@ -154,7 +154,7 @@ private:
                 cuDevicePrimaryCtxRetain(&temp, 0);
                 if (temp == m_context) {
                     if (cuCtxPushCurrent(m_context) != CUDA_SUCCESS) {
-                        log("Failed to set CUDA context"s, LogLevel::Error);
+                        logInternal(LogLevel::Error, "Failed to set CUDA context");
                     }
                     if (m_module != nullptr) {
                         cuModuleUnload(m_module);
@@ -167,7 +167,7 @@ private:
             }
         }
 
-        bool isValid() const
+        bool isValid() const noexcept
         {
             return m_context != nullptr;
         }
@@ -222,13 +222,13 @@ private:
         return true;
     }
 
-    static constexpr uint32_t divUp(const uint32_t total, const uint32_t grain)
+    static constexpr uint32_t divUp(const uint32_t total, const uint32_t grain) noexcept
     {
         return (total + grain - 1) / grain;
     }
 
-    static CUresult convertNV12ToRGB8P(uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
-        uint8_t* dest[3], uint32_t destStep, KernelContext* context)
+    static CUresult convertNV12ToRGB8P(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width,
+        uint32_t height, uint8_t* dest[3], uint32_t destStep, KernelContext* context) noexcept
     {
         const uint32_t blockX = 8;
         const uint32_t blockY = 8;
@@ -241,8 +241,8 @@ private:
             blockY, 1, context->m_kernelNV12ToRGB8PMem, context->m_stream, args, nullptr);
     }
 
-    static CUresult convertNV12ToRGB32FP(uint8_t* const source[2], uint32_t sourceStep, uint32_t width, uint32_t height,
-        uint8_t* dest[3], uint32_t destStep, KernelContext* context)
+    static CUresult convertNV12ToRGB32FP(const uint8_t* const source[2], uint32_t sourceStep, uint32_t width,
+        uint32_t height, uint8_t* dest[3], uint32_t destStep, KernelContext* context) noexcept
     {
         const uint32_t blockX = 8;
         const uint32_t blockY = 8;
@@ -256,7 +256,7 @@ private:
     }
 
 #    if FFFR_BUILD_NPPI
-    static CUresult cudaNppStatusToError(const NppStatus err)
+    static CUresult cudaNppStatusToError(const NppStatus err) noexcept
     {
         if (err == NPP_SUCCESS) {
             return CUDA_SUCCESS;
@@ -276,21 +276,21 @@ private:
 
 public:
     static bool convertFormat(
-        const std::shared_ptr<Frame>& frame, uint8_t* outMem, const PixelFormat outFormat, bool asynch) noexcept
+        const std::shared_ptr<Frame>& frame, uint8_t* const outMem, const PixelFormat outFormat, const bool asynch)
     {
         if (frame == nullptr || outMem == nullptr) {
-            log("Invalid frame"s, LogLevel::Error);
+            logInternal(LogLevel::Error, "Invalid frame");
             return false;
         }
         // This only supports cuda frames
         if (frame->getDataType() != DecodeType::Cuda) {
-            log("Only CUDA frames are currently supported by convertFormat"s, LogLevel::Error);
+            logInternal(LogLevel::Error, "Only CUDA frames are currently supported by convertFormat");
             return false;
         }
         auto* framesContext = reinterpret_cast<AVHWFramesContext*>(frame->m_frame->hw_frames_ctx->data);
         auto* cudaDevice = reinterpret_cast<AVCUDADeviceContext*>(framesContext->device_ctx->hwctx);
         if (cuCtxPushCurrent(cudaDevice->cuda_ctx) != CUDA_SUCCESS) {
-            log("Failed to set CUDA context"s, LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to set CUDA context");
             return false;
         }
         const auto stream = cudaDevice->stream;
@@ -328,7 +328,7 @@ public:
             case PixelFormat::YUV420P: {
                 const auto data2 = frame->getFrameData(1);
                 const auto data3 = frame->getFrameData(2);
-                const uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
+                const uint8_t* const inMem[3] = {data1.first, data2.first, data3.first};
                 int32_t inStep[3] = {data1.second, data2.second, data3.second};
                 switch (outFormat) {
                     case PixelFormat::RGB8P: {
@@ -349,7 +349,7 @@ public:
             case PixelFormat::YUV422P: {
                 const auto data2 = frame->getFrameData(1);
                 const auto data3 = frame->getFrameData(2);
-                const uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
+                const uint8_t* const inMem[3] = {data1.first, data2.first, data3.first};
                 int32_t inStep[3] = {data1.second, data2.second, data3.second};
                 switch (outFormat) {
                     case PixelFormat::RGB8P: {
@@ -370,7 +370,7 @@ public:
             case PixelFormat::YUV444P: {
                 const auto data2 = frame->getFrameData(1);
                 const auto data3 = frame->getFrameData(2);
-                const uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
+                const uint8_t* const inMem[3] = {data1.first, data2.first, data3.first};
                 switch (outFormat) {
                     case PixelFormat::RGB8P: {
                         ret = cudaNppStatusToError(
@@ -390,7 +390,7 @@ public:
 #    endif
             case PixelFormat::NV12: {
                 const auto data2 = frame->getFrameData(1);
-                uint8_t* inMem[2] = {data1.first, data2.first};
+                uint8_t* const inMem[2] = {data1.first, data2.first};
                 switch (outFormat) {
 #    if FFFR_BUILD_NPPI
                     case PixelFormat::RGB8: {
@@ -445,7 +445,7 @@ public:
             case PixelFormat::RGB8P: {
                 const auto data2 = frame->getFrameData(1);
                 const auto data3 = frame->getFrameData(2);
-                const uint8_t* inMem[3] = {data1.first, data2.first, data3.first};
+                const uint8_t* const inMem[3] = {data1.first, data2.first, data3.first};
                 switch (outFormat) {
                     case PixelFormat::YUV444P: {
                         ret = cudaNppStatusToError(
@@ -473,13 +473,13 @@ public:
         }
         if (ret != CUDA_SUCCESS) {
             if (ret == CUDA_ERROR_UNKNOWN) {
-                log("Format conversion not currently supported", LogLevel::Error);
+                logInternal(LogLevel::Error, "Format conversion not currently supported");
             } else if (ret == CUDA_ERROR_LAUNCH_FAILED) {
-                log("CUDA kernel for format conversion failed", LogLevel::Error);
+                logInternal(LogLevel::Error, "CUDA kernel for format conversion failed");
             } else {
                 const char* errorString;
                 cuGetErrorName(ret, &errorString);
-                log("Format conversion failed: "s += errorString, LogLevel::Error);
+                logInternal(LogLevel::Error, "Format conversion failed: ", errorString);
             }
         }
         if (!asynch) {
@@ -487,12 +487,12 @@ public:
             if (ret != CUDA_SUCCESS) {
                 const char* errorString;
                 cuGetErrorName(ret, &errorString);
-                log("Format conversion failed: "s += errorString, LogLevel::Error);
+                logInternal(LogLevel::Error, "Format conversion failed: ", errorString);
             }
         }
         CUcontext dummy;
         if (cuCtxPopCurrent(&dummy) != CUDA_SUCCESS) {
-            log("Failed to restore CUDA context", LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to restore CUDA context");
         }
         return (ret == CUDA_SUCCESS);
     }
@@ -500,7 +500,7 @@ public:
     static bool synchroniseConvert(const std::shared_ptr<Stream>& stream) noexcept
     {
         if (stream == nullptr || stream->m_codecContext->pix_fmt != AV_PIX_FMT_CUDA || stream->m_outputHost) {
-            log("Invalid stream"s, LogLevel::Error);
+            logInternal(LogLevel::Error, "Invalid stream");
             return false;
         }
         CUcontext context = nullptr;
@@ -515,18 +515,18 @@ public:
             context = cudaDevice->cuda_ctx;
         }
         if (cuCtxPushCurrent(context) != CUDA_SUCCESS) {
-            log("Failed to set CUDA context"s, LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to set CUDA context");
             return false;
         }
         const auto err = cuCtxSynchronize();
         CUcontext dummy;
         if (cuCtxPopCurrent(&dummy) != CUDA_SUCCESS) {
-            log("Failed to restore CUDA context", LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to restore CUDA context");
         }
         if (err != CUDA_SUCCESS) {
             const char* errorString;
             cuGetErrorName(err, &errorString);
-            log("Hardware synchronisation failed: "s += errorString, LogLevel::Error);
+            logInternal(LogLevel::Error, "Hardware synchronisation failed: ", errorString);
             return false;
         }
         return true;
@@ -558,7 +558,7 @@ bool convertFormatAsync(const std::shared_ptr<Frame>& frame, uint8_t* outMem, co
 #endif
 }
 
-bool synchroniseConvert(const std::shared_ptr<Stream>& stream)
+bool synchroniseConvert(const std::shared_ptr<Stream>& stream) noexcept
 {
 #if FFFR_BUILD_CUDA
     return FFR::synchroniseConvert(stream);

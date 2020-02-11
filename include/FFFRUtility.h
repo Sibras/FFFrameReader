@@ -16,6 +16,7 @@
 #pragma once
 #include "FFFrameReader.h"
 
+#include <sstream>
 #include <string>
 
 extern "C" {
@@ -51,7 +52,7 @@ FFFRAMEREADER_EXPORT AVPixelFormat getPixelFormat(PixelFormat format) noexcept;
  * @param ratio The ratio.
  * @returns The rational.
  */
-FFFRAMEREADER_EXPORT Rational getRational(AVRational ratio);
+FFFRAMEREADER_EXPORT Rational getRational(AVRational ratio) noexcept;
 
 /**
  * Return the timestamp of a a packet.
@@ -59,4 +60,22 @@ FFFRAMEREADER_EXPORT Rational getRational(AVRational ratio);
  * @returns The packets internal timestamp.
  */
 FFFRAMEREADER_NO_EXPORT int64_t getPacketTimeStamp(const AVPacket& packet) noexcept;
+
+/**
+ * Helper function for exception-less logging
+ * @tparam Args Type of the arguments.
+ * @param  level The log level.
+ * @param  args  Variable arguments providing the arguments.
+ */
+template<typename... Args>
+FFFRAMEREADER_NO_EXPORT void logInternal(const LogLevel level, Args... args) noexcept
+{
+    try {
+        std::ostringstream out;
+        const int arr[] = {0, (out << args, void(), 0)...};
+        const std::string output = out.str();
+        log(output, level);
+    } catch (...) {
+    }
+}
 } // namespace Ffr

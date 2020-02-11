@@ -64,7 +64,7 @@ bool EncoderOptions::operator!=(const EncoderOptions& other) const noexcept
 }
 
 FormatContextPtr::FormatContextPtr(AVFormatContext* formatContext) noexcept
-    : m_formatContext(formatContext, [](AVFormatContext* p) { avformat_close_input(&p); })
+    : m_formatContext(formatContext, [](AVFormatContext* p) noexcept { avformat_close_input(&p); })
 {}
 
 AVFormatContext* FormatContextPtr::operator->() const noexcept
@@ -78,7 +78,7 @@ AVFormatContext* FormatContextPtr::get() const noexcept
 }
 
 CodecContextPtr::CodecContextPtr(AVCodecContext* codecContext) noexcept
-    : m_codecContext(codecContext, [](AVCodecContext* p) { avcodec_free_context(&p); })
+    : m_codecContext(codecContext, [](AVCodecContext* p) noexcept { avcodec_free_context(&p); })
 {}
 
 AVCodecContext* CodecContextPtr::operator->() const noexcept
@@ -151,7 +151,7 @@ const AVFrame* FramePtr::operator->() const noexcept
 }
 
 OutputFormatContextPtr::OutputFormatContextPtr(AVFormatContext* formatContext) noexcept
-    : m_formatContext(formatContext, [](AVFormatContext* p) { avformat_free_context(p); })
+    : m_formatContext(formatContext, [](AVFormatContext* p) noexcept { avformat_free_context(p); })
 {}
 
 AVFormatContext* OutputFormatContextPtr::get() const noexcept

@@ -53,7 +53,7 @@ PixelFormat getPixelFormat(const AVPixelFormat format) noexcept
             return PixelFormat::RGB32FP;
         default:
             try {
-                log("Unsupported pixel format detected: "s += to_string(format), LogLevel::Error);
+                logInternal(LogLevel::Error, "Unsupported pixel format detected: ", to_string(format));
             } catch (...) {
             }
             return PixelFormat::Auto;
@@ -73,7 +73,7 @@ AVPixelFormat getPixelFormat(PixelFormat format) noexcept
     return static_cast<AVPixelFormat>(format);
 }
 
-Rational getRational(const AVRational ratio)
+Rational getRational(const AVRational ratio) noexcept
 {
     return Rational{ratio.num, ratio.den};
 }

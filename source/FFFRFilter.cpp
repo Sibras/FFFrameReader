@@ -32,7 +32,7 @@ extern "C" {
 
 namespace Ffr {
 Filter::FilterGraphPtr::FilterGraphPtr(AVFilterGraph* filterGraph) noexcept
-    : m_filterGraph(filterGraph, [](AVFilterGraph* p) { avfilter_graph_free(&p); })
+    : m_filterGraph(filterGraph, [](AVFilterGraph* p) noexcept { avfilter_graph_free(&p); })
 {}
 
 AVFilterGraph* Filter::FilterGraphPtr::get() const noexcept
@@ -54,7 +54,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
     const auto bufferOut = avfilter_get_by_name("buffersink");
 
     if (tempGraph.get() == nullptr || bufferIn == nullptr || bufferOut == nullptr) {
-        log("Unable to create filter graph"s, LogLevel::Error);
+        logInternal(LogLevel::Error, "Unable to create filter graph");
         return;
     }
 
@@ -62,7 +62,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
     const auto bufferInContext = avfilter_graph_alloc_filter(tempGraph.get(), bufferIn, "src");
     const auto bufferOutContext = avfilter_graph_alloc_filter(tempGraph.get(), bufferOut, "sink");
     if (bufferInContext == nullptr || bufferOutContext == nullptr) {
-        log("Could not allocate the filter buffer instance"s, LogLevel::Error);
+        logInternal(LogLevel::Error, "Could not allocate the filter buffer instance");
         return;
     }
 
@@ -85,13 +85,13 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
     auto ret = av_buffersrc_parameters_set(bufferInContext, inParams);
     if (ret < 0) {
         av_free(inParams);
-        log("Failed setting filter input parameters: "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed setting filter input parameters: ", getFfmpegErrorString(ret));
         return;
     }
     av_free(inParams);
     ret = avfilter_init_str(bufferInContext, nullptr);
     if (ret < 0) {
-        log("Could not initialize the filter input instance: "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Could not initialize the filter input instance: ", getFfmpegErrorString(ret));
         return;
     }
 
@@ -103,7 +103,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
 
     // Set the output buffer parameters
     if (formatRequired) {
-        enum AVPixelFormat pixelFormats[] = {static_cast<AVPixelFormat>(format)};
+        const enum AVPixelFormat pixelFormats[] = {static_cast<AVPixelFormat>(format)};
         ret = av_opt_set_bin(bufferOutContext, "pix_fmts", reinterpret_cast<const uint8_t*>(pixelFormats),
             sizeof(pixelFormats), AV_OPT_SEARCH_CHILDREN);
         ret = (ret < 0) ? ret : avfilter_init_str(bufferOutContext, nullptr);
@@ -111,7 +111,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
         ret = avfilter_init_str(bufferOutContext, nullptr);
     }
     if (ret < 0) {
-        log("Could not initialize the filter output instance: "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Could not initialize the filter output instance: ", getFfmpegErrorString(ret));
         return;
     }
 
@@ -120,12 +120,12 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
         if (cropRequired) {
             const auto cropFilter = avfilter_get_by_name("crop");
             if (cropFilter == nullptr) {
-                log("Unable to create crop filter"s, LogLevel::Error);
+                logInternal(LogLevel::Error, "Unable to create crop filter");
                 return;
             }
             const auto cropContext = avfilter_graph_alloc_filter(tempGraph.get(), cropFilter, "crop");
             if (cropContext == nullptr) {
-                log("Unable to create crop filter context"s, LogLevel::Error);
+                logInternal(LogLevel::Error, "Unable to create crop filter context");
                 return;
             }
             if (crop.m_top != 0 || crop.m_bottom != 0) {
@@ -149,7 +149,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
             // Link the filter into chain
             ret = avfilter_link(nextFilter, 0, cropContext, 0);
             if (ret < 0) {
-                log("Unable to link crop filter"s, LogLevel::Error);
+                logInternal(LogLevel::Error, "Unable to link crop filter");
                 return;
             }
             nextFilter = cropContext;
@@ -157,12 +157,12 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
         if (scaleRequired || formatRequired) {
             const auto scaleFilter = avfilter_get_by_name("scale");
             if (scaleFilter == nullptr) {
-                log("Unable to create scale filter"s, LogLevel::Error);
+                logInternal(LogLevel::Error, "Unable to create scale filter");
                 return;
             }
             const auto scaleContext = avfilter_graph_alloc_filter(tempGraph.get(), scaleFilter, "scale");
             if (scaleContext == nullptr) {
-                log("Unable to create scale filter context"s, LogLevel::Error);
+                logInternal(LogLevel::Error, "Unable to create scale filter context");
                 return;
             }
 
@@ -180,22 +180,22 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
             // Link the filter into chain
             ret = avfilter_link(nextFilter, 0, scaleContext, 0);
             if (ret < 0) {
-                log("Unable to link scale filter"s, LogLevel::Error);
+                logInternal(LogLevel::Error, "Unable to link scale filter");
                 return;
             }
             nextFilter = scaleContext;
         }
     } else {
-        auto* deviceContext = reinterpret_cast<AVHWDeviceContext*>(codecContext->hw_device_ctx->data);
+        const auto* const deviceContext = reinterpret_cast<AVHWDeviceContext*>(codecContext->hw_device_ctx->data);
         if (deviceContext->type == AV_HWDEVICE_TYPE_CUDA) {
             // Scale and crop are performed by decoder
             if (formatRequired) {
                 // TODO: Needs additions to ffmpegs filters for cuda accelerated format conversion
-                log("Feature not yet implemented for selected decoding type"s, LogLevel::Error);
+                logInternal(LogLevel::Error, "Feature not yet implemented for selected decoding type");
                 return;
             }
         } else {
-            log("Feature not yet implemented for selected decoding type"s, LogLevel::Error);
+            logInternal(LogLevel::Error, "Feature not yet implemented for selected decoding type");
             return;
         }
     }
@@ -203,14 +203,14 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
     // Link final filter sequence
     ret = avfilter_link(nextFilter, 0, bufferOutContext, 0);
     if (ret < 0) {
-        log("Could not set the filter links: "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Could not set the filter links: ", getFfmpegErrorString(ret));
         return;
     }
 
     // Configure the completed graph
     ret = avfilter_graph_config(tempGraph.get(), nullptr);
     if (ret < 0) {
-        log("Failed configuring filter graph: "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed configuring filter graph: ", getFfmpegErrorString(ret));
         return;
     }
 
@@ -224,7 +224,7 @@ bool Filter::sendFrame(FramePtr& frame) const noexcept
 {
     const auto err = av_buffersrc_add_frame(m_source, *frame);
     if (err < 0) {
-        log("Failed to submit frame to filter graph: "s += getFfmpegErrorString(err), LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to submit frame to filter graph: ", getFfmpegErrorString(err));
         return false;
     }
     return true;
@@ -238,7 +238,7 @@ bool Filter::receiveFrame(FramePtr& frame) const noexcept
         if ((err == AVERROR(EAGAIN)) || (err == AVERROR_EOF)) {
             return true;
         }
-        log("Failed to receive frame from filter graph: "s += getFfmpegErrorString(err), LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to receive frame from filter graph: ", getFfmpegErrorString(err));
         return false;
     }
     return true;

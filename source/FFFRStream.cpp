@@ -44,13 +44,12 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
     auto ret = avformat_open_input(&formatPtr, fileName.c_str(), nullptr, nullptr);
     FormatContextPtr tempFormat(formatPtr);
     if (ret < 0) {
-        log(("Failed to open input stream: "s += fileName) += ", "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to open input stream: ", fileName, ", ", getFfmpegErrorString(ret));
         return;
     }
     ret = avformat_find_stream_info(tempFormat.get(), nullptr);
     if (ret < 0) {
-        log(("Failed finding stream information: "s += fileName) += ", "s += getFfmpegErrorString(ret),
-            LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed finding stream information: ", fileName, ", ", getFfmpegErrorString(ret));
         return;
     }
 
@@ -58,8 +57,8 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
     AVCodec* decoder = nullptr;
     ret = av_find_best_stream(tempFormat.get(), AVMEDIA_TYPE_VIDEO, -1, -1, &decoder, 0);
     if (ret < 0) {
-        log(("Failed to find video stream in file: "s += fileName) += ", "s += getFfmpegErrorString(ret),
-            LogLevel::Error);
+        logInternal(
+            LogLevel::Error, "Failed to find video stream in file: ", fileName, ", ", getFfmpegErrorString(ret));
         return;
     }
     AVStream* stream = tempFormat->streams[ret];
@@ -101,7 +100,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
             cuvidName += "_cuvid";
             decoder = avcodec_find_decoder_by_name(cuvidName.c_str());
             if (decoder == nullptr) {
-                log("Requested hardware decoding not supported for file: "s += fileName, LogLevel::Error);
+                logInternal(LogLevel::Error, "Requested hardware decoding not supported for file: ", fileName);
                 return;
             }
         } else {
@@ -109,9 +108,8 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
             for (int i = 0;; i++) {
                 const AVCodecHWConfig* config = avcodec_get_hw_config(decoder, i);
                 if (config == nullptr) {
-                    log(("Decoder does not support device type: "s += decoder->name) +=
-                        av_hwdevice_get_type_name(DecoderContext::DecodeTypeToFFmpeg(decoderContext->getType())),
-                        LogLevel::Error);
+                    logInternal(LogLevel::Error, "Decoder does not support device type: ", decoder->name,
+                        av_hwdevice_get_type_name(DecoderContext::DecodeTypeToFFmpeg(decoderContext->getType())));
                     return;
                 }
                 if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
@@ -125,14 +123,14 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
     // Create a decoder context
     CodecContextPtr tempCodec(avcodec_alloc_context3(decoder));
     if (tempCodec.get() == nullptr) {
-        log("Failed allocating decoder context: "s += fileName, LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed allocating decoder context: ", fileName);
         return;
     }
 
     ret = avcodec_parameters_to_context(tempCodec.get(), stream->codecpar);
     if (ret < 0) {
-        log(("Failed copying parameters to decoder context: "s += fileName) += ", "s += getFfmpegErrorString(ret),
-            LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed copying parameters to decoder context: ", fileName, ", ",
+            getFfmpegErrorString(ret));
         return;
     }
 
@@ -148,7 +146,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
         tempCodec->hw_device_ctx = av_buffer_ref(decoderContext->m_deviceContext.get());
         tempCodec->get_format = decoderContext->getFormatFunction();
         if (tempCodec->get_format == nullptr) {
-            log("Hardware Device not properly implemented"s, LogLevel::Error);
+            logInternal(LogLevel::Error, "Hardware Device not properly implemented");
             return;
         }
         // Enable extra hardware frames to ensure we don't run out of buffers
@@ -175,7 +173,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
     }
     ret = avcodec_open2(tempCodec.get(), decoder, &opts);
     if (ret < 0) {
-        log(("Failed opening decoder: "s += fileName) += ": "s += getFfmpegErrorString(ret), LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed opening decoder: ", fileName, ": ", getFfmpegErrorString(ret));
         return;
     }
 
@@ -188,7 +186,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
 
     // Check if the pixel format is a known format
     if (Ffr::getPixelFormat(static_cast<AVPixelFormat>(inFormat)) == PixelFormat::Auto) {
-        log("Unknown output pixel format, Manual format conversion must be used: "s += fileName, LogLevel::Error);
+        logInternal(LogLevel::Error, "Unknown output pixel format, Manual format conversion must be used: ", fileName);
         return;
     }
 
@@ -196,7 +194,6 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
     if (scaleRequired || cropRequired || formatRequired) {
         // Create a new filter object
         shared_ptr<Filter> filter = make_shared<Filter>(postScale, crop, format, tempFormat, index, tempCodec);
-
         if (filter->m_filterGraph.get() == nullptr) {
             // filter creation failed
             return;
@@ -215,7 +212,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
     m_frameSeekSupported = m_formatContext->iformat->read_seek2 != nullptr;
 
     // Ensure ping/pong buffers are long enough to handle the maximum number of frames a video may require
-    uint32_t minFrames = std::max(static_cast<uint32_t>(m_seekThreshold), m_bufferLength);
+    const uint32_t minFrames = std::max(static_cast<uint32_t>(m_seekThreshold), m_bufferLength);
 
     // Allocate ping and pong buffers
     m_bufferPing.reserve(static_cast<size_t>(minFrames) * 2);
@@ -260,7 +257,7 @@ bool Stream::initialise() noexcept
 shared_ptr<Stream> Stream::getStream(const string& fileName, const DecoderOptions& options) noexcept
 {
     // Create the device context
-    shared_ptr<DecoderContext> deviceContext = nullptr;
+    shared_ptr<DecoderContext> deviceContext;
     if (options.m_type != DecodeType::Software) {
         deviceContext = make_shared<DecoderContext>(options.m_type, options.m_context, options.m_device);
         if (deviceContext->m_deviceContext.get() == nullptr) {
@@ -357,12 +354,12 @@ shared_ptr<Frame> Stream::peekNextFrame() noexcept
         }
         // Check if there are any new frames or we reached EOF
         if (m_bufferPing.size() == 0) {
-            log("Cannot get a new frame, End of file has been reached"s, LogLevel::Warning);
+            logInternal(LogLevel::Warning, "Cannot get a new frame, End of file has been reached");
             return nullptr;
         }
     }
     // Get frame from ping buffer
-    return m_bufferPing[m_bufferPingHead];
+    return m_bufferPing.at(m_bufferPingHead);
 }
 
 shared_ptr<Frame> Stream::getNextFrame() noexcept
@@ -493,13 +490,12 @@ bool Stream::seek(const int64_t timeStamp) noexcept
         // Bail if seek is not possible
         return false;
     }
-
     lock_guard<recursive_mutex> lock(m_mutex);
     // Check if we actually have any frames in the current buffer
     if (m_bufferPingHead < m_bufferPing.size()) {
         // Check if the frame is in the current buffer
         const auto halfFrameDuration = frameToTime(1) / 2;
-        if ((timeStamp >= m_bufferPing[m_bufferPingHead]->getTimeStamp() - halfFrameDuration) &&
+        if ((timeStamp >= m_bufferPing.at(m_bufferPingHead)->getTimeStamp() - halfFrameDuration) &&
             (timeStamp < m_bufferPing.back()->getTimeStamp() + halfFrameDuration)) {
             // Dump all frames before requested one
             while (true) {
@@ -539,8 +535,7 @@ bool Stream::seek(const int64_t timeStamp) noexcept
     const auto err = avformat_seek_file(m_formatContext.get(), m_index,
         localTimeStamp - timeStamp2ToTimeStamp(m_seekThreshold), localTimeStamp, localTimeStamp, 0);
     if (err < 0) {
-        log("Failed seeking to specified time stamp "s += to_string(timeStamp) += getFfmpegErrorString(err),
-            LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed seeking to specified time stamp ", timeStamp, getFfmpegErrorString(err));
         return false;
     }
 
@@ -554,12 +549,11 @@ bool Stream::seekFrame(const int64_t frame) noexcept
         // Early out if seek is not possible
         return false;
     }
-
     lock_guard<recursive_mutex> lock(m_mutex);
     // Check if we actually have any frames in the current buffer
     if (m_bufferPingHead < m_bufferPing.size()) {
         // Check if the frame is in the current buffer
-        if ((frame >= m_bufferPing[m_bufferPingHead]->getFrameNumber()) &&
+        if ((frame >= m_bufferPing.at(m_bufferPingHead)->getFrameNumber()) &&
             (frame <= m_bufferPing.back()->getFrameNumber())) {
             // Dump all frames before requested one
             while (true) {
@@ -602,8 +596,7 @@ bool Stream::seekFrame(const int64_t frame) noexcept
     const auto err = avformat_seek_file(m_formatContext.get(), m_index,
         frameInternal - timeStampToFrame2(m_seekThreshold), frameInternal, frameInternal, AVSEEK_FLAG_FRAME);
     if (err < 0) {
-        log("Failed to seek to specified frame "s += to_string(frame) += ": "s += getFfmpegErrorString(err),
-            LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to seek to specified frame ", frame, ": ", getFfmpegErrorString(err));
         return false;
     }
 
@@ -717,7 +710,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
         if (ret < 0) {
             if (ret != AVERROR_EOF) {
                 av_packet_unref(&packet);
-                log("Failed to retrieve new packet: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                logInternal(LogLevel::Error, "Failed to retrieve new packet: ", getFfmpegErrorString(ret));
                 return false;
             }
             eof = true;
@@ -735,7 +728,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                         ret = av_read_frame(m_formatContext.get(), &packet);
                         if (ret < 0) {
                             av_packet_unref(&packet);
-                            log("Failed to retrieve new packet: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                            logInternal(LogLevel::Error, "Failed to retrieve new packet: ", getFfmpegErrorString(ret));
                             return false;
                         }
                         packetTimeStamp = getPacketTimeStamp(packet);
@@ -753,7 +746,8 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                     if (ret < 0) {
                         av_packet_unref(&packet);
                         av_dict_free(&markerDict);
-                        log("Failed to create side data dictionary: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                        logInternal(
+                            LogLevel::Error, "Failed to create side data dictionary: ", getFfmpegErrorString(ret));
                         return false;
                     }
                     int markerSize = 0;
@@ -761,14 +755,15 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                     if (sideMarker == nullptr) {
                         av_packet_unref(&packet);
                         av_dict_free(&markerDict);
-                        log("Failed to create packet side data"s, LogLevel::Error);
+                        logInternal(LogLevel::Error, "Failed to create packet side data");
                         return false;
                     }
                     av_dict_free(&markerDict);
                     ret = av_packet_add_side_data(&packet, AV_PKT_DATA_STRINGS_METADATA, sideMarker, markerSize);
                     if (ret < 0) {
                         av_packet_unref(&packet);
-                        log("Failed to add packer marker side data: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                        logInternal(
+                            LogLevel::Error, "Failed to add packer marker side data: ", getFfmpegErrorString(ret));
                         return false;
                     }
                 }
@@ -789,12 +784,12 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                     ret = avcodec_send_packet(m_codecContext.get(), &packet);
                     if (ret == AVERROR(EAGAIN)) {
                         av_packet_unref(&packet);
-                        log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                        logInternal(LogLevel::Error, "Failed to send packet to decoder: ", getFfmpegErrorString(ret));
                         return false;
                     }
                 } else {
                     av_packet_unref(&packet);
-                    log("Failed to send packet to decoder: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                    logInternal(LogLevel::Error, "Failed to send packet to decoder: ", getFfmpegErrorString(ret));
                     return false;
                 }
             }
@@ -815,7 +810,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
 
     // Check no buffer flush succeeded
     if (flushFrames) {
-        log("Failed to detect flush packet", LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to detect flush packet");
         return false;
     }
 
@@ -843,7 +838,7 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime, bool& flushCheck) noexcept
         if (*m_tempFrame == nullptr) {
             m_tempFrame = FramePtr(av_frame_alloc());
             if (*m_tempFrame == nullptr) {
-                log("Failed to allocate new frame"s, LogLevel::Error);
+                logInternal(LogLevel::Error, "Failed to allocate new frame");
                 return false;
             }
         }
@@ -852,7 +847,7 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime, bool& flushCheck) noexcept
             if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF)) {
                 return true;
             }
-            log("Failed to receive decoded frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to receive decoded frame: ", getFfmpegErrorString(ret));
             return false;
         }
 
@@ -942,10 +937,9 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime, bool& flushCheck) noexcept
             if (frameNum != previous + 1) {
                 // Fill in missing frames by duplicating the old one
                 auto fillFrameNum = previous;
-                int64_t fillTimeStamp;
                 for (auto i = previous + 1; i < frameNum; i++) {
                     ++fillFrameNum;
-                    fillTimeStamp = frameToTime2(fillFrameNum);
+                    int64_t fillTimeStamp = frameToTime2(fillFrameNum);
                     FramePtr frameClone(av_frame_clone(*m_tempFrame));
                     // Perform any required filtering
                     if (!processFrame(frameClone)) {
@@ -984,14 +978,14 @@ bool Stream::processFrame(FramePtr& frame) const noexcept
         FramePtr frame2(av_frame_alloc());
         if (*frame2 == nullptr) {
             av_frame_unref(*frame);
-            log("Failed to allocate new host frame"s, LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to allocate new host frame");
             return false;
         }
         const auto ret2 = av_hwframe_transfer_data(*frame2, *frame, 0);
         av_frame_unref(*frame);
         if (ret2 < 0) {
             av_frame_unref(*frame2);
-            log("Failed to copy frame to host: "s += getFfmpegErrorString(ret2), LogLevel::Error);
+            logInternal(LogLevel::Error, "Failed to copy frame to host: ", getFfmpegErrorString(ret2));
             return false;
         }
         frame = move(frame2);
@@ -1021,11 +1015,11 @@ bool Stream::processFrame(FramePtr& frame) const noexcept
 void Stream::popFrame() noexcept
 {
     if (m_bufferPingHead >= m_bufferPing.size()) {
-        log("No more frames to pop"s, LogLevel::Error);
+        logInternal(LogLevel::Error, "No more frames to pop");
         return;
     }
     // Release reference and pop frame
-    m_bufferPing[m_bufferPingHead++].reset();
+    m_bufferPing.at(m_bufferPingHead++).reset();
 }
 
 int32_t Stream::getCodecDelay() const noexcept
@@ -1053,13 +1047,13 @@ int32_t Stream::getSeekThreshold() const noexcept
 
 int32_t Stream::GetCodecDelay(const CodecContextPtr& codec) noexcept
 {
-    return std::max(((codec->codec->capabilities & AV_CODEC_CAP_DELAY) ? codec->delay : 0) + codec->has_b_frames, 1);
+    return std::max((codec->codec->capabilities & AV_CODEC_CAP_DELAY ? codec->delay : 0) + codec->has_b_frames, 1);
 }
 
 int64_t Stream::getStreamStartTime() const noexcept
 {
     // First check if the stream has a start timeStamp
-    AVStream* stream = m_formatContext->streams[m_index];
+    const AVStream* const stream = m_formatContext->streams[m_index];
     if (stream->start_time != int64_t(AV_NOPTS_VALUE)) {
         return stream->start_time;
     }
@@ -1070,7 +1064,7 @@ int64_t Stream::getStreamStartTime() const noexcept
         startDts = std::min(startDts, stream->first_dts);
     }
     if (av_seek_frame(m_formatContext.get(), m_index, startDts, AVSEEK_FLAG_BACKWARD) < 0) {
-        log("Failed to determine stream start time"s, LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to determine stream start time");
         return 0;
     }
     AVPacket packet;
@@ -1100,7 +1094,7 @@ int64_t Stream::getStreamStartTime() const noexcept
 
 int64_t Stream::getStreamFrames() const noexcept
 {
-    AVStream* stream = m_formatContext->streams[m_index];
+    const AVStream* const stream = m_formatContext->streams[m_index];
     // Check if the number of frames is specified in the stream
     if (stream->nb_frames > 0) {
         return stream->nb_frames - timeStampToFrame(m_startTimeStamp * 2);
@@ -1108,7 +1102,7 @@ int64_t Stream::getStreamFrames() const noexcept
 
     // Attempt to calculate from stream duration, time base and fps
     if (stream->duration > 0) {
-        return timeStampToFrame(int64_t(stream->duration));
+        return timeStampToFrame(static_cast<int64_t>(stream->duration));
     }
 
     // If we are at this point then the only option is to scan the entire file and check the DTS/PTS.
@@ -1118,7 +1112,7 @@ int64_t Stream::getStreamFrames() const noexcept
     avcodec_flush_buffers(m_codecContext.get());
     const auto maxSeek = frameToTimeStampNoOffset(1UL << 29UL);
     if (avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, maxSeek, maxSeek, 0) < 0) {
-        log("Failed to determine number of frames in stream"s, LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to determine number of frames in stream");
         return 0;
     }
 
@@ -1150,7 +1144,7 @@ int64_t Stream::getStreamDuration() const noexcept
 {
     // First try and get the format duration if specified. For some formats this durations can override the duration
     // specified within each stream which is why it should be checked first.
-    AVStream* stream = m_formatContext->streams[m_index];
+    AVStream* const stream = m_formatContext->streams[m_index];
     if (m_formatContext->duration > 0) {
         return m_formatContext->duration -
             timeStampToTime(m_startTimeStamp * 2); //*2 To avoid the minus in timeStampToTime
@@ -1168,7 +1162,7 @@ int64_t Stream::getStreamDuration() const noexcept
     avcodec_flush_buffers(m_codecContext.get());
     const auto maxSeek = frameToTimeStampNoOffset(1UL << 29UL);
     if (avformat_seek_file(m_formatContext.get(), m_index, INT64_MIN, maxSeek, maxSeek, 0) < 0) {
-        log("Failed to determine stream duration"s, LogLevel::Error);
+        logInternal(LogLevel::Error, "Failed to determine stream duration");
         return 0;
     }
 

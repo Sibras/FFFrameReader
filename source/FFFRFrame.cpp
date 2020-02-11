@@ -90,7 +90,7 @@ PixelFormat Frame::getPixelFormat() const noexcept
     if (m_frame->hw_frames_ctx == nullptr) {
         return Ffr::getPixelFormat(static_cast<AVPixelFormat>(m_frame->format));
     }
-    auto* framesContext = reinterpret_cast<AVHWFramesContext*>(m_frame->hw_frames_ctx->data);
+    const auto* const framesContext = reinterpret_cast<AVHWFramesContext*>(m_frame->hw_frames_ctx->data);
     return Ffr::getPixelFormat(framesContext->sw_format);
 }
 
@@ -99,7 +99,7 @@ int32_t Frame::getNumberPlanes() const noexcept
     if (m_frame->hw_frames_ctx == nullptr) {
         return av_pix_fmt_count_planes(static_cast<AVPixelFormat>(m_frame->format));
     }
-    auto* framesContext = reinterpret_cast<AVHWFramesContext*>(m_frame->hw_frames_ctx->data);
+    const auto* const framesContext = reinterpret_cast<AVHWFramesContext*>(m_frame->hw_frames_ctx->data);
     return av_pix_fmt_count_planes(framesContext->sw_format);
 }
 
