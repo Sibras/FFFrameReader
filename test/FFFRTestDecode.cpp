@@ -36,18 +36,18 @@ static std::vector<TestParamsDecode> g_testDataDecode = {
     {0, false, false, true, false},
     {1, false, false, true, false},
     {2, false, false, true, false},
-#if FFFR_BUILD_CUDA
     {0, true, false, false, false},
     {0, true, false, true, false},
+#if FFFR_BUILD_CUDA
     {0, true, true, false, false},
     {0, true, true, true, false},
 #endif
     {0, false, false, true, true},
     {1, false, false, true, true},
     {2, false, false, true, true},
-#if FFFR_BUILD_CUDA
     {0, true, false, false, true},
     {0, true, false, true, true},
+#if FFFR_BUILD_CUDA
     {0, true, true, false, true},
     {0, true, true, true, true},
 #endif
@@ -71,9 +71,9 @@ public:
     void SetUp(const TestParamsDecode& params)
     {
         DecoderOptions options;
-#if FFFR_BUILD_CUDA
         if (params.m_useNvdec) {
             options.m_type = DecodeType::Cuda;
+#if FFFR_BUILD_CUDA
             if (params.m_useContext) {
                 // Setup a cuda context
                 auto err = cuInit(0);
@@ -86,8 +86,8 @@ public:
 
                 options.m_context = m_cudaContext;
             }
-        }
 #endif
+        }
         options.m_outputHost = params.m_outputToHost;
         options.m_noBufferFlush = params.m_noBufferFlush;
         m_stream = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
@@ -189,6 +189,34 @@ TEST_P(DecodeTest1, getMultiple)
     ASSERT_EQ(frame1->getTimeStamp(), 0);
     ASSERT_EQ(frame2->getTimeStamp(), 0);
     ASSERT_EQ(frame3->getTimeStamp(), 0);
+}
+
+TEST_P(DecodeTest1, seekFrame1Loop)
+{
+    // Seek to start
+    ASSERT_TRUE(m_decoder.m_stream->seekFrame(0));
+    constexpr uint32_t numLoops = 5;
+    constexpr uint32_t numFrames = 25;
+    if (g_testData[GetParam().m_testDataIndex].m_totalFrames >= numLoops * (1 + numFrames)) {
+        int64_t frame = 0;
+        // Perform multiple forward seeks
+        for (uint32_t i = 0; i < numLoops; i++) {
+            ASSERT_TRUE(m_decoder.m_stream->seekFrame(frame));
+            // Check that multiple sequential frames can be read
+            int64_t frame2 = frame;
+            for (uint32_t j = 0; j < numFrames; j++) {
+                const auto frame1 = m_decoder.m_stream->getNextFrame();
+                // Allow EOF
+                if (frame1 == nullptr && m_decoder.m_stream->isEndOfFile()) {
+                    return;
+                }
+                ASSERT_NE(frame1, nullptr);
+                ASSERT_EQ(frame1->getFrameNumber(), frame2);
+                ++frame2;
+            }
+            frame += 1;
+        }
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(DecodeTestData, DecodeTest1, ::testing::ValuesIn(g_testDataDecode));
