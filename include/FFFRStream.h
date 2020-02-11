@@ -379,10 +379,11 @@ private:
 
     /**
      * Decodes any frames currently pending in the decoder.
-     * @param flushTillTime All frames with decoder time stamps before this will be discarded.
+     * @param [in,out] flushTillTime All frames with decoder time stamps before this will be discarded.
+     * @param          flushCheck    True to wait for no buffer flush packet to be received.
      * @returns True if it succeeds, false if it fails.
      */
-    FFFRAMEREADER_NO_EXPORT bool decodeNextFrames(int64_t& flushTillTime) noexcept;
+    FFFRAMEREADER_NO_EXPORT bool decodeNextFrames(int64_t& flushTillTime, bool& flushCheck) noexcept;
 
     /**
      * Process a frame with any required additional filtering/conversion.

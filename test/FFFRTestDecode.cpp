@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "FFFRConfig.h"
 #include "FFFRTestData.h"
 #include "FFFrameReader.h"
 
@@ -30,26 +31,29 @@ struct TestParamsDecode
     bool m_useContext;
     bool m_outputToHost;
     bool m_noBufferFlush;
+    uint32_t m_bufferLength;
 };
 
 static std::vector<TestParamsDecode> g_testDataDecode = {
-    {0, false, false, true, false},
-    {1, false, false, true, false},
-    {2, false, false, true, false},
-    {0, true, false, false, false},
-    {0, true, false, true, false},
+    {0, false, false, true, false, 1},
+    {1, false, false, true, false, 1},
+    {2, false, false, true, false, 1},
+    {0, true, false, false, false, 1},
+    {0, true, false, true, false, 1},
 #if FFFR_BUILD_CUDA
-    {0, true, true, false, false},
-    {0, true, true, true, false},
+    {0, true, true, false, false, 1},
+    {0, true, true, true, false, 1},
 #endif
-    {0, false, false, true, true},
-    {1, false, false, true, true},
-    {2, false, false, true, true},
-    {0, true, false, false, true},
-    {0, true, false, true, true},
+    {0, false, false, true, true, 1},
+    {1, false, false, true, true, 1},
+    {2, false, false, true, true, 1},
+    {0, true, false, false, true, 1},
+    {0, true, false, true, true, 1},
 #if FFFR_BUILD_CUDA
-    {0, true, true, false, true},
-    {0, true, true, true, true},
+    {0, true, true, false, true, 1},
+    {0, true, true, true, true, 1},
+    {0, true, true, false, true, 10},
+    {0, true, true, true, true, 10},
 #endif
 };
 
@@ -90,6 +94,7 @@ public:
         }
         options.m_outputHost = params.m_outputToHost;
         options.m_noBufferFlush = params.m_noBufferFlush;
+        options.m_bufferLength = params.m_bufferLength;
         m_stream = Stream::getStream(g_testData[params.m_testDataIndex].m_fileName, options);
         ASSERT_NE(m_stream, nullptr);
     }

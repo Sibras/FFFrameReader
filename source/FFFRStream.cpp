@@ -709,6 +709,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
     AVPacket packet;
     av_init_packet(&packet);
     bool eof = false;
+    bool flushFrames = seeking & m_noBufferFlush;
     do {
         // This may or may not be a keyframe, So we just start decoding packets until we receive a valid frame
         auto ret = av_read_frame(m_formatContext.get(), &packet);
@@ -716,7 +717,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
         if (ret < 0) {
             if (ret != AVERROR_EOF) {
                 av_packet_unref(&packet);
-                log("Failed to retrieve new frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                log("Failed to retrieve new packet: "s += getFfmpegErrorString(ret), LogLevel::Error);
                 return false;
             }
             eof = true;
@@ -734,7 +735,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                         ret = av_read_frame(m_formatContext.get(), &packet);
                         if (ret < 0) {
                             av_packet_unref(&packet);
-                            log("Failed to retrieve new frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                            log("Failed to retrieve new packet: "s += getFfmpegErrorString(ret), LogLevel::Error);
                             return false;
                         }
                         packetTimeStamp = getPacketTimeStamp(packet);
@@ -745,6 +746,31 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                 if (!m_noBufferFlush) {
                     avcodec_flush_buffers(m_codecContext.get());
                     m_lastDecodedTimeStamp = -1;
+                } else {
+                    // Mark the new packet as the next desired output frame
+                    AVDictionary* markerDict = nullptr;
+                    ret = av_dict_set(&markerDict, "sideMarker", "0", 0);
+                    if (ret < 0) {
+                        av_packet_unref(&packet);
+                        av_dict_free(&markerDict);
+                        log("Failed to create side data dictionary: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                        return false;
+                    }
+                    int markerSize = 0;
+                    const auto sideMarker = av_packet_pack_dictionary(markerDict, &markerSize);
+                    if (sideMarker == nullptr) {
+                        av_packet_unref(&packet);
+                        av_dict_free(&markerDict);
+                        log("Failed to create packet side data"s, LogLevel::Error);
+                        return false;
+                    }
+                    av_dict_free(&markerDict);
+                    ret = av_packet_add_side_data(&packet, AV_PKT_DATA_STRINGS_METADATA, sideMarker, markerSize);
+                    if (ret < 0) {
+                        av_packet_unref(&packet);
+                        log("Failed to add packer marker side data: "s += getFfmpegErrorString(ret), LogLevel::Error);
+                        return false;
+                    }
                 }
                 m_lastValidTimeStamp = -1;
             }
@@ -757,7 +783,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                     avcodec_flush_buffers(m_codecContext.get());
                     ret = avcodec_send_packet(m_codecContext.get(), &packet);
                 } else if (ret == AVERROR(EAGAIN)) {
-                    if (!decodeNextFrames(flushTillTime)) {
+                    if (!decodeNextFrames(flushTillTime, flushFrames)) {
                         return false;
                     }
                     ret = avcodec_send_packet(m_codecContext.get(), &packet);
@@ -778,7 +804,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
 
         if (sentPacket) {
             // Decode any pending frames
-            if (!decodeNextFrames(flushTillTime)) {
+            if (!decodeNextFrames(flushTillTime, flushFrames)) {
                 return false;
             }
         }
@@ -786,6 +812,12 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
         // TODO: The maximum number of frames that are needed to get a valid frame is calculated using getCodecDelay().
         // If more than that are passed without a returned frame then an error has occured (ignoring flushTillTime).
     } while (m_bufferPong.size() < m_bufferLength && !eof);
+
+    // Check no buffer flush succeeded
+    if (flushFrames) {
+        log("Failed to detect flush packet", LogLevel::Error);
+        return false;
+    }
 
     if (eof) {
         // Check if we got more frames than we should have. This occurs when there are missing frames that are
@@ -804,7 +836,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
     return true;
 }
 
-bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
+bool Stream::decodeNextFrames(int64_t& flushTillTime, bool& flushCheck) noexcept
 {
     // Loop through and retrieve all decoded frames
     do {
@@ -866,6 +898,15 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
         m_lastDecodedTimeStamp = offsetTimeStamp;
 
         if (flushTillTime >= 0) {
+            if (flushCheck) {
+                // Check if the current frame has the correct marker
+                if (av_dict_get(m_tempFrame->metadata, "sideMarker", nullptr, 0) == nullptr) {
+                    // Dump this frame and continue
+                    av_frame_unref(*m_tempFrame);
+                    continue;
+                }
+            }
+            flushCheck = false;
             const auto singleFrame = frameToTimeStamp2(1);
             const auto doubleTime =
                 offsetTimeStamp * 2; // Use double in cases where singleFrame cannot be halved without losses
