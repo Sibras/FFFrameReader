@@ -77,4 +77,9 @@ Rational getRational(const AVRational ratio)
 {
     return Rational{ratio.num, ratio.den};
 }
+
+int64_t getPacketTimeStamp(const AVPacket& packet) noexcept
+{
+    return packet.dts != AV_NOPTS_VALUE ? packet.dts : packet.pts;
+}
 } // namespace Ffr

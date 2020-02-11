@@ -19,6 +19,7 @@
 #include <string>
 
 extern "C" {
+#include <libavcodec/avcodec.h>
 #include <libavutil/pixfmt.h>
 #include <libavutil/rational.h>
 }
@@ -51,4 +52,11 @@ FFFRAMEREADER_EXPORT AVPixelFormat getPixelFormat(PixelFormat format) noexcept;
  * @returns The rational.
  */
 FFFRAMEREADER_EXPORT Rational getRational(AVRational ratio);
+
+/**
+ * Return the timestamp of a a packet.
+ * @param  packet The packet.
+ * @returns The packets internal timestamp.
+ */
+FFFRAMEREADER_NO_EXPORT int64_t getPacketTimeStamp(const AVPacket& packet) noexcept;
 } // namespace Ffr

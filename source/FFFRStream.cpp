@@ -727,7 +727,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
             if (seeking) {
                 seeking = false;
                 // Check if a seek went backwards when it should have gone forward
-                auto packetTimeStamp = packet.dts != AV_NOPTS_VALUE ? packet.dts : packet.pts;
+                auto packetTimeStamp = getPacketTimeStamp(packet);
                 if (flushTillTime > m_lastDecodedTimeStamp && m_lastPacketTimeStamp > packetTimeStamp) {
                     while (m_lastPacketTimeStamp > packetTimeStamp || m_index != packet.stream_index) {
                         av_packet_unref(&packet);
@@ -737,7 +737,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                             log("Failed to retrieve new frame: "s += getFfmpegErrorString(ret), LogLevel::Error);
                             return false;
                         }
-                        packetTimeStamp = packet.dts != AV_NOPTS_VALUE ? packet.dts : packet.pts;
+                        packetTimeStamp = getPacketTimeStamp(packet);
                     }
                     av_packet_unref(&packet);
                     continue;
@@ -748,7 +748,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                 }
                 m_lastValidTimeStamp = -1;
             }
-            m_lastPacketTimeStamp = packet.dts != AV_NOPTS_VALUE ? packet.dts : packet.pts;
+            m_lastPacketTimeStamp = getPacketTimeStamp(packet);
             // Convert timebase
             av_packet_rescale_ts(&packet, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
             ret = avcodec_send_packet(m_codecContext.get(), &packet);
@@ -1043,12 +1043,7 @@ int64_t Stream::getStreamStartTime() const noexcept
             return 0;
         }
         if (packet.stream_index == m_index) {
-            // Get the Presentation time stamp for the packet, if this value is not set then try the Decompression time
-            // stamp
-            auto pts = packet.pts;
-            if (pts == int64_t(AV_NOPTS_VALUE)) {
-                pts = packet.dts;
-            }
+            const auto pts = getPacketTimeStamp(packet);
             if ((pts != int64_t(AV_NOPTS_VALUE)) &&
                 ((pts < startTimeStamp) || (startTimeStamp == int64_t(AV_NOPTS_VALUE)))) {
                 startTimeStamp = pts;
@@ -1091,7 +1086,7 @@ int64_t Stream::getStreamFrames() const noexcept
     av_init_packet(&packet);
     while (av_read_frame(m_formatContext.get(), &packet) >= 0) {
         if (packet.stream_index == m_index) {
-            const auto found = packet.pts != AV_NOPTS_VALUE ? packet.pts : packet.dts;
+            const auto found = getPacketTimeStamp(packet);
             if (found > foundTimeStamp) {
                 foundTimeStamp = found;
             }
