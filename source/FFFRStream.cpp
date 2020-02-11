@@ -110,12 +110,12 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
                 const AVCodecHWConfig* config = avcodec_get_hw_config(decoder, i);
                 if (config == nullptr) {
                     log(("Decoder does not support device type: "s += decoder->name) +=
-                        av_hwdevice_get_type_name(DecoderContext::decodeTypeToFFmpeg(decoderContext->getType())),
+                        av_hwdevice_get_type_name(DecoderContext::DecodeTypeToFFmpeg(decoderContext->getType())),
                         LogLevel::Error);
                     return;
                 }
                 if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
-                    config->device_type == DecoderContext::decodeTypeToFFmpeg(decoderContext->getType())) {
+                    config->device_type == DecoderContext::DecodeTypeToFFmpeg(decoderContext->getType())) {
                     break;
                 }
             }
@@ -166,7 +166,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
                 av_dict_set(&opts, "crop", cropString.c_str(), 0);
                 cropRequired = false;
             }
-            const uint32_t surfaces = std::max(getCodecDelay(tempCodec), tempCodec->extra_hw_frames) + 3;
+            const uint32_t surfaces = std::max(GetCodecDelay(tempCodec), tempCodec->extra_hw_frames) + 3;
             const string surfacesString = to_string(surfaces);
             av_dict_set(&opts, "surfaces", surfacesString.c_str(), 0);
         }
@@ -206,12 +206,12 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
 
     // Make the new stream
     m_bufferLength = bufferLength;
-    m_outputHost = outputHost && decoderContext.get() != nullptr;
+    m_outputHost = outputHost && (decoderContext.get() != nullptr);
     m_formatContext = move(tempFormat);
     m_index = index;
     m_codecContext = move(tempCodec);
     m_seekThreshold = seekThreshold;
-    m_noBufferFlush = noBufferFlush;
+    m_noBufferFlush = noBufferFlush && (decoderContext.get() != nullptr);
     m_frameSeekSupported = m_formatContext->iformat->read_seek2 != nullptr;
 
     // Ensure ping/pong buffers are long enough to handle the maximum number of frames a video may require
@@ -412,7 +412,7 @@ vector<std::shared_ptr<Frame>> Stream::getFrames(const vector<int64_t>& frameSeq
     vector<shared_ptr<Frame>> ret;
     const auto bufferBackup = m_bufferLength;
     for (auto i = frameSequence.cbegin(); i < frameSequence.cend(); ++i) {
-        // Max number of frames that can be reliable held at any point in time is equal to buffer length
+        // Max number of frames that can be reliably held at any point in time is equal to buffer length
         if (ret.size() >= bufferBackup) {
             break;
         }
@@ -938,22 +938,6 @@ bool Stream::processFrame(FramePtr& frame) const noexcept
     frame->best_effort_timestamp = m_lastValidTimeStamp;
     frame->pts = frame->best_effort_timestamp;
 
-    if (m_filterGraph != nullptr) {
-        StreamUtils::rescale(frame, m_codecContext->time_base, av_buffersink_get_time_base(m_filterGraph->m_sink));
-        if (!m_filterGraph->sendFrame(frame)) {
-            av_frame_unref(*frame);
-            return false;
-        }
-        if (!m_filterGraph->receiveFrame(frame)) {
-            av_frame_unref(*frame);
-            return false;
-        }
-        // Check if we actually got a new frame or we need to continue
-        if (frame->height == 0) {
-            return true;
-        }
-    }
-
     // Check type of memory pointer requested and perform a memory move
     if (m_outputHost) {
         FramePtr frame2(av_frame_alloc());
@@ -974,6 +958,22 @@ bool Stream::processFrame(FramePtr& frame) const noexcept
         frame->best_effort_timestamp = m_lastValidTimeStamp;
         frame->pts = frame->best_effort_timestamp;
     }
+
+    if (m_filterGraph != nullptr) {
+        StreamUtils::rescale(frame, m_codecContext->time_base, av_buffersink_get_time_base(m_filterGraph->m_sink));
+        if (!m_filterGraph->sendFrame(frame)) {
+            av_frame_unref(*frame);
+            return false;
+        }
+        if (!m_filterGraph->receiveFrame(frame)) {
+            av_frame_unref(*frame);
+            return false;
+        }
+        // Check if we actually got a new frame or we need to continue
+        if (frame->height == 0) {
+            return true;
+        }
+    }
     return true;
 }
 
@@ -989,7 +989,7 @@ void Stream::popFrame() noexcept
 
 int32_t Stream::getCodecDelay() const noexcept
 {
-    return getCodecDelay(m_codecContext);
+    return GetCodecDelay(m_codecContext);
 }
 
 int32_t Stream::getSeekThreshold() const noexcept
@@ -1010,7 +1010,7 @@ int32_t Stream::getSeekThreshold() const noexcept
     return static_cast<int32_t>(frames);
 }
 
-int32_t Stream::getCodecDelay(const CodecContextPtr& codec) noexcept
+int32_t Stream::GetCodecDelay(const CodecContextPtr& codec) noexcept
 {
     return std::max(((codec->codec->capabilities & AV_CODEC_CAP_DELAY) ? codec->delay : 0) + codec->has_b_frames, 1);
 }

@@ -415,7 +415,7 @@ private:
      * @param codec The codec.
      * @returns The codec delay.
      */
-    FFFRAMEREADER_NO_EXPORT static int32_t getCodecDelay(const CodecContextPtr& codec) noexcept;
+    FFFRAMEREADER_NO_EXPORT static int32_t GetCodecDelay(const CodecContextPtr& codec) noexcept;
 
     /**
      * Gets stream start time in the stream timebase.
