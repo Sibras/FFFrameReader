@@ -69,9 +69,7 @@ private:
 
     DeviceContextPtr m_deviceContext = DeviceContextPtr(nullptr);
 
-    friend const DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept;
-
-    FFFRAMEREADER_NO_EXPORT static enum AVHWDeviceType decodeTypeToFFmpeg(DecodeType type);
+    FFFRAMEREADER_NO_EXPORT static enum AVHWDeviceType DecodeTypeToFFmpeg(DecodeType type);
 
     using FormatFunction = enum AVPixelFormat (*)(struct AVCodecContext*, const enum AVPixelFormat*);
 

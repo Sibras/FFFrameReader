@@ -56,12 +56,7 @@ static enum AVPixelFormat getHardwareFormatNvdec(AVCodecContext* context, const 
     return AV_PIX_FMT_NONE;
 }
 
-const DecoderContext::DeviceContextPtr& getDeviceContext(DecoderContext* context) noexcept
-{
-    return context->m_deviceContext;
-}
-
-enum AVHWDeviceType DecoderContext::decodeTypeToFFmpeg(const DecodeType type)
+enum AVHWDeviceType DecoderContext::DecodeTypeToFFmpeg(const DecodeType type)
 {
     if (type == DecodeType::Cuda) {
         return AV_HWDEVICE_TYPE_CUDA;
@@ -114,7 +109,7 @@ DecoderContext::DecoderContext(const DecodeType type, const std::any& context, c
             deviceName = to_string(device);
         } catch (...) {
         }
-        const auto typeInternal = decodeTypeToFFmpeg(type);
+        const auto typeInternal = DecodeTypeToFFmpeg(type);
 
         // Check if we should create a custom hardware device
         if (context.has_value()) {
