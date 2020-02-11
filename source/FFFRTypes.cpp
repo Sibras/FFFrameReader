@@ -110,13 +110,21 @@ FramePtr::FramePtr(FramePtr&& other) noexcept
 
 FramePtr& FramePtr::operator=(FramePtr& other) noexcept
 {
-    m_frame = other.m_frame;
-    other.m_frame = nullptr;
+    if (m_frame != other.m_frame) {
+        if (m_frame != nullptr) {
+            av_frame_free(&m_frame);
+        }
+        m_frame = other.m_frame;
+        other.m_frame = nullptr;
+    }
     return *this;
 }
 
 FramePtr& FramePtr::operator=(FramePtr&& other) noexcept
 {
+    if (m_frame != nullptr) {
+        av_frame_free(&m_frame);
+    }
     m_frame = other.m_frame;
     other.m_frame = nullptr;
     return *this;
