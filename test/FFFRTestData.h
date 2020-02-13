@@ -41,7 +41,7 @@ static std::vector<TestParams> g_testData = {
     {"data/bbb_sunflower_1080p_30fps_normal.mp4", 1920, 1080, 16.0 / 9.0, 19034, 634466666, 30.0, 33333,
         Ffr::PixelFormat::YUV420P},
     {"data/board_game-h264.mkv", 1280, 720, 16.0 / 9.0, 50, 2000000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
-    {"data/tvl_missing_pts.avi", 2048, 2048, 1.0, 375, 15000000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
+    {"data/tvl_missing_pts.avi", 2048, 2048, 1.0, 373, 14920000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
     {"data/board_game-h264-cropped.mkv", 52, 28, 52.0 / 28.0, 50, 2000000, 25.0, 40000, Ffr::PixelFormat::YUV420P},
 #if FFFR_INTERNAL_FILES
     // These are internal testing files and are not redistributed
@@ -51,5 +51,6 @@ static std::vector<TestParams> g_testData = {
     {"data/MVI_0048.MP4", 3840, 2160, 16.0 / 9.0, 8592, 171840000, 50.0, 20000, Ffr::PixelFormat::YUV420P},
     {"data/Women_400IM_Heat2_Sony.MXF", 3840, 2160, 16.0 / 9.0, 9204, 368160000, 25.0, 40000,
         Ffr::PixelFormat::YUV420P},
+    {"data/20191007a-calib-left.mkv", 3840, 2160, 16.0 / 9.0, 2788, 55760000, 50.0, 20000, Ffr::PixelFormat::YUV420P},
 #endif
 };

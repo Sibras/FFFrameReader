@@ -222,6 +222,7 @@ Filter::Filter(const Resolution scale, const Crop crop, PixelFormat format, cons
 
 bool Filter::sendFrame(FramePtr& frame) const noexcept
 {
+    LOG_DEBUG("sendFrame- Sending frame to filter graph: ", frame->best_effort_timestamp);
     const auto err = av_buffersrc_add_frame(m_source, *frame);
     if (err < 0) {
         logInternal(LogLevel::Error, "Failed to submit frame to filter graph: ", getFfmpegErrorString(err));
@@ -241,6 +242,7 @@ bool Filter::receiveFrame(FramePtr& frame) const noexcept
         logInternal(LogLevel::Error, "Failed to receive frame from filter graph: ", getFfmpegErrorString(err));
         return false;
     }
+    LOG_DEBUG("sendFrame- Received frame from filter graph: ", frame->best_effort_timestamp);
     return true;
 }
 

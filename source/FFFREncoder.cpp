@@ -93,7 +93,8 @@ bool Encoder::encodeStream(
         getRational(StreamUtils::getSampleAspectRatio(stream.get())), stream->getPixelFormat(),
         getRational(StreamUtils::getFrameRate(stream.get())),
         stream->getDuration() -
-            (stream->m_lastDecodedTimeStamp >= 0 ? stream->timeStampToTime2(stream->m_lastDecodedTimeStamp) : 0),
+            (stream->m_lastDecodedTimeStamp != INT64_MIN ? stream->timeStampToTime2(stream->m_lastDecodedTimeStamp) :
+                                                           0),
         options.m_type, options.m_quality, options.m_preset, options.m_numThreads, options.m_gopSize,
         ConstructorLock());
     if (!encoder->isEncoderValid()) {
@@ -206,7 +207,8 @@ Encoder::Encoder(const std::string& fileName, const uint32_t width, const uint32
     // Init the muxer and write out file header
     ret = avformat_write_header(tempFormat.get(), nullptr);
     if (ret < 0) {
-        logInternal(LogLevel::Error, "Failed writing header to output file: ", fileName, ", ", getFfmpegErrorString(ret));
+        logInternal(
+            LogLevel::Error, "Failed writing header to output file: ", fileName, ", ", getFfmpegErrorString(ret));
         return;
     }
 

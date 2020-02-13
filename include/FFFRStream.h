@@ -252,13 +252,16 @@ private:
     int32_t m_index = -1; /**< Zero-based index of the video stream  */
     CodecContextPtr m_codecContext;
 
-    int64_t m_startTimeStamp = 0;        /**< PTS of the first frame in the stream time base */
-    int64_t m_startTimeStamp2 = 0;       /**< PTS of the first frame in the codec time base */
-    int64_t m_lastDecodedTimeStamp = -1; /**< The decoder time stamp of the last decoded frame */
-    int64_t m_lastValidTimeStamp = -1;   /**< The decoder time stamp of the last valid stored frame */
-    int64_t m_lastPacketTimeStamp = -1;  /**< The demuxer time stamp of the last retrieved packet */
-    int64_t m_totalFrames = 0;           /**< Stream video duration in frames */
-    int64_t m_totalDuration = 0;         /**< Stream video duration in microseconds (AV_TIME_BASE) */
+    int64_t m_startTimeStamp = 0;  /**< PTS of the first frame in the stream time base */
+    int64_t m_startTimeStamp2 = 0; /**< PTS of the first frame in the codec time base */
+    int64_t m_lastDecodedTimeStamp =
+        INT64_MIN; /**< The decoder time stamp of the last decoded frame (decoder time base) */
+    int64_t m_lastValidTimeStamp =
+        INT64_MIN; /**< The decoder time stamp of the last valid stored frame (decoder time base) */
+    int64_t m_lastPacketTimeStamp =
+        INT64_MIN;                /**< The demuxer time stamp of the last retrieved packet (stream time base) */
+    int64_t m_totalFrames = 0;    /**< Stream video duration in frames */
+    int64_t m_totalDuration = 0;  /**< Stream video duration in microseconds (AV_TIME_BASE) */
     int64_t m_seekThreshold = 0;  /**< Time stamp difference for determining if a forward seek should forward decode */
     bool m_noBufferFlush = false; /**< True to skip buffer flushing on seeks */
     bool m_frameSeekSupported = true; /**< True if frame seek supported */
@@ -365,9 +368,23 @@ private:
     /**
      * Convert codec based time stamp to stream based time stamp.
      * @param timeStamp The time stamp represented in the codecs internal time base.
-     * @return The converted frame index.
+     * @return The converted time stamp.
      */
     FFFRAMEREADER_NO_EXPORT int64_t timeStamp2ToTimeStamp(int64_t timeStamp) const noexcept;
+
+    /**
+     * Convert stream based time stamp to codec based time stamp.
+     * @param timeStamp The time stamp represented in the streams internal time base.
+     * @return The converted time stamp.
+     */
+    FFFRAMEREADER_NO_EXPORT int64_t timeStampToTimeStamp2(int64_t timeStamp) const noexcept;
+
+    /**
+     * Convert stream based time stamp to time value represented in microseconds (AV_TIME_BASE).
+     * @param timeStamp The time stamp represented in the streams internal time base.
+     * @return The converted time.
+     */
+    FFFRAMEREADER_NO_EXPORT int64_t timeStampToTimeNoOffset(int64_t timeStamp) const noexcept;
 
     /**
      * Decodes the next block of frames into the pong buffer. Once complete swaps the ping/pong buffers.
@@ -375,15 +392,14 @@ private:
      * @param seeking       (Optional) True if called directly after seeking.
      * @returns True if it succeeds, false if it fails.
      */
-    FFFRAMEREADER_NO_EXPORT bool decodeNextBlock(int64_t flushTillTime = -1, bool seeking = false) noexcept;
+    FFFRAMEREADER_NO_EXPORT bool decodeNextBlock(int64_t flushTillTime = INT64_MIN, bool seeking = false) noexcept;
 
     /**
      * Decodes any frames currently pending in the decoder.
      * @param [in,out] flushTillTime All frames with decoder time stamps before this will be discarded.
-     * @param          flushCheck    True to wait for no buffer flush packet to be received.
      * @returns True if it succeeds, false if it fails.
      */
-    FFFRAMEREADER_NO_EXPORT bool decodeNextFrames(int64_t& flushTillTime, bool& flushCheck) noexcept;
+    FFFRAMEREADER_NO_EXPORT bool decodeNextFrames(int64_t& flushTillTime) noexcept;
 
     /**
      * Process a frame with any required additional filtering/conversion.
@@ -425,10 +441,10 @@ private:
     FFFRAMEREADER_NO_EXPORT int64_t getStreamStartTime() const noexcept;
 
     /**
-     * Gets total number of frames in a stream.
-     * @returns The stream frames.
+     * Gets total number of frames and the duration of a stream represented in microseconds.
+     * @returns The stream frames and duration.
      */
-    FFFRAMEREADER_NO_EXPORT int64_t getStreamFrames() const noexcept;
+    FFFRAMEREADER_NO_EXPORT std::pair<int64_t, int64_t> getStreamFramesDuration() const noexcept;
 
     /**
      * Gets the duration of a stream represented in microseconds (AV_TIME_BASE).

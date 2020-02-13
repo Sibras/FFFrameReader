@@ -102,30 +102,31 @@ TEST_P(SeekTest1, seekLoop)
     constexpr uint32_t seekJump = 40;
     constexpr uint32_t numLoops = 5;
     constexpr uint32_t numFrames = 25;
-    if (std::get<1>(GetParam()).m_totalFrames >= numLoops * (seekJump + numFrames)) {
-        double timeStamp1 = 0.0;
-        int64_t time1 = 0;
-        // Perform multiple forward seeks
-        for (uint32_t i = 0; i < numLoops; i++) {
-            ASSERT_TRUE(m_stream->seek(time1));
-            // Check that multiple sequential frames can be read
-            int64_t time2 = time1;
-            for (uint32_t j = 0; j < numFrames; j++) {
-                const auto frame1 = m_stream->getNextFrame();
-                // Allow EOF
-                if (frame1 == nullptr && m_stream->isEndOfFile()) {
-                    return;
-                }
-                ASSERT_NE(frame1, nullptr);
-                ASSERT_EQ(frame1->getTimeStamp(), time2);
-                const double timeStamp2 =
-                    timeStamp1 + (static_cast<double>(j + 1) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-                time2 = llround(timeStamp2);
-            }
-            timeStamp1 = (static_cast<double>(i + 1) * static_cast<double>(seekJump) *
-                (1000000.0 / std::get<1>(GetParam()).m_frameRate));
-            time1 = llround(timeStamp1);
+    double timeStamp1 = 0.0;
+    int64_t time1 = 0;
+    // Perform multiple forward seeks
+    for (uint32_t i = 0; i < numLoops; i++) {
+        if (time1 >= std::get<1>(GetParam()).m_duration) {
+            return;
         }
+        ASSERT_TRUE(m_stream->seek(time1));
+        // Check that multiple sequential frames can be read
+        int64_t time2 = time1;
+        for (uint32_t j = 0; j < numFrames; j++) {
+            const auto frame1 = m_stream->getNextFrame();
+            // Allow EOF
+            if (frame1 == nullptr && m_stream->isEndOfFile()) {
+                return;
+            }
+            ASSERT_NE(frame1, nullptr);
+            ASSERT_EQ(frame1->getTimeStamp(), time2);
+            const double timeStamp2 =
+                timeStamp1 + (static_cast<double>(j + 1) * (1000000.0 / std::get<1>(GetParam()).m_frameRate));
+            time2 = llround(timeStamp2);
+        }
+        timeStamp1 = (static_cast<double>(i + 1) * static_cast<double>(seekJump) *
+            (1000000.0 / std::get<1>(GetParam()).m_frameRate));
+        time1 = llround(timeStamp1);
     }
 }
 
@@ -152,25 +153,26 @@ TEST_P(SeekTest1, seekFrameLoop)
     constexpr uint32_t seekJump = 40;
     constexpr uint32_t numLoops = 5;
     constexpr uint32_t numFrames = 25;
-    if (std::get<1>(GetParam()).m_totalFrames >= numLoops * (seekJump + numFrames)) {
-        int64_t frame = 0;
-        // Perform multiple forward seeks
-        for (uint32_t i = 0; i < numLoops; i++) {
-            ASSERT_TRUE(m_stream->seekFrame(frame));
-            // Check that multiple sequential frames can be read
-            int64_t frame2 = frame;
-            for (uint32_t j = 0; j < numFrames; j++) {
-                const auto frame1 = m_stream->getNextFrame();
-                // Allow EOF
-                if (frame1 == nullptr && m_stream->isEndOfFile()) {
-                    return;
-                }
-                ASSERT_NE(frame1, nullptr);
-                ASSERT_EQ(frame1->getFrameNumber(), frame2);
-                ++frame2;
-            }
-            frame += seekJump;
+    int64_t frame = 0;
+    // Perform multiple forward seeks
+    for (uint32_t i = 0; i < numLoops; i++) {
+        if (frame >= std::get<1>(GetParam()).m_totalFrames) {
+            return;
         }
+        ASSERT_TRUE(m_stream->seekFrame(frame));
+        // Check that multiple sequential frames can be read
+        int64_t frame2 = frame;
+        for (uint32_t j = 0; j < numFrames; j++) {
+            const auto frame1 = m_stream->getNextFrame();
+            // Allow EOF
+            if (frame1 == nullptr && m_stream->isEndOfFile()) {
+                return;
+            }
+            ASSERT_NE(frame1, nullptr);
+            ASSERT_EQ(frame1->getFrameNumber(), frame2);
+            ++frame2;
+        }
+        frame += seekJump;
     }
 }
 

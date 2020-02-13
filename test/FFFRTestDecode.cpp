@@ -54,6 +54,12 @@ static std::vector<TestParamsDecode> g_testDataDecode = {
     {0, true, true, true, true, 1},
     {0, true, true, false, true, 10},
     {0, true, true, true, true, 10},
+#   if FFFR_INTERNAL_FILES
+    {8, true, true, false, true, 1},
+    {8, true, true, true, true, 1},
+    {8, true, true, false, true, 10},
+    {8, true, true, true, true, 10},
+#   endif
 #endif
 };
 
@@ -200,27 +206,59 @@ TEST_P(DecodeTest1, seekFrame1Loop)
 {
     // Seek to start
     ASSERT_TRUE(m_decoder.m_stream->seekFrame(0));
+    ASSERT_NE(m_decoder.m_stream->getNextFrame(), nullptr);
     constexpr uint32_t numLoops = 5;
     constexpr uint32_t numFrames = 25;
-    if (g_testData[GetParam().m_testDataIndex].m_totalFrames >= numLoops * (1 + numFrames)) {
-        int64_t frame = 0;
-        // Perform multiple forward seeks
-        for (uint32_t i = 0; i < numLoops; i++) {
-            ASSERT_TRUE(m_decoder.m_stream->seekFrame(frame));
-            // Check that multiple sequential frames can be read
-            int64_t frame2 = frame;
-            for (uint32_t j = 0; j < numFrames; j++) {
-                const auto frame1 = m_decoder.m_stream->getNextFrame();
-                // Allow EOF
-                if (frame1 == nullptr && m_decoder.m_stream->isEndOfFile()) {
-                    return;
-                }
-                ASSERT_NE(frame1, nullptr);
-                ASSERT_EQ(frame1->getFrameNumber(), frame2);
-                ++frame2;
-            }
-            frame += 1;
+    int64_t frame = 0;
+    // Perform multiple forward seeks
+    for (uint32_t i = 0; i < numLoops; i++) {
+        if (frame >= g_testData[GetParam().m_testDataIndex].m_totalFrames) {
+            return;
         }
+        ASSERT_TRUE(m_decoder.m_stream->seekFrame(frame));
+        // Check that multiple sequential frames can be read
+        int64_t frame2 = frame;
+        for (uint32_t j = 0; j < numFrames; j++) {
+            const auto frame1 = m_decoder.m_stream->getNextFrame();
+            // Allow EOF
+            if (frame1 == nullptr && m_decoder.m_stream->isEndOfFile()) {
+                return;
+            }
+            ASSERT_NE(frame1, nullptr);
+            ASSERT_EQ(frame1->getFrameNumber(), frame2);
+            ++frame2;
+        }
+        frame += 1;
+    }
+}
+
+TEST_P(DecodeTest1, seekFrame25Loop)
+{
+    // Seek to start
+    ASSERT_TRUE(m_decoder.m_stream->seekFrame(0));
+    ASSERT_NE(m_decoder.m_stream->getNextFrame(), nullptr);
+    constexpr uint32_t numLoops = 5;
+    constexpr uint32_t numFrames = 5;
+    int64_t frame = 0;
+    // Perform multiple forward seeks
+    for (uint32_t i = 0; i < numLoops; i++) {
+        if (frame >= g_testData[GetParam().m_testDataIndex].m_totalFrames) {
+            return;
+        }
+        ASSERT_TRUE(m_decoder.m_stream->seekFrame(frame));
+        // Check that multiple sequential frames can be read
+        int64_t frame2 = frame;
+        for (uint32_t j = 0; j < numFrames; j++) {
+            const auto frame1 = m_decoder.m_stream->getNextFrame();
+            // Allow EOF
+            if (frame1 == nullptr && m_decoder.m_stream->isEndOfFile()) {
+                return;
+            }
+            ASSERT_NE(frame1, nullptr);
+            ASSERT_EQ(frame1->getFrameNumber(), frame2);
+            ++frame2;
+        }
+        frame += 25;
     }
 }
 

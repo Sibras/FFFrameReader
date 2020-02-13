@@ -25,6 +25,10 @@ extern "C" {
 #include <libavutil/rational.h>
 }
 
+#ifndef DEBUG_LOGGING
+#    define DEBUG_LOGGING 0 // Define to 1 to enable debug logging
+#endif
+
 namespace Ffr {
 /**
  * Gets ffmpeg error string.
@@ -78,4 +82,10 @@ FFFRAMEREADER_NO_EXPORT void logInternal(const LogLevel level, Args... args) noe
     } catch (...) {
     }
 }
+
+#if DEBUG_LOGGING
+#    define LOG_DEBUG(...) logInternal(LogLevel::Quiet, __VA_ARGS__)
+#else
+#    define LOG_DEBUG(...)
+#endif
 } // namespace Ffr
