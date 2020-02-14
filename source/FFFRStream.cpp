@@ -998,12 +998,10 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
         return true;
     }
     if (m_bufferPong.size() >= m_bufferLength || eof) {
-        if (flushAllFrames) {
-            // Sort the output frames buffer to ensure correct ordering
-            sort(m_bufferPong.begin(), m_bufferPong.end(), [](const shared_ptr<Frame>& a, const shared_ptr<Frame>& b) {
-                return a->getTimeStamp() < b->getTimeStamp();
-            });
-        }
+        // Sort the output frames buffer to ensure correct ordering
+        sort(m_bufferPong.begin(), m_bufferPong.end(), [](const shared_ptr<Frame>& a, const shared_ptr<Frame>& b) {
+            return a->getTimeStamp() < b->getTimeStamp();
+        });
 
         auto bufferLength = m_bufferPong.size();
         auto previousTimeStamp = m_lastValidTimeStamp;
@@ -1043,26 +1041,30 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
             }
         }
 
-        if (bufferLength != m_bufferPong.size()) {
-            // Sort the output frames buffer to ensure correct ordering in case new frames were added
-            sort(m_bufferPong.begin(), m_bufferPong.end(), [](const shared_ptr<Frame>& a, const shared_ptr<Frame>& b) {
-                return a->getTimeStamp() < b->getTimeStamp();
-            });
-        }
-
-        auto it = m_bufferPong.begin();
-        while (it < m_bufferPong.end()) {
-            // Perform any required filtering
-            if (!processFrame(it->get()->m_frame)) {
-                return false;
+        // If frames were removed then skip processing until a full frame buffer or eof
+        if (m_bufferPong.size() >= m_bufferLength || eof) {
+            if (bufferLength != m_bufferPong.size()) {
+                // Sort the output frames buffer to ensure correct ordering in case new frames were added
+                sort(m_bufferPong.begin(), m_bufferPong.end(),
+                    [](const shared_ptr<Frame>& a, const shared_ptr<Frame>& b) {
+                        return a->getTimeStamp() < b->getTimeStamp();
+                    });
             }
-            if (it->get()->m_frame->height != 0) {
-                m_lastValidTimeStamp = it->get()->m_frame->best_effort_timestamp;
-                ++it;
-            } else {
-                LOG_DEBUG("decodeNextFrames- Dropping invalid frame: ", it->get()->m_frame->best_effort_timestamp, ", ",
-                    it->get()->getTimeStamp());
-                m_bufferPong.erase(it);
+
+            auto it = m_bufferPong.begin();
+            while (it < m_bufferPong.end()) {
+                // Perform any required filtering
+                if (!processFrame(it->get()->m_frame)) {
+                    return false;
+                }
+                if (it->get()->m_frame->height != 0) {
+                    m_lastValidTimeStamp = it->get()->m_frame->best_effort_timestamp;
+                    ++it;
+                } else {
+                    LOG_DEBUG("decodeNextFrames- Dropping invalid frame: ", it->get()->m_frame->best_effort_timestamp,
+                        ", ", it->get()->getTimeStamp());
+                    m_bufferPong.erase(it);
+                }
             }
         }
     }

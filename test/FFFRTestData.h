@@ -52,5 +52,7 @@ static std::vector<TestParams> g_testData = {
     {"data/Women_400IM_Heat2_Sony.MXF", 3840, 2160, 16.0 / 9.0, 9204, 368160000, 25.0, 40000,
         Ffr::PixelFormat::YUV420P},
     {"data/20191007a-calib-left.mkv", 3840, 2160, 16.0 / 9.0, 2788, 55760000, 50.0, 20000, Ffr::PixelFormat::YUV420P},
+    {"data/M100FS_Final_WorldChampionshipTrials2019.mp4", 3840, 2160, 16.0 / 9.0, 3960, 79200000, 50.0, 20000,
+        Ffr::PixelFormat::YUV420P},
 #endif
 };

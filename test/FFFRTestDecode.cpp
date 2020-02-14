@@ -49,17 +49,21 @@ static std::vector<TestParamsDecode> g_testDataDecode = {
     {2, false, false, true, true, 1},
     {0, true, false, false, true, 1},
     {0, true, false, true, true, 1},
+    {1, true, false, false, true, 1},
+    {1, true, false, false, true, 10},
+    {2, true, false, false, true, 1},
+    {2, true, false, false, true, 10},
+#if FFFR_INTERNAL_FILES
+    {8, true, false, false, true, 1},
+    {8, true, false, false, true, 10},
+    {9, true, false, false, true, 1},
+    {9, true, false, false, true, 10},
+#endif
 #if FFFR_BUILD_CUDA
     {0, true, true, false, true, 1},
     {0, true, true, true, true, 1},
     {0, true, true, false, true, 10},
     {0, true, true, true, true, 10},
-#   if FFFR_INTERNAL_FILES
-    {8, true, true, false, true, 1},
-    {8, true, true, true, true, 1},
-    {8, true, true, false, true, 10},
-    {8, true, true, true, true, 10},
-#   endif
 #endif
 };
 
