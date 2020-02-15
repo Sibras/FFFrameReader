@@ -999,22 +999,26 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
     }
     if (m_bufferPong.size() >= m_bufferLength || eof) {
         // Sort the output frames buffer to ensure correct ordering
-        sort(m_bufferPong.begin(), m_bufferPong.end(), [](const shared_ptr<Frame>& a, const shared_ptr<Frame>& b) {
-            return a->getTimeStamp() < b->getTimeStamp();
-        });
+        stable_sort(
+            m_bufferPong.begin(), m_bufferPong.end(), [](const shared_ptr<Frame>& a, const shared_ptr<Frame>& b) {
+                return a->getTimeStamp() < b->getTimeStamp();
+            });
 
-        auto bufferLength = m_bufferPong.size();
         auto previousTimeStamp = m_lastValidTimeStamp;
-        for (size_t j = 0; j < bufferLength; ++j) {
+        for (size_t j = 0; j < m_bufferPong.size(); ++j) {
             if (previousTimeStamp != INT64_MIN) {
                 // Check for duplicated frames
                 const auto previous = timeStampToFrame2(previousTimeStamp);
                 if (m_bufferPong[j]->getFrameNumber() == previous) {
                     LOG_DEBUG("decodeNextFrames- Deleting duplicated frames: ",
                         m_bufferPong[j]->m_frame->best_effort_timestamp, ", ", m_bufferPong[j]->getTimeStamp());
-                    m_bufferPong.erase(m_bufferPong.begin() + j);
+                    if (j != 0) {
+                        // Keep the last received of the duplicate frames
+                        m_bufferPong.erase(m_bufferPong.begin() + j - 1);
+                    } else {
+                        m_bufferPong.erase(m_bufferPong.begin() + j);
+                    }
                     --j;
-                    --bufferLength;
                     continue;
                 }
                 previousTimeStamp = m_bufferPong[j]->m_frame->best_effort_timestamp;
@@ -1023,17 +1027,15 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
                 if (m_bufferPong[j]->getFrameNumber() != previous + 1) {
                     LOG_DEBUG("decodeNextFrames- Skipped frames detected");
                     // Fill in missing frames by duplicating the old one
-                    auto fillFrameNum = previous;
                     for (auto i = previous + 1; i < m_bufferPong[j]->getFrameNumber(); i++) {
-                        ++fillFrameNum;
-                        int64_t fillTimeStamp = frameToTime2(fillFrameNum);
+                        int64_t fillTimeStamp = frameToTime2(i);
                         FramePtr frameClone(av_frame_clone(*m_bufferPong[j]->m_frame));
                         frameClone->best_effort_timestamp = timeToTimeStamp2(fillTimeStamp);
                         frameClone->pts = frameClone->best_effort_timestamp;
                         previousTimeStamp = frameClone->best_effort_timestamp;
                         LOG_DEBUG("decodeNextFrames- Adding missing frame: ", fillTimeStamp);
-                        m_bufferPong.emplace_back(make_shared<Frame>(
-                            frameClone, fillTimeStamp, fillFrameNum, m_formatContext, m_codecContext));
+                        m_bufferPong.insert(m_bufferPong.begin() + j++,
+                            make_shared<Frame>(frameClone, fillTimeStamp, i, m_formatContext, m_codecContext));
                     }
                 }
             } else {
@@ -1043,14 +1045,6 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
 
         // If frames were removed then skip processing until a full frame buffer or eof
         if (m_bufferPong.size() >= m_bufferLength || eof) {
-            if (bufferLength != m_bufferPong.size()) {
-                // Sort the output frames buffer to ensure correct ordering in case new frames were added
-                sort(m_bufferPong.begin(), m_bufferPong.end(),
-                    [](const shared_ptr<Frame>& a, const shared_ptr<Frame>& b) {
-                        return a->getTimeStamp() < b->getTimeStamp();
-                    });
-            }
-
             auto it = m_bufferPong.begin();
             while (it < m_bufferPong.end()) {
                 // Perform any required filtering
