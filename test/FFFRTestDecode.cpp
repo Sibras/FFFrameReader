@@ -32,38 +32,47 @@ struct TestParamsDecode
     bool m_outputToHost;
     bool m_noBufferFlush;
     uint32_t m_bufferLength;
+    bool m_resize;
 };
 
 static std::vector<TestParamsDecode> g_testDataDecode = {
-    {0, false, false, true, false, 1},
-    {1, false, false, true, false, 1},
-    {2, false, false, true, false, 1},
-    {0, true, false, false, false, 1},
-    {0, true, false, true, false, 1},
+    {0, false, false, true, false, 1, false},
+    {1, false, false, true, false, 1, false},
+    {2, false, false, true, false, 1, false},
+    {0, true, false, false, false, 1, false},
+    {0, true, false, true, false, 1, false},
+    {0, true, false, false, false, 1, true},
+    {0, true, false, true, false, 1, true},
 #if FFFR_BUILD_CUDA
-    {0, true, true, false, false, 1},
-    {0, true, true, true, false, 1},
+    {0, true, true, false, false, 1, false},
+    {0, true, true, true, false, 1, false},
 #endif
-    {0, false, false, true, true, 1},
-    {1, false, false, true, true, 1},
-    {2, false, false, true, true, 1},
-    {0, true, false, false, true, 1},
-    {0, true, false, true, true, 1},
-    {1, true, false, false, true, 1},
-    {1, true, false, false, true, 10},
-    {2, true, false, false, true, 1},
-    {2, true, false, false, true, 10},
+    {0, false, false, true, true, 1, false},
+    {1, false, false, true, true, 1, false},
+    {2, false, false, true, true, 1, false},
+    {0, true, false, false, true, 1, false},
+    {0, true, false, true, true, 1, false},
+    {1, true, false, false, true, 1, false},
+    {1, true, false, false, true, 10, false},
+    {2, true, false, false, true, 1, false},
+    {2, true, false, false, true, 10, false},
+    {1, true, false, false, true, 1, true},
+    {2, true, false, false, true, 10, true},
 #if FFFR_INTERNAL_FILES
-    {8, true, false, false, true, 1},
-    {8, true, false, false, true, 10},
-    {9, true, false, false, true, 1},
-    {9, true, false, false, true, 10},
+    {8, true, false, false, true, 1, false},
+    {8, true, false, false, true, 10, false},
+    {9, true, false, false, true, 1, false},
+    {9, true, false, false, true, 10, false},
+    {8, true, false, false, true, 1, true},
+    {8, true, false, false, true, 10, true},
+    {9, true, false, false, true, 1, true},
+    {9, true, false, false, true, 10, true},
 #endif
 #if FFFR_BUILD_CUDA
-    {0, true, true, false, true, 1},
-    {0, true, true, true, true, 1},
-    {0, true, true, false, true, 10},
-    {0, true, true, true, true, 10},
+    {0, true, true, false, true, 1, false},
+    {0, true, true, true, true, 1, false},
+    {0, true, true, false, true, 10, false},
+    {0, true, true, true, true, 10, false},
 #endif
 };
 
@@ -101,6 +110,9 @@ public:
                 options.m_context = m_cudaContext;
             }
 #endif
+            if (params.m_resize) {
+                options.m_scale = {1280, 720};
+            }
         }
         options.m_outputHost = params.m_outputToHost;
         options.m_noBufferFlush = params.m_noBufferFlush;

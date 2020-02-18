@@ -35,9 +35,9 @@ extern "C" {
 }
 
 namespace Ffr {
-Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seekThreshold, bool noBufferFlush,
-    const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost, Crop crop, Resolution scale,
-    PixelFormat format, ConstructorLock) noexcept
+Stream::Stream(const std::string& fileName, uint32_t bufferLength, const uint32_t seekThreshold, bool noBufferFlush,
+    const std::shared_ptr<DecoderContext>& decoderContext, const bool outputHost, Crop crop, const Resolution scale,
+    const PixelFormat format, ConstructorLock) noexcept
 {
     // Open the input file
     AVFormatContext* formatPtr = nullptr;
@@ -103,6 +103,7 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, uint32_t seek
                 logInternal(LogLevel::Error, "Requested hardware decoding not supported for file: ", fileName);
                 return;
             }
+            noBufferFlush = false; // Cant use fast seek with the older cuvid decoder
             logInternal(LogLevel::Info, "Stream- Using decoder: cuvid");
         } else {
             // Check if required codec is supported
@@ -766,30 +767,21 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
             LOG_DEBUG("decodeNextBlock- Discarding empty packet");
             continue;
         } else if (m_index == packet.stream_index) {
-            auto packetTimeStamp = getPacketTimeStamp(packet);
+            const auto packetTimeStamp = getPacketTimeStamp(packet);
             LOG_DEBUG("decodeNextBlock- Received packet: ", packetTimeStamp, ", ", timeStampToTime(packetTimeStamp));
             if (seeking) {
-                seeking = false;
                 // Check if a seek went backwards when it should have gone forward
                 if (flushTillTime > m_lastDecodedTimeStamp && m_lastPacketTimeStamp > packetTimeStamp) {
-                    LOG_DEBUG("decodeNextBlock- Backward seek detected");
-                    while (m_lastPacketTimeStamp > packetTimeStamp || m_index != packet.stream_index) {
-                        LOG_DEBUG("decodeNextBlock- Skipping packet: ", packetTimeStamp, ", ",
-                            timeStampToTime(packetTimeStamp));
-                        av_packet_unref(&packet);
-                        ret = av_read_frame(m_formatContext.get(), &packet);
-                        if (ret < 0) {
-                            av_packet_unref(&packet);
-                            logInternal(LogLevel::Error, "Failed to retrieve new packet: ", getFfmpegErrorString(ret));
-                            return false;
-                        }
-                        packetTimeStamp = getPacketTimeStamp(packet);
-                        LOG_DEBUG("decodeNextBlock- Received packet: ", packetTimeStamp, ", ",
-                            timeStampToTime(packetTimeStamp));
-                    }
                     av_packet_unref(&packet);
-                    LOG_DEBUG(
-                        "decodeNextBlock- Skipping packet: ", packetTimeStamp, ", ", timeStampToTime(packetTimeStamp));
+                    LOG_DEBUG("decodeNextBlock- Backward seek detected. Skipping packet: ", packetTimeStamp, ", ",
+                        timeStampToTime(packetTimeStamp));
+                    continue;
+                }
+                seeking = false;
+                if (flushTillTime > m_lastDecodedTimeStamp && m_lastPacketTimeStamp == packetTimeStamp) {
+                    // Don't flush buffers as we can just continue to decode from current location
+                    LOG_DEBUG("decodeNextBlock- Continuing decode instead of seek: ", packetTimeStamp, ", ",
+                        timeStampToTime(packetTimeStamp));
                     continue;
                 }
                 if (!m_noBufferFlush) {
@@ -800,6 +792,7 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
                 m_lastValidTimeStamp = INT64_MIN;
             }
             m_lastPacketTimeStamp = packetTimeStamp;
+
             // Convert timebase
             av_packet_rescale_ts(&packet, m_formatContext->streams[m_index]->time_base, m_codecContext->time_base);
             ret = avcodec_send_packet(m_codecContext.get(), &packet);
@@ -840,6 +833,10 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
         // If more than that are passed without a returned frame then an error has occured (ignoring flushTillTime).
     } while ((m_bufferPong.size() < m_bufferLength || flushTillTime >= 0) && !eof);
 
+    if (!processFrames()) {
+        return false;
+    }
+
     if (eof) {
         // Check if we got more frames than we should have. This occurs when there are missing frames that are
         // padded in resulting in more output frames than expected.
@@ -857,13 +854,12 @@ bool Stream::decodeNextBlock(int64_t flushTillTime, bool seeking) noexcept
     swap(m_bufferPing, m_bufferPong);
 
     return true;
-} // namespace Ffr
+}
 
 bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
 {
     // Loop through and retrieve all decoded frames
     bool flushAllFrames = false;
-    bool eof = false;
     do {
         if (*m_tempFrame == nullptr) {
             m_tempFrame = FramePtr(av_frame_alloc());
@@ -875,9 +871,6 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
         const auto ret = avcodec_receive_frame(m_codecContext.get(), *m_tempFrame);
         if (ret < 0) {
             if ((ret == AVERROR(EAGAIN)) || (ret == AVERROR_EOF)) {
-                if (ret == AVERROR_EOF) {
-                    eof = true;
-                }
                 LOG_DEBUG("decodeNextFrames- Decoder returned EAGAIN/EOF");
                 break;
             }
@@ -991,77 +984,71 @@ bool Stream::decodeNextFrames(int64_t& flushTillTime) noexcept
             make_shared<Frame>(m_tempFrame, timeStamp, frameNum, m_formatContext, m_codecContext));
     } while (m_bufferPong.size() < m_bufferLength || flushAllFrames);
 
-    if (m_bufferPong.empty()) {
-        return true;
-    }
-    if (flushTillTime >= 0) {
-        return true;
-    }
-    if (m_bufferPong.size() >= m_bufferLength || eof) {
-        // Sort the output frames buffer to ensure correct ordering
-        stable_sort(
-            m_bufferPong.begin(), m_bufferPong.end(), [](const shared_ptr<Frame>& a, const shared_ptr<Frame>& b) {
-                return a->getTimeStamp() < b->getTimeStamp();
-            });
+    return true;
+}
 
-        auto previousTimeStamp = m_lastValidTimeStamp;
-        for (size_t j = 0; j < m_bufferPong.size(); ++j) {
-            if (previousTimeStamp != INT64_MIN) {
-                // Check for duplicated frames
-                const auto previous = timeStampToFrame2(previousTimeStamp);
-                if (m_bufferPong[j]->getFrameNumber() == previous) {
-                    LOG_DEBUG("decodeNextFrames- Deleting duplicated frames: ",
-                        m_bufferPong[j]->m_frame->best_effort_timestamp, ", ", m_bufferPong[j]->getTimeStamp());
-                    if (j != 0) {
-                        // Keep the last received of the duplicate frames
-                        m_bufferPong.erase(m_bufferPong.begin() + j - 1);
-                    } else {
-                        m_bufferPong.erase(m_bufferPong.begin() + j);
-                    }
-                    --j;
-                    continue;
-                }
-                previousTimeStamp = m_bufferPong[j]->m_frame->best_effort_timestamp;
+bool Stream::processFrames() noexcept
+{
+    // Sort the output frames buffer to ensure correct ordering
+    stable_sort(m_bufferPong.begin(), m_bufferPong.end(),
+        [](const shared_ptr<Frame>& a, const shared_ptr<Frame>& b) { return a->getTimeStamp() < b->getTimeStamp(); });
 
-                // Check if we have skipped a frame
-                if (m_bufferPong[j]->getFrameNumber() != previous + 1) {
-                    LOG_DEBUG("decodeNextFrames- Skipped frames detected");
-                    // Fill in missing frames by duplicating the old one
-                    for (auto i = previous + 1; i < m_bufferPong[j]->getFrameNumber(); i++) {
-                        int64_t fillTimeStamp = frameToTime2(i);
-                        FramePtr frameClone(av_frame_clone(*m_bufferPong[j]->m_frame));
-                        frameClone->best_effort_timestamp = timeToTimeStamp2(fillTimeStamp);
-                        frameClone->pts = frameClone->best_effort_timestamp;
-                        previousTimeStamp = frameClone->best_effort_timestamp;
-                        LOG_DEBUG("decodeNextFrames- Adding missing frame: ", fillTimeStamp);
-                        m_bufferPong.insert(m_bufferPong.begin() + j++,
-                            make_shared<Frame>(frameClone, fillTimeStamp, i, m_formatContext, m_codecContext));
-                    }
-                }
-            } else {
-                previousTimeStamp = m_bufferPong[j]->m_frame->best_effort_timestamp;
-            }
-        }
-
-        // If frames were removed then skip processing until a full frame buffer or eof
-        if (m_bufferPong.size() >= m_bufferLength || eof) {
-            auto it = m_bufferPong.begin();
-            while (it < m_bufferPong.end()) {
-                // Perform any required filtering
-                if (!processFrame(it->get()->m_frame)) {
-                    return false;
-                }
-                if (it->get()->m_frame->height != 0) {
-                    m_lastValidTimeStamp = it->get()->m_frame->best_effort_timestamp;
-                    ++it;
+    auto previousTimeStamp = m_lastValidTimeStamp;
+    for (size_t j = 0; j < m_bufferPong.size(); ++j) {
+        if (previousTimeStamp != INT64_MIN) {
+            // Check for duplicated frames
+            const auto previous = timeStampToFrame2(previousTimeStamp);
+            if (m_bufferPong[j]->getFrameNumber() == previous) {
+                LOG_DEBUG("decodeNextFrames- Deleting duplicated frames: ",
+                    m_bufferPong[j]->m_frame->best_effort_timestamp, ", ", m_bufferPong[j]->getTimeStamp());
+                if (j != 0) {
+                    // Keep the last received of the duplicate frames
+                    m_bufferPong.erase(m_bufferPong.begin() + j - 1);
                 } else {
-                    LOG_DEBUG("decodeNextFrames- Dropping invalid frame: ", it->get()->m_frame->best_effort_timestamp,
-                        ", ", it->get()->getTimeStamp());
-                    m_bufferPong.erase(it);
+                    m_bufferPong.erase(m_bufferPong.begin() + j);
                 }
+                --j;
+                continue;
             }
+            previousTimeStamp = m_bufferPong[j]->m_frame->best_effort_timestamp;
+
+            // Check if we have skipped a frame
+            if (m_bufferPong[j]->getFrameNumber() != previous + 1) {
+                LOG_DEBUG("decodeNextFrames- Skipped frames detected");
+                // Fill in missing frames by duplicating the old one
+                for (auto i = previous + 1; i < m_bufferPong[j]->getFrameNumber(); i++) {
+                    int64_t fillTimeStamp = frameToTime2(i);
+                    FramePtr frameClone(av_frame_clone(*m_bufferPong[j]->m_frame));
+                    frameClone->best_effort_timestamp = timeToTimeStamp2(fillTimeStamp);
+                    frameClone->pts = frameClone->best_effort_timestamp;
+                    previousTimeStamp = frameClone->best_effort_timestamp;
+                    LOG_DEBUG("decodeNextFrames- Adding missing frame: ", fillTimeStamp);
+                    m_bufferPong.insert(m_bufferPong.begin() + j++,
+                        make_shared<Frame>(frameClone, fillTimeStamp, i, m_formatContext, m_codecContext));
+                }
+                --j;
+            }
+        } else {
+            previousTimeStamp = m_bufferPong[j]->m_frame->best_effort_timestamp;
         }
     }
+
+    auto it = m_bufferPong.begin();
+    while (it < m_bufferPong.end()) {
+        // Perform any required filtering
+        if (!processFrame(it->get()->m_frame)) {
+            return false;
+        }
+        if (it->get()->m_frame->height != 0) {
+            m_lastValidTimeStamp = it->get()->m_frame->best_effort_timestamp;
+            ++it;
+        } else {
+            LOG_DEBUG("decodeNextFrames- Dropping invalid frame: ", it->get()->m_frame->best_effort_timestamp, ", ",
+                it->get()->getTimeStamp());
+            m_bufferPong.erase(it);
+        }
+    }
+
     return true;
 }
 

@@ -402,6 +402,12 @@ private:
     FFFRAMEREADER_NO_EXPORT bool decodeNextFrames(int64_t& flushTillTime) noexcept;
 
     /**
+     * Process all buffered with any required additional filtering/conversion.
+     * @returns True if it succeeds, false if it fails.
+     */
+    FFFRAMEREADER_NO_EXPORT bool processFrames() noexcept;
+
+    /**
      * Process a frame with any required additional filtering/conversion.
      * @param [in,out] frame The frame.
      * @returns True if it succeeds, false if it fails.
