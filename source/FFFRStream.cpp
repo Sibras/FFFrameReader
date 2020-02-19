@@ -170,9 +170,6 @@ Stream::Stream(const std::string& fileName, uint32_t bufferLength, const uint32_
                 cropRequired = false;
                 logInternal(LogLevel::Info, "Stream- Using cuvid cropping: ", crop.m_top, ", ", crop.m_left);
             }
-            const uint32_t surfaces = std::max(GetCodecDelay(tempCodec), tempCodec->extra_hw_frames) + 3;
-            const string surfacesString = to_string(surfaces);
-            av_dict_set(&opts, "surfaces", surfacesString.c_str(), 0);
         }
     } else {
         av_dict_set(&opts, "threads", "auto", 0);
